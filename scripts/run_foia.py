@@ -152,5 +152,44 @@ def main():
         doc.save(word_path)
         print(f"📄 Word document saved: {word_path}")
 
-if __name__ == "__main__":
-    main()
+def run_foia(df):
+    output_paths = []
+    for _, row in df.iterrows():
+        client_id = str(row['Client ID'])
+        abbreviation = str(row.get('Defendant Abbreviation', ''))
+        filename_base = f"FOIA Request to {abbreviation} ({client_id})"
+
+        try:
+            bullet_points = generate_bullet_points(
+                case_synopsis=row.get('Case Synopsis', ''),
+                potential_requests=row.get('Potential Requests', ''),
+                explicit_instructions=row.get('Explicit instructions', ''),
+                case_type=row.get('Case Type', ''),
+                facility=row.get('Facility or System', ''),
+                defendant_role=row.get('Defendant Role', '')
+            )
+            synopsis = generate_synopsis(row.get('Case Synopsis', ''))
+        except Exception as e:
+            print(f"❌ OpenAI failed for {client_id}: {e}")
+            continue
+
+        context = {
+            'client_id': client_id,
+            'date': date.today().strftime("%B %d, %Y"),
+            'defendant_name': str(row.get('Defendant Name', '')),
+            'defendant_line1': str(row.get('Defendant Line 1 (address)', '')),
+            'defendant_line2': str(row.get('Defendant Line 2 (City,state, zip)', '')),
+            'doi': str(row.get('DOI', '')),
+            'location': str(row.get('location of incident', '')),
+            'synopsis': synopsis,
+            'foia_request_bullet_points': bullet_points
+        }
+
+        word_path = os.path.join(OUTPUT_FOLDER, f"{filename_base}.docx")
+        doc = fill_template(context, TEMPLATE_FILE)
+        doc.save(word_path)
+        output_paths.append(word_path)
+        print(f"📄 Word document saved: {word_path}")
+    
+    return output_paths
+
