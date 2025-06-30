@@ -93,38 +93,49 @@ if tool == "📬 FOIA Requests":
 
         submitted = st.form_submit_button("Generate FOIA Letter")
 
-    if submitted:
-        try:
-            df = pd.DataFrame([{
-                "Client ID": client_id,
-                "Defendant Name": defendant_name,
-                "Defendant Abbreviation": abbreviation,
-                "Defendant Line 1 (address)": address_line1,
-                "Defendant Line 2 (City,state, zip)": address_line2,
-                "DOI": date_of_incident,
-                "location of incident": location,
-                "Case Synopsis": case_synopsis,
-                "Potential Requests": potential_requests,
-                "Explicit instructions": explicit_instructions,
-                "Case Type": case_type,
-                "Facility or System": facility,
-                "Defendant Role": defendant_role
-            }])
+   if submitted:
+    try:
+        df = pd.DataFrame([{
+            "Client ID": client_id,
+            "Defendant Name": defendant_name,
+            "Defendant Abbreviation": abbreviation,
+            "Defendant Line 1 (address)": address_line1,
+            "Defendant Line 2 (City,state, zip)": address_line2,
+            "DOI": date_of_incident,
+            "location of incident": location,
+            "Case Synopsis": case_synopsis,
+            "Potential Requests": potential_requests,
+            "Explicit instructions": explicit_instructions,
+            "Case Type": case_type,
+            "Facility or System": facility,
+            "Defendant Role": defendant_role
+        }])
 
-            output_paths = run_foia(df)
-            st.success("✅ FOIA letter generated!")
+        output_paths = run_foia(df)
+        st.success("✅ FOIA letter generated!")
 
-            for path in output_paths:
-                filename = os.path.basename(path)
-                with open(path, "rb") as f:
-                    st.download_button(
-                        label=f"📄 Download {filename}",
-                        data=f.read(),
-                        file_name=filename,
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-        except Exception as e:
-            st.error(f"❌ Error: {e}")
+        from docx import Document
+
+        for path in output_paths:
+            filename = os.path.basename(path)
+
+            # Preview contents
+            doc = Document(path)
+            preview_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+            st.subheader(f"📄 {filename}")
+            st.text_area("📘 Preview", preview_text, height=400)
+
+            # Download button
+            with open(path, "rb") as f:
+                st.download_button(
+                    label=f"⬇️ Download {filename}",
+                    data=f.read(),
+                    file_name=filename,
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+
+    except Exception as e:
+        st.error(f"❌ Error: {e}")
 
 # === Demands ===
 elif tool == "📂 Demands":
