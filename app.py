@@ -3,7 +3,7 @@ st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
 # ✅ Correct way to import modules from scripts folder
 from scripts.run_foia import run_foia
-from scripts.run_demand import run_demand
+from scripts.run_demand import run
 
 import pandas as pd
 import os
@@ -153,7 +153,7 @@ elif tool == "📂 Demands":
         }])
 
         try:
-            output_paths = run_demand(df)
+            output_paths = run(df)
             st.success("✅ Letter generated!")
 
             for path in output_paths:
