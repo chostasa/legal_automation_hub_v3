@@ -1,0 +1,11 @@
+[33mcommit d53a5cf3072b6621584005f198535378d54e5f49[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: Cole Hostasa <chostasa@sgghlaw.com>
+Date:   Fri Jun 27 15:12:16 2025 -0500
+
+    Refactor: Use .env for OpenAI key and remove plaintext secret
+
+[33mcommit d6e000f593ff4835cbacb17841374721bdffff72[m
+Author: Cole Hostasa <chostasa@sgghlaw.com>
+Date:   Fri Jun 27 14:40:19 2025 -0500
+
+    Initial commit
