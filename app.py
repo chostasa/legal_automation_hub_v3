@@ -95,7 +95,6 @@ if tool == "📬 FOIA Requests":
 
     if submitted:
         try:
-            # Build DataFrame from form data
             df = pd.DataFrame([{
                 "Client ID": client_id,
                 "Defendant Name": defendant_name,
@@ -118,8 +117,12 @@ if tool == "📬 FOIA Requests":
             for path in output_paths:
                 filename = os.path.basename(path)
                 with open(path, "rb") as f:
-                    st.download_button(f"Download {filename}", f, file_name=filename)
-
+                    st.download_button(
+                        label=f"📄 Download {filename}",
+                        data=f.read(),
+                        file_name=filename,
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
         except Exception as e:
             st.error(f"❌ Error: {e}")
 

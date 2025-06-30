@@ -1,3 +1,18 @@
+print("🟡 Loading run_demand.py")
+try:
+    api_key = st.secrets.OPENAI_API_KEY
+    print("✅ Loaded OpenAI key from secrets.")
+except Exception as e:
+    print(f"❌ Could not load OPENAI_API_KEY: {e}")
+
+try:
+    client = OpenAI(api_key=api_key)
+    print("✅ OpenAI client initialized.")
+except Exception as e:
+    print(f"❌ Failed to initialize OpenAI client: {e}")
+
+print("🔍 Is generate_with_openai defined?", 'generate_with_openai' in globals())
+
 import os
 import re
 from datetime import datetime
@@ -8,8 +23,23 @@ from docx.table import _Cell
 from docx.text.paragraph import Paragraph
 import streamlit as st
 
+from openai import OpenAI
+import streamlit as st
+
 api_key = st.secrets.OPENAI_API_KEY
 client = OpenAI(api_key=api_key)
+
+def generate_with_openai(prompt):
+    response = client.chat.completions.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are a professional legal writer."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.5
+    )
+    return response.choices[0].message.content.strip()
+
     
 # === Prompt Guidelines ===
 NO_HALLUCINATION_NOTE = """
