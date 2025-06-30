@@ -150,12 +150,11 @@ def main():
         word_path = os.path.join(OUTPUT_FOLDER, f"{filename_base}.docx")
         doc = fill_template(context, TEMPLATE_FILE)
         doc.save(word_path)
-        print(f"📄 Word document saved: {word_path}")
 
 def run_foia(df):
     output_paths = []
     for _, row in df.iterrows():
-        client_id = str(row['Client ID'])
+        client_id = str(row.get('Client ID', ''))
         abbreviation = str(row.get('Defendant Abbreviation', ''))
         filename_base = f"FOIA Request to {abbreviation} ({client_id})"
 
@@ -190,6 +189,5 @@ def run_foia(df):
         doc.save(word_path)
         output_paths.append(word_path)
         print(f"📄 Word document saved: {word_path}")
-    
-    return output_paths
 
+    return output_paths[0] if len(output_paths) == 1 else output_paths

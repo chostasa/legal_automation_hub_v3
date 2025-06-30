@@ -1,30 +1,11 @@
-print("🟡 Loading run_demand.py")
-try:
-    api_key = st.secrets.OPENAI_API_KEY
-    print("✅ Loaded OpenAI key from secrets.")
-except Exception as e:
-    print(f"❌ Could not load OPENAI_API_KEY: {e}")
-
-try:
-    client = OpenAI(api_key=api_key)
-    print("✅ OpenAI client initialized.")
-except Exception as e:
-    print(f"❌ Failed to initialize OpenAI client: {e}")
-
-print("🔍 Is generate_with_openai defined?", 'generate_with_openai' in globals())
-
 import os
-import re
 from datetime import datetime
 from docx import Document
-from openpyxl import load_workbook
-from openai import OpenAI
 from docx.table import _Cell
 from docx.text.paragraph import Paragraph
-import streamlit as st
-
 from openai import OpenAI
 import streamlit as st
+from openpyxl import load_workbook
 
 api_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=api_key)
@@ -40,7 +21,6 @@ def generate_with_openai(prompt):
     )
     return response.choices[0].message.content.strip()
 
-    
 # === Prompt Guidelines ===
 NO_HALLUCINATION_NOTE = """
 Do not fabricate or assume any facts. Use only what is provided. Avoid headings, greetings, and signoffs — the template handles those. Refer to the client by their first name only. Keep all naming, pronouns, and chronology consistent. Do not use more than one version of the incident. Do not repeat injury or treatment details across sections.
@@ -335,6 +315,30 @@ def fill_template(data, template_path, output_path):
     output_filename = f"Demand_{full_name.replace(' ', '_')}_{datetime.today().strftime('%Y-%m-%d')}.docx"
     doc.save(os.path.join(output_path, output_filename))
     print(f"Generated: {output_filename}")
+    return os.path.join(output_path, output_filename)
+
+def run(df):
+    output_dir = "outputs/demands"
+    os.makedirs(output_dir, exist_ok=True)
+    template_path = "templates/demand_template.docx"
+    output_paths = []
+
+    for _, row in df.iterrows():
+        data = {
+            "Client Name": row.get("Client Name", ""),
+            "IncidentDate": row.get("Incident Date", ""),
+            "Summary": row.get("Summary", ""),
+            "Damages": row.get("Damages", "")
+        }
+        full_name = data["Client Name"].strip()
+        if not full_name:
+            continue
+
+        output_path = fill_template(data, template_path, output_dir)
+        output_paths.append(output_path)
+
+    return output_paths
+
 
 # === Excel Integration ===
 def generate_all_demands(template_path, excel_path, output_dir):
@@ -354,41 +358,3 @@ if __name__ == "__main__":
     OUTPUT_DIR = "output_requests"
 
     generate_all_demands(TEMPLATE_PATH, EXCEL_PATH, OUTPUT_DIR)
-def run(df):
-    output_dir = "outputs/demands"
-    os.makedirs(output_dir, exist_ok=True)
-    output_paths = []
-
-    template_path = "templates/demand_template.docx"
-
-    for _, row in df.iterrows():
-        data = {
-            "Client Name": row.get("Client Name", ""),
-            "IncidentDate": row.get("Incident Date", ""),
-            "Summary": row.get("Summary", ""),
-            "Damages": row.get("Damages", "")
-        }
-
-        full_name = data["Client Name"].strip()
-        if not full_name:
-            continue
-
-        doc = Document(template_path)
-
-        replacements = {
-            "{{Client Name}}": full_name,
-            "{{IncidentDate}}": data["IncidentDate"],
-            "{{Brief Synopsis}}": generate_brief_synopsis(data["Summary"], full_name),
-            "{{Demand}}": generate_demand(data["Summary"], "Jane"),
-            "{{Damages}}": generate_damages(data["Damages"], "Jane"),
-            "{{Settlement Demand}}": generate_settlement_demand(data["Summary"], data["Damages"], "Jane")
-        }
-
-        replace_placeholders(doc, replacements)
-
-        output_filename = f"Demand_{full_name.replace(' ', '_')}_{datetime.today().strftime('%Y-%m-%d')}.docx"
-        output_path = os.path.join(output_dir, output_filename)
-        doc.save(output_path)
-        output_paths.append(output_path)
-
-    return output_paths
