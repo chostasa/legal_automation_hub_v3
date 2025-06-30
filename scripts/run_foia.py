@@ -20,7 +20,6 @@ def generate_with_openai(prompt):
         temperature=0.5
     )
     return response.choices[0].message.content.strip()
-
 # === CONFIG ===
 INPUT_FILE = 'data_foia_requests.xlsx'
 TEMPLATE_FILE = 'templates_foia_template.docx'
@@ -34,7 +33,7 @@ def load_api_key():
     with open(API_KEY_FILE, "r") as f:
         return f.read().strip()
 
-# === PROMPT BUILDER ===
+# === PROMPT BUILDING ===
 def build_prompt(case_synopsis, potential_requests, explicit_instructions, case_type, facility, defendant_role):
     return f"""
 You are drafting FOIA bullet points for a civil legal claim.
@@ -56,6 +55,7 @@ Please return a detailed and **role-specific** list of records, documents, media
 Only include items that would reasonably be within the possession, custody, or control of a {defendant_role} operating within a {facility}. Do not include irrelevant medical, financial, or third-party institutional records if they would not be held by this entity.
 
 Format output as Word-style bullet points using asterisks (*).
+Only return the list.
 
 === EXAMPLES ===
 • Any and all highway-rail grade crossing incident reports, including initial accident reports, police or first responder reports submitted to the FRA, internal FRA documentation concerning the accident, and any witness statements or interviews conducted as part of the investigation;
@@ -108,19 +108,20 @@ Summarize the following legal case background in 2 professional sentences explai
     )
     return response.choices[0].message.content.strip()
 
-# === CALL OPENAI ===
+# === OPENAI CALLS ===
 def generate_bullet_points(case_synopsis, potential_requests, explicit_instructions, case_type, facility, defendant_role):
     prompt = build_prompt(case_synopsis, potential_requests, explicit_instructions, case_type, facility, defendant_role)
-    client = OpenAI(api_key=load_api_key())
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.5
-    )
-    bullet_text = response.choices[0].message.content.strip()
-    return bullet_text.replace("* ", "")
+    return generate_with_openai(prompt).replace("* ", "")
 
-# === TEMPLATE FILLER ===
+def generate_synopsis(case_synopsis):
+    prompt = f"""
+Summarize the following legal case background in 2 professional sentences explaining what happened and the resulting harm or damages. Do not include any parties' names or personal identifiers:
+
+{case_synopsis}
+"""
+    return generate_with_openai(prompt)
+
+# === DOCX HELPER ===
 def fill_template(context, template_path):
     doc = Document(template_path)
     for p in doc.paragraphs:
@@ -130,52 +131,6 @@ def fill_template(context, template_path):
     return doc
 
 # === MAIN FUNCTION ===
-def main():
-    df = pd.read_excel(INPUT_FILE)
-
-    for _, row in df.iterrows():
-        client_id = str(row['Client ID'])
-        abbreviation = str(row['Defendant Abbreviation'])
-        filename_base = f"FOIA Request to {abbreviation} ({client_id})"
-
-        try:
-            bullet_points = generate_bullet_points(
-                case_synopsis=row['Case Synopsis'],
-                potential_requests=row['Potential Requests'],
-                explicit_instructions=row.get('Explicit instructions', ''),
-                case_type=row['Case Type'],
-                facility=row['Facility or System'],
-                defendant_role=row['Defendant Role']
-            )
-            synopsis = generate_synopsis(row['Case Synopsis'])
-        except Exception as e:
-            print(f"❌ OpenAI failed for {client_id}: {e}")
-            continue
-
-        context = {
-            'client_id': client_id,
-            'date': date.today().strftime("%B %d, %Y"),
-            'defendant_name': str(row['Defendant Name']),
-            'defendant_line1': str(row['Defendant Line 1 (address)']),
-            'defendant_line2': str(row['Defendant Line 2 (City,state, zip)']),
-            'doi': str(row['DOI'].date()),
-            'location': str(row['location of incident']),  # updated to match Excel column
-            'synopsis': synopsis,
-            'foia_request_bullet_points': bullet_points
-        }
-
-        word_path = os.path.join(OUTPUT_FOLDER, f"{filename_base}.docx")
-        doc = fill_template(context, TEMPLATE_FILE)
-        doc.save(word_path)
-
-def fill_template(context, template_path):
-    doc = Document(template_path)
-    for p in doc.paragraphs:
-        for key, val in context.items():
-            if f"{{{{{key}}}}}" in p.text:
-                p.text = p.text.replace(f"{{{{{key}}}}}", val)
-    return doc
-
 def run_foia(df):
     output_dir = "outputs/foias"
     template_path = "templates/foia_template.docx"
@@ -190,7 +145,7 @@ def run_foia(df):
                 'defendant_name': row.get('Defendant Name', ''),
                 'defendant_line1': row.get('Defendant Line 1 (address)', ''),
                 'defendant_line2': row.get('Defendant Line 2 (City,state, zip)', ''),
-                'doi': row.get('DOI', ''),
+                'doi': str(row.get('DOI', '')),
                 'location': row.get('location of incident', ''),
                 'synopsis': generate_synopsis(row.get('Case Synopsis', '')),
                 'foia_request_bullet_points': generate_bullet_points(
@@ -203,8 +158,8 @@ def run_foia(df):
                 )
             }
 
-            file_name = f"FOIA_{context['client_id'].replace(' ', '_')}_{datetime.today().strftime('%Y-%m-%d')}.docx"
-            output_path = os.path.join(output_dir, file_name)
+            filename = f"FOIA_{context['client_id'].replace(' ', '_')}_{datetime.today().strftime('%Y-%m-%d')}.docx"
+            output_path = os.path.join(output_dir, filename)
             doc = fill_template(context, template_path)
             doc.save(output_path)
             output_paths.append(output_path)
