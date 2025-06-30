@@ -176,7 +176,7 @@ def fill_template(context, template_path):
                 p.text = p.text.replace(f"{{{{{key}}}}}", val)
     return doc
 
-def run(df):
+def run_foia(df):
     output_dir = "outputs/foias"
     template_path = "templates/foia_template.docx"
     os.makedirs(output_dir, exist_ok=True)
