@@ -381,7 +381,8 @@ Use this tool to **automatically generate documents in bulk** by merging a Word 
 
 **Step-by-step:**
 1. **Upload a Word Template**
-   - Use placeholders like `{{ClientName}}`, `{{Date}}`, etc.
+   - Use placeholders inside of the document like `{{ClientName}}`, `{{Date}}`, etc.
+   - These placeholders should mirror what is at the top of your excel columns
    - Save your template for reuse — it’ll appear in the dropdown.
 
 2. **Select a Template**
@@ -409,7 +410,8 @@ Use this tool to generate **individual FOIA request letters** using form fields 
 
 **Step-by-step:**
 1. **Fill Out the Form**
-   - Enter details like Client ID, Defendant info, Synopsis, and Requested Records.
+   - Enter details like Client ID, Recipient info, Synopsis, Requested Records, and any Explicit Instructions (Optional but typically helpful to establish scope).
+   - Enter the case type (Not Neos case type, get specific. Ex: Motorcycle Accident), the Facility or System (Ex: Municpal Police Department, DCFS, etc.), and the Defendant Role (Ex. Responding Officers). 
    - All inputs are required unless marked optional.
 
 2. **Click 'Generate FOIA Letter'**
@@ -425,13 +427,13 @@ Use this tool to generate **individual demand letters** using a manual entry for
 
 **Step-by-step:**
 1. **Fill Out the Form**
-   - Enter the client’s name, defendant, incident date, location, summary, and damages.
+   - Enter the client’s name, defendant, incident date, location, summary, and damages (damages should be a dollar figure. Ex. $100,000 One Hundred Thousand Dollars).
 
 2. **Click 'Generate Demand Letter'**
    - The app will insert your responses into a Word template.
 
 3. **Download**
-   - A finished letter will be available for download immediately.
+   - A finished letter will be available for download after approximately a minute.
         """)
 
     with st.expander("🚧 Complaints – Coming Soon", expanded=False):
