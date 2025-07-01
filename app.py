@@ -68,7 +68,7 @@ with st.sidebar:
         "📄 Batch Doc Generator",
         "📬 FOIA Requests",
         "📂 Demands",
-        "📈 Litigation Dashboard",
+        "📊 Litigation Dashboard",
         "🚧 Complaint (In Progress)",
         "🚧 Subpoenas (In Progress)",
     ])
