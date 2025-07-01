@@ -217,7 +217,7 @@ if tool == "📄 Batch Doc Generator":
         if "DOB" in df.columns:
             df["DOB"] = pd.to_datetime(df["DOB"], errors="coerce").dt.strftime("%m/%d/%Y")
 
-        # Replace NaN in SSN and all other columns with blank strings
+        # Replace NaN in all columns with blank strings
         df = df.fillna("")
 
         st.subheader("🔍 Preview First Row of Excel Data")
@@ -238,12 +238,16 @@ if tool == "📄 Batch Doc Generator":
             os.makedirs(word_dir)
 
             for idx, row in df.iterrows():
+                row = row.fillna("").to_dict()
+
+                for k, v in row.items():
+                    if isinstance(v, (pd.Timestamp, datetime)):
+                        row[k] = v.strftime("%m/%d/%Y")
+
                 doc = Document(template_path)
 
                 for para in doc.paragraphs:
                     for key, val in row.items():
-                        if isinstance(val, pd.Timestamp):
-                            val = val.strftime("%m/%d/%Y")
                         placeholder = f"{left}{key}{right}"
                         for run in para.runs:
                             if placeholder in run.text:
@@ -254,16 +258,12 @@ if tool == "📄 Batch Doc Generator":
                         for para in cell.paragraphs:
                             for run in para.runs:
                                 for key, val in row.items():
-                                    if isinstance(val, pd.Timestamp):
-                                        val = val.strftime("%m/%d/%Y")
                                     placeholder = f"{left}{key}{right}"
                                     if placeholder in run.text:
                                         run.text = run.text.replace(placeholder, str(val))
 
                 name_for_file = output_name_format
                 for key, val in row.items():
-                    if isinstance(val, pd.Timestamp):
-                        val = val.strftime("%m/%d/%Y")
                     name_for_file = name_for_file.replace(f"{left}{key}{right}", str(val))
                 filename = name_for_file + ".docx"
 
@@ -284,7 +284,6 @@ if tool == "📄 Batch Doc Generator":
                 file_name="word_documents.zip",
                 mime="application/zip"
             )
-
 
     if template_mode == "Upload New Template":
         uploaded_template = st.file_uploader("Upload a .docx Template", type="docx")
