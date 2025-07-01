@@ -7,6 +7,8 @@ from scripts.run_demand import run
 
 import pandas as pd
 import os
+import dropbox
+from io import BytesIO
 import zipfile
 import io
 import tempfile
@@ -386,62 +388,70 @@ if tool == "📄 Batch Doc Generator":
         else:
             st.warning("⚠️ No templates found matching your search.")
 
-elif tool == "📊 Litigation Dashboard":
-    st.header("📊 Interactive Litigation Dashboard")
-    from streamlit_autorefresh import st_autorefresh
-    st_autorefresh(interval=3600000, key="refresh_dashboard") 
+# === Load Excel Data from Dropbox App Folder (Secure API Method) ===
+from streamlit_autorefresh import st_autorefresh
+import dropbox
+from io import BytesIO
 
-    try:
-        # === Load Excel Data from Dropbox ===
-        dropbox_url = "https://www.dropbox.com/scl/fi/hen7cwn0jiaxa1vujeyj4/Litigation_Dashboard.xlsx?rlkey=o50y8egigwupgpyjgh1is7cso&st=splnq6y9&raw=1"
-        df = pd.read_excel(dropbox_url, sheet_name="Master Dashboard")
+st.header("📊 Interactive Litigation Dashboard")
+st_autorefresh(interval=3600000, key="refresh_dashboard")
 
-        # Drop rows with missing essentials (optional)
-        df = df[df["Case Type"].notna()]
+try:
+    # Authenticate with Dropbox using your secret token
+    dbx = dropbox.Dropbox(st.secrets["dropbox_token"])
+    file_path = "/Master Dashboard.xlsx"  # Adjust path if you move the file to a subfolder
 
-        # === Sidebar Filters ===
-        with st.sidebar:
-            st.markdown("### 🔎 Filter by:")
+    metadata, res = dbx.files_download(file_path)
+    df = pd.read_excel(BytesIO(res.content), sheet_name="Master Dashboard")
 
-            case_types = sorted(df["Case Type"].dropna().unique())
-            class_codes = sorted(df["Class Code Title"].dropna().unique())
-            referred_by = sorted(df["Referred By Name (Full - Last, First)"].dropna().unique())
+    # Drop rows with missing essentials (optional)
+    df = df[df["Case Type"].notna()]
 
-            selected_case_types = st.multiselect("Case Type", case_types, default=case_types)
-            selected_class_codes = st.multiselect("Class Code Title", class_codes, default=class_codes)
-            selected_referrers = st.multiselect("Referred By", referred_by, default=referred_by)
+    # === Sidebar Filters ===
+    with st.sidebar:
+        st.markdown("### 🔎 Filter by:")
 
-        # === Apply Filters ===
-        filtered_df = df[
-            df["Case Type"].isin(selected_case_types) &
-            df["Class Code Title"].isin(selected_class_codes) &
-            df["Referred By Name (Full - Last, First)"].isin(selected_referrers)
-        ]
+        case_types = sorted(df["Case Type"].dropna().unique())
+        class_codes = sorted(df["Class Code Title"].dropna().unique())
+        referred_by = sorted(df["Referred By Name (Full - Last, First)"].dropna().unique())
 
-        # === Display Results ===
-        st.markdown(f"### 📁 Showing {len(filtered_df)} Case(s)")
-        st.dataframe(filtered_df, use_container_width=True)
+        selected_case_types = st.multiselect("Case Type", case_types, default=case_types)
+        selected_class_codes = st.multiselect("Class Code Title", class_codes, default=class_codes)
+        selected_referrers = st.multiselect("Referred By", referred_by, default=referred_by)
 
-        # === Metrics Summary ===
-        st.markdown("### 📊 Summary")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Cases Shown", len(filtered_df))
-        col2.metric("Unique Referrers", filtered_df['Referred By Name (Full - Last, First)'].nunique())
-        col3.metric("Case Types", filtered_df['Case Type'].nunique())
+    # === Apply Filters ===
+    filtered_df = df[
+        df["Case Type"].isin(selected_case_types) &
+        df["Class Code Title"].isin(selected_class_codes) &
+        df["Referred By Name (Full - Last, First)"].isin(selected_referrers)
+    ]
 
-        # === Counts by Referrer and Class Code ===
-        st.markdown("### 📊 Counts by Referrer")
-        ref_counts = filtered_df['Referred By Name (Full - Last, First)'].value_counts().reset_index()
-        ref_counts.columns = ["Referred By", "# of Cases"]
-        st.dataframe(ref_counts, use_container_width=True)
+    # === Display Results ===
+    st.markdown(f"### 📁 Showing {len(filtered_df)} Case(s)")
+    st.dataframe(filtered_df, use_container_width=True)
 
-        st.markdown("### 📊 Counts by Class Code")
-        class_counts = filtered_df['Class Code Title'].value_counts().reset_index()
-        class_counts.columns = ["Class Code Title", "# of Cases"]
-        st.dataframe(class_counts, use_container_width=True)
+    # === Metrics Summary ===
+    st.markdown("### 📊 Summary")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Cases Shown", len(filtered_df))
+    col2.metric("Unique Referrers", filtered_df['Referred By Name (Full - Last, First)'].nunique())
+    col3.metric("Case Types", filtered_df['Case Type'].nunique())
 
-    except Exception as e:
-        st.error(f"❌ Could not load dashboard: {e}")
+    # === Counts by Referrer and Class Code ===
+    st.markdown("### 📊 Counts by Referrer")
+    ref_counts = filtered_df['Referred By Name (Full - Last, First)'].value_counts().reset_index()
+    ref_counts.columns = ["Referred By", "# of Cases"]
+    st.dataframe(ref_counts, use_container_width=True)
+
+    st.markdown("### 📊 Counts by Class Code")
+    class_counts = filtered_df['Class Code Title'].value_counts().reset_index()
+    class_counts.columns = ["Class Code Title", "# of Cases"]
+    st.dataframe(class_counts, use_container_width=True)
+
+except Exception as e:
+    st.error(f"❌ Could not load dashboard: {e}")
+    st.stop()
+
 
 elif tool == "📖 Instructions & Support":
     st.header("📘 Instructions & Support")
