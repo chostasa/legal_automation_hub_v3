@@ -68,9 +68,11 @@ with st.sidebar:
         "📄 Batch Doc Generator",
         "📬 FOIA Requests",
         "📂 Demands",
+        "📈 Litigation Dashboard",
         "🚧 Complaint (In Progress)",
         "🚧 Subpoenas (In Progress)",
     ])
+
 
 # === FOIA Requests ===
 if tool == "📬 FOIA Requests":
