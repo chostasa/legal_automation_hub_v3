@@ -380,9 +380,10 @@ elif tool == "📊 Litigation Dashboard":
     import streamlit.components.v1 as components
 
     components.iframe(
-        "https://netorgft11884955-my.sharepoint.com/personal/chostasa_sgghlaw_com/_layouts/15/Doc.aspx?sourcedoc={438ee21a-9742-4741-aa88-0d1a09caca5b}&action=embedview&wdAllowInteractivity=False&wdHideGridlines=True&wdHideHeaders=True&wdDownloadButton=True&wdInConfigurator=True&wdInConfigurator=True",
-        height=800,
-        width=1100
+        src="https://netorgft11884955-my.sharepoint.com/personal/chostasa_sgghlaw_com/_layouts/15/Doc.aspx?sourcedoc={438ee21a-9742-4741-aa88-0d1a09caca5b}&action=embededit&wdHideGridlines=True&wdHideHeaders=True&wdDownloadButton=True&wdInConfigurator=True&wdInConfigurator=True",
+        height=1100,
+        width=1600,
+        scrolling=True
     )
 
 elif tool == "📖 Instructions & Support":
