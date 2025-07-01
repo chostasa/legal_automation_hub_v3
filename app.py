@@ -380,7 +380,7 @@ elif tool == "📊 Litigation Dashboard":
     dropbox_url = "https://www.dropbox.com/scl/fi/hen7cwn0jiaxa1vujeyj4/Litigation_Dashboard.xlsx?rlkey=o50y8egigwupgpyjgh1is7cso&st=xvwry0jo&dl=1"
 
     try:
-        df = pd.read_excel(onedrive_url)
+        df = pd.read_excel(dropbox_url)
 
         st.success("✅ Live dashboard loaded from OneDrive")
         st.dataframe(df, use_container_width=True)
