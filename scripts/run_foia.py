@@ -1,4 +1,4 @@
-import os
+mport os
 from datetime import datetime
 from docx import Document
 from docx.table import _Cell
@@ -122,12 +122,13 @@ Summarize the following legal case background in 2 professional sentences explai
     return generate_with_openai(prompt)
 
 # === DOCX HELPER ===
-from mailmerge import MailMerge
-
-def fill_template(context, template_path, output_path):
-    doc = MailMerge(template_path)
-    doc.merge(**context)
-    doc.write(output_path)
+def fill_template(context, template_path):
+    doc = Document(template_path)
+    for p in doc.paragraphs:
+        for key, val in context.items():
+            if f"{{{{{key}}}}}" in p.text:
+                p.text = p.text.replace(f"{{{{{key}}}}}", val)
+    return doc
 
 # === MAIN FUNCTION ===
 def run_foia(df):
@@ -159,7 +160,8 @@ def run_foia(df):
 
             filename = f"FOIA_{context['client_id'].replace(' ', '_')}_{datetime.today().strftime('%Y-%m-%d')}.docx"
             output_path = os.path.join(output_dir, filename)
-            fill_template(context, template_path, output_path)
+            doc = fill_template(context, template_path)
+            doc.save(output_path)
             output_paths.append(output_path)
         except Exception as e:
             print(f"❌ Failed for {row.get('Client ID', '')}: {e}")

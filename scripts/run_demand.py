@@ -6,7 +6,6 @@ from docx.text.paragraph import Paragraph
 from openai import OpenAI
 import streamlit as st
 from openpyxl import load_workbook
-from mailmerge import MailMerge
 
 api_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=api_key)
@@ -262,7 +261,34 @@ Damages:
 """
     return generate_with_openai(prompt)
 
+
+# === Placeholder Replacement ===
+def replace_placeholders(doc, replacements):
+    def replace_in_paragraph(paragraph: Paragraph):
+        full_text = paragraph.text
+        for key, val in replacements.items():
+            if key in full_text:
+                full_text = full_text.replace(key, val)
+        if paragraph.runs:
+            paragraph.clear()
+            paragraph.add_run(full_text)
+
+    def replace_in_cell(cell: _Cell):
+        for paragraph in cell.paragraphs:
+            replace_in_paragraph(paragraph)
+
+    for paragraph in doc.paragraphs:
+        replace_in_paragraph(paragraph)
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                replace_in_cell(cell)
+
+# === Word Template Filler ===
 def fill_template(data, template_path, output_path):
+    doc = Document(template_path)
+
     full_name = data.get("Client Name", "").strip()
     first_name = "Jane"
 
@@ -276,23 +302,20 @@ def fill_template(data, template_path, output_path):
     damages = data.get("Damages", "") or "[No damages provided.]"
 
     replacements = {
-        "Client Name": full_name,
-        "IncidentDate": incident_date,
-        "Brief Synopsis": generate_brief_synopsis(summary, first_name),
-        "Demand": generate_demand(summary, first_name),
-        "Damages": generate_damages(damages, first_name),
-        "Settlement Demand": generate_settlement_demand(summary, damages, first_name)
+        "{{Client Name}}": full_name,
+        "{{IncidentDate}}": incident_date,
+        "{{Brief Synopsis}}": generate_brief_synopsis(summary, first_name),
+        "{{Demand}}": generate_demand(summary, first_name),
+        "{{Damages}}": generate_damages(damages, first_name),
+        "{{Settlement Demand}}": generate_settlement_demand(summary, damages, first_name)
     }
 
-    doc = MailMerge(template_path)
-    doc.merge(**replacements)
+    replace_placeholders(doc, replacements)
 
     output_filename = f"Demand_{full_name.replace(' ', '_')}_{datetime.today().strftime('%Y-%m-%d')}.docx"
-    final_path = os.path.join(output_path, output_filename)
-    doc.write(final_path)
+    doc.save(os.path.join(output_path, output_filename))
     print(f"Generated: {output_filename}")
-    return final_path
-
+    return os.path.join(output_path, output_filename)
 
 def run(df):
     output_dir = "outputs/demands"
