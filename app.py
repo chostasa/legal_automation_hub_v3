@@ -30,14 +30,12 @@ if not st.session_state.logged_in:
             st.session_state.logged_in = True
             st.session_state.username = username
             st.success(f"Welcome, {username}!")
-            st.experimental_rerun()
+            st.stop()  # Let Streamlit naturally rerun with new state
         else:
             st.error("Invalid username or password")
     st.stop()
 else:
     st.sidebar.markdown(f"**Logged in as:** `{st.session_state.username}`")
-
-
 
 st.markdown("""
 <style>
