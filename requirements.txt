@@ -45,6 +45,7 @@ openai
 pypandoc
 streamlit-autorefresh
 docx-mailmerge
+dropbox
 
 
 
