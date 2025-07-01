@@ -377,7 +377,7 @@ if tool == "📄 Batch Doc Generator":
 elif tool == "📊 Litigation Dashboard":
     st.header("📊 Interactive Litigation Dashboard")
     from streamlit_autorefresh import st_autorefresh
-    st_autorefresh(interval=60000, key="refresh_dashboard")  # refreshes every 60 seconds
+    st_autorefresh(interval=3600000, key="refresh_dashboard") 
 
     try:
         # === Load Excel Data from Dropbox ===
