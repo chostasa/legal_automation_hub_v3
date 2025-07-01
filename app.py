@@ -539,9 +539,6 @@ This tool will allow you to auto-generate subpoena forms for institutions, agenc
                 f.write(issue + "\n---\n")
             st.success("✅ Issue submitted. Thank you!")
 
-else:
-    st.warning("🚧 This section is currently under development.")
-
 st.markdown("""
 <hr style="margin-top: 2rem;">
 <div style="text-align: center; font-size: 0.85rem; color: gray;">
