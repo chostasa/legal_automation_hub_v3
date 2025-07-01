@@ -44,5 +44,7 @@ python-dotenv
 openai
 pypandoc
 streamlit-autorefresh
+docx-mailmerge
+
 
 
