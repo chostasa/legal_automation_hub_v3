@@ -12,6 +12,31 @@ import io
 import tempfile
 from docx import Document
 from datetime import datetime
+from users import USERS, hash_password
+
+# === Username + Password Login ===
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    st.title("Login")
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        hashed_input = hash_password(password)
+        if username in USERS and USERS[username] == hashed_input:
+            st.session_state.logged_in = True
+            st.session_state.username = username
+            st.success(f"Welcome, {username}!")
+            st.experimental_rerun()
+        else:
+            st.error("Invalid username or password")
+    st.stop()
+else:
+    st.sidebar.markdown(f"**Logged in as:** `{st.session_state.username}`")
+
 
 
 st.markdown("""
@@ -31,18 +56,6 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True)
-
-# === Simple login ===
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-if not st.session_state.authenticated:
-    password = st.text_input("Enter Password", type="password")
-    if password == st.secrets["password"]:
-        st.session_state.authenticated = True
-        st.rerun()
-    else:
-        st.stop()
 
 # === Branding: Logo inside navy header bar ===
 import base64
