@@ -380,26 +380,24 @@ elif tool == "📖 Instructions & Support":
 Use this tool to **automatically generate documents in bulk** by merging a Word template with an Excel sheet.
 
 **Step-by-step:**
-1. **Upload a Word Template**
-   - Use placeholders inside of the document like `{{ClientName}}`, `{{Date}}`, etc.
+1. **Upload a Word Template or Select an Existing Template**
+   - If uploading a new template, use placeholders inside of the document like `{{ClientName}}`, `{{Date}}`, etc.
    - These placeholders should mirror what is at the top of your excel columns
    - Save your template for reuse — it’ll appear in the dropdown.
+   - If selecting an existing template, choose 'Select a Saved Template' and search for the existing template. 
 
-2. **Select a Template**
-   - Choose a saved template from the list.
-
-3. **Upload an Excel File**
+2. **Upload an Excel File**
    - Must have one row per document.
    - Column names must match the placeholders in your Word template.
 
-4. **Preview the Data**
+3. **Preview the Data**
    - View the first row to confirm the placeholder match.
 
-5. **Set Output Filename Format**
+4. **Set Output Filename Format**
    - Use any column name inside `{{ }}`.
    - Example: `{{ClientName}}_Notice` → `JohnDoe_Notice.docx`.
 
-6. **Generate Documents**
+5. **Generate Documents**
    - Click “Generate Files.”
    - Download a ZIP file with all Word documents.
         """)
