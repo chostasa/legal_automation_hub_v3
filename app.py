@@ -377,23 +377,13 @@ if tool == "📄 Batch Doc Generator":
 elif tool == "📊 Litigation Dashboard":
     st.header("📊 Live Litigation Dashboard")
 
-    dropbox_url = "https://www.dropbox.com/scl/fi/hen7cwn0jiaxa1vujeyj4/Litigation_Dashboard.xlsx?rlkey=o50y8egigwupgpyjgh1is7cso&st=xvwry0jo&dl=1"
+    import streamlit.components.v1 as components
 
-    try:
-        df = pd.read_excel(dropbox_url)
-
-        st.success("✅ Live dashboard loaded from OneDrive")
-        st.dataframe(df, use_container_width=True)
-
-        # Optional: Add a campaign filter if relevant
-        if "Campaign" in df.columns:
-            selected_campaign = st.selectbox("📁 Filter by Campaign", df["Campaign"].dropna().unique())
-            filtered_df = df[df["Campaign"] == selected_campaign]
-            st.dataframe(filtered_df, use_container_width=True)
-
-    except Exception as e:
-        st.error(f"❌ Could not load dashboard: {e}")
-
+    components.iframe(
+        "https://netorgft11884955-my.sharepoint.com/personal/chostasa_sgghlaw_com/_layouts/15/Doc.aspx?sourcedoc={438ee21a-9742-4741-aa88-0d1a09caca5b}&action=embedview&wdAllowInteractivity=False&wdHideGridlines=True&wdHideHeaders=True&wdDownloadButton=True&wdInConfigurator=True&wdInConfigurator=True",
+        height=800,
+        width=1100
+    )
 
 elif tool == "📖 Instructions & Support":
     st.header("📘 Instructions & Support")
