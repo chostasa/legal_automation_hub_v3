@@ -379,9 +379,8 @@ elif tool == "📊 Litigation Dashboard":
     from streamlit_autorefresh import st_autorefresh
     st_autorefresh(interval=60000, key="refresh_dashboard")  # refreshes every 60 seconds
 
-
-    # === Load Excel Data from Dropbox ===
     try:
+        # === Load Excel Data from Dropbox ===
         dropbox_url = "https://www.dropbox.com/scl/fi/hen7cwn0jiaxa1vujeyj4/Litigation_Dashboard.xlsx?rlkey=o50y8egigwupgpyjgh1is7cso&st=splnq6y9&raw=1"
         df = pd.read_excel(dropbox_url, sheet_name="Master Dashboard")
 
@@ -411,17 +410,26 @@ elif tool == "📊 Litigation Dashboard":
         st.markdown(f"### 📁 Showing {len(filtered_df)} Case(s)")
         st.dataframe(filtered_df, use_container_width=True)
 
-        # === Optional: Metrics Summary ===
+        # === Metrics Summary ===
         st.markdown("### 📊 Summary")
         col1, col2, col3 = st.columns(3)
         col1.metric("Cases Shown", len(filtered_df))
         col2.metric("Unique Referrers", filtered_df['Referred By Name (Full - Last, First)'].nunique())
         col3.metric("Case Types", filtered_df['Case Type'].nunique())
 
+        # === Counts by Referrer and Class Code ===
+        st.markdown("### 📊 Counts by Referrer")
+        ref_counts = filtered_df['Referred By Name (Full - Last, First)'].value_counts().reset_index()
+        ref_counts.columns = ["Referred By", "# of Cases"]
+        st.dataframe(ref_counts, use_container_width=True)
+
+        st.markdown("### 📊 Counts by Class Code")
+        class_counts = filtered_df['Class Code Title'].value_counts().reset_index()
+        class_counts.columns = ["Class Code Title", "# of Cases"]
+        st.dataframe(class_counts, use_container_width=True)
+
     except Exception as e:
         st.error(f"❌ Could not load dashboard: {e}")
-
-
 
 elif tool == "📖 Instructions & Support":
     st.header("📘 Instructions & Support")
