@@ -385,14 +385,14 @@ Use this tool to **automatically generate documents in bulk** by merging a Word 
    - Save your template for reuse — it’ll appear in the dropdown.
 
 2. **Select a Template**
-   - Choose an uploaded template from the list.
+   - Choose a saved template from the list.
 
 3. **Upload an Excel File**
    - Must have one row per document.
-   - Column names must match placeholders in your Word template.
+   - Column names must match the placeholders in your Word template.
 
 4. **Preview the Data**
-   - You’ll see the first row to confirm column names match your template.
+   - View the first row to confirm the placeholder match.
 
 5. **Set Output Filename Format**
    - Use any column name inside `{{ }}`.
@@ -400,61 +400,59 @@ Use this tool to **automatically generate documents in bulk** by merging a Word 
 
 6. **Generate Documents**
    - Click “Generate Files.”
-   - Download a ZIP with all Word documents.
+   - Download a ZIP file with all Word documents.
         """)
 
     with st.expander("📬 FOIA Requests – How to Use", expanded=False):
         st.markdown("""
-This tool helps you generate FOIA request letters at scale using OpenAI to write bullet points and summaries.
+Use this tool to generate **individual FOIA request letters** using form fields you fill in manually.
 
 **Step-by-step:**
-1. **Upload Excel File**
-   Required columns:
-   - `Client Name`
-   - `Facility Name`
-   - `Request Type` (e.g., Intake File, Medical Records)
+1. **Fill Out the Form**
+   - Enter details like Client ID, Defendant info, Synopsis, and Requested Records.
+   - All inputs are required unless marked optional.
 
-2. **Generate Drafts**
-   - The app uses OpenAI to write a summary and request list.
-   - These are inserted into your FOIA Word template.
+2. **Click 'Generate FOIA Letter'**
+   - A personalized Word document will be created.
 
 3. **Download**
-   - Download your completed FOIA request letters as DOCX files.
+   - You’ll see a preview and a download button for the generated letter.
         """)
 
     with st.expander("📂 Demand Letters – How to Use", expanded=False):
         st.markdown("""
-Use this tool to generate personalized demand letters with tone-controlled summaries.
+Use this tool to generate **individual demand letters** using a manual entry form.
 
 **Step-by-step:**
-1. **Upload Excel File**
-   Required columns:
-   - `Client Name`
-   - `Defendant`
-   - `Incident Date`
-   - `Location`
-   - `Summary`
-   - `Damages`
-   - `Tone` (e.g., Formal, Empathetic)
+1. **Fill Out the Form**
+   - Enter the client’s name, defendant, incident date, location, summary, and damages.
 
-2. **Choose Template**
-   - Upload a Word template with matching placeholders.
+2. **Click 'Generate Demand Letter'**
+   - The app will insert your responses into a Word template.
 
-3. **Generate Letters**
-   - OpenAI writes the 1–2 paragraph synopsis and inserts all fields.
-
-4. **Download**
-   - Get a ZIP with Word and PDF documents.
+3. **Download**
+   - A finished letter will be available for download immediately.
         """)
 
-    st.subheader("🐞 Report a Bug")
-    with st.form("report_form"):
-        issue = st.text_area("Describe the issue:")
-        submitted = st.form_submit_button("Submit")
-        if submitted:
-            with open("error_reports.txt", "a", encoding="utf-8") as f:
-                f.write(issue + "\n---\n")
-            st.success("✅ Issue submitted. Thank you!")
+    with st.expander("🚧 Complaints – Coming Soon", expanded=False):
+        st.markdown("""
+This section will automate formal legal complaint drafting.
+
+**Planned Features:**
+- Upload structured abuse data (e.g., facility, dates, abuse summary).
+- Auto-generate civil complaints using AI + custom templates.
+- Optional footnotes, exhibits, and institutional history blocks.
+        """)
+
+    with st.expander("🚧 Subpoenas – Coming Soon", expanded=False):
+        st.markdown("""
+This tool will allow you to auto-generate subpoena forms for institutions, agencies, and record holders.
+
+**Planned Features:**
+- Upload a list of targets with addresses and requested materials.
+- Pre-fill standard subpoena templates.
+- Batch generate, preview, and download signed copies.
+        """)
 
     st.subheader("🐞 Report a Bug")
     with st.form("report_form"):
