@@ -377,7 +377,7 @@ if tool == "📄 Batch Doc Generator":
 elif tool == "📊 Litigation Dashboard":
     st.header("📊 Live Litigation Dashboard")
 
-    dropbox_url = "https://www.dropbox.com/scl/fi/hen7cwn0jiaxa1vujeyj4/Litigation_Dashboard.xlsx?rlkey=o50y8egigwupgpyjgh1is7cso&st=xvwry0jo&dl
+    dropbox_url = "https://www.dropbox.com/scl/fi/hen7cwn0jiaxa1vujeyj4/Litigation_Dashboard.xlsx?rlkey=o50y8egigwupgpyjgh1is7cso&st=xvwry0jo&dl=1"
 
     try:
         df = pd.read_excel(onedrive_url)
