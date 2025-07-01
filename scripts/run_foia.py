@@ -1,4 +1,4 @@
-mport os
+import os
 from datetime import datetime
 from docx import Document
 from docx.table import _Cell
@@ -91,6 +91,15 @@ Any and all BFS reports documenting responses to incidents involving agents and/
 • Copies of any and all statements, whether written or recorded, involving BFS personnel or emergency responders in relation to investigations into incidents involving agents and/or employees of Streamwood Hospital concerning a student and/or minor during the time period from 1983 to the present.
 • Complete copies of any and all BFS investigative reports and/or files related to incidents involving a minor/student and agents and/or employees of Streamwood Hospital during the time period from 1983 to the present.
 Only return the list.
+"""
+
+# === SYNOPSIS GENERATOR ===
+def generate_synopsis(case_synopsis):
+    client = OpenAI(api_key=load_api_key())
+    prompt = f"""
+Summarize the following legal case background in 2 professional sentences explaining what happened and the resulting harm or damages. Do not include any parties' names or personal identifiers:
+
+{case_synopsis}
 """
     response = client.chat.completions.create(
         model="gpt-4",
