@@ -373,26 +373,88 @@ if tool == "📄 Batch Doc Generator":
             st.warning("⚠️ No templates found matching your search.")
 
 elif tool == "📖 Instructions & Support":
-    st.header("📘 Instructions")
-    st.markdown("""
-    Fill in the applicable fields:
+    st.header("📘 Instructions & Support")
 
-    ### 📂 Demands:
-    - Client Name
-    - Incident Date
-    - Summary
-    - Damages
+    with st.expander("📄 Batch Doc Generator – How to Use", expanded=True):
+        st.markdown("""
+Use this tool to **automatically generate documents in bulk** by merging a Word template with an Excel sheet.
 
-    ### 📨 FOIA:
-    - Client ID
-    - Case Synopsis
-    - Potential Requests
-    - Case Type
-    - Facility or System
-    - Defendant Role
+**Step-by-step:**
+1. **Upload a Word Template**
+   - Use placeholders like `{{ClientName}}`, `{{Date}}`, etc.
+   - Save your template for reuse — it’ll appear in the dropdown.
 
-    Click **Generate** to create your letters and download the results.
-    """)
+2. **Select a Template**
+   - Choose an uploaded template from the list.
+
+3. **Upload an Excel File**
+   - Must have one row per document.
+   - Column names must match placeholders in your Word template.
+
+4. **Preview the Data**
+   - You’ll see the first row to confirm column names match your template.
+
+5. **Set Output Filename Format**
+   - Use any column name inside `{{ }}`.
+   - Example: `{{ClientName}}_Notice` → `JohnDoe_Notice.docx`.
+
+6. **Generate Documents**
+   - Click “Generate Files.”
+   - Download a ZIP with all Word documents.
+        """)
+
+    with st.expander("📬 FOIA Requests – How to Use", expanded=False):
+        st.markdown("""
+This tool helps you generate FOIA request letters at scale using OpenAI to write bullet points and summaries.
+
+**Step-by-step:**
+1. **Upload Excel File**
+   Required columns:
+   - `Client Name`
+   - `Facility Name`
+   - `Request Type` (e.g., Intake File, Medical Records)
+
+2. **Generate Drafts**
+   - The app uses OpenAI to write a summary and request list.
+   - These are inserted into your FOIA Word template.
+
+3. **Download**
+   - Download your completed FOIA request letters as DOCX files.
+        """)
+
+    with st.expander("📂 Demand Letters – How to Use", expanded=False):
+        st.markdown("""
+Use this tool to generate personalized demand letters with tone-controlled summaries.
+
+**Step-by-step:**
+1. **Upload Excel File**
+   Required columns:
+   - `Client Name`
+   - `Defendant`
+   - `Incident Date`
+   - `Location`
+   - `Summary`
+   - `Damages`
+   - `Tone` (e.g., Formal, Empathetic)
+
+2. **Choose Template**
+   - Upload a Word template with matching placeholders.
+
+3. **Generate Letters**
+   - OpenAI writes the 1–2 paragraph synopsis and inserts all fields.
+
+4. **Download**
+   - Get a ZIP with Word and PDF documents.
+        """)
+
+    st.subheader("🐞 Report a Bug")
+    with st.form("report_form"):
+        issue = st.text_area("Describe the issue:")
+        submitted = st.form_submit_button("Submit")
+        if submitted:
+            with open("error_reports.txt", "a", encoding="utf-8") as f:
+                f.write(issue + "\n---\n")
+            st.success("✅ Issue submitted. Thank you!")
 
     st.subheader("🐞 Report a Bug")
     with st.form("report_form"):
