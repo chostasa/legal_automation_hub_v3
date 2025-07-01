@@ -78,10 +78,10 @@ if tool == "📬 FOIA Requests":
 
     with st.form("foia_form"):
         client_id = st.text_input("Client ID")
-        defendant_name = st.text_input("Defendant Name")
-        abbreviation = st.text_input("Defendant Abbreviation (for file name)")
-        address_line1 = st.text_input("Defendant Address Line 1")
-        address_line2 = st.text_input("Defendant Address Line 2 (City, State, Zip)")
+        defendant_name = st.text_input("Recipient Name")
+        abbreviation = st.text_input("Recipient Abbreviation (for file name)")
+        address_line1 = st.text_input("Recipient Address Line 1")
+        address_line2 = st.text_input("Recipient Address Line 2 (City, State, Zip)")
         date_of_incident = st.date_input("Date of Incident")
         location = st.text_input("Location of Incident")
         case_synopsis = st.text_area("Case Synopsis")
@@ -89,7 +89,7 @@ if tool == "📬 FOIA Requests":
         explicit_instructions = st.text_area("Explicit Instructions (optional)")
         case_type = st.text_input("Case Type")
         facility = st.text_input("Facility or System")
-        defendant_role = st.text_input("Defendant Role")
+        defendant_role = st.text_input("Recipient Role")
 
         submitted = st.form_submit_button("Generate FOIA Letter")
 
@@ -97,10 +97,10 @@ if tool == "📬 FOIA Requests":
         try:
             df = pd.DataFrame([{
                 "Client ID": client_id,
-                "Defendant Name": defendant_name,
-                "Defendant Abbreviation": abbreviation,
-                "Defendant Line 1 (address)": address_line1,
-                "Defendant Line 2 (City,state, zip)": address_line2,
+                "Recipient Name": defendant_name,
+                "Recipient Abbreviation": abbreviation,
+                "Recipient Line 1 (address)": address_line1,
+                "Recipient Line 2 (City,state, zip)": address_line2,
                 "DOI": date_of_incident,
                 "location of incident": location,
                 "Case Synopsis": case_synopsis,
@@ -108,7 +108,7 @@ if tool == "📬 FOIA Requests":
                 "Explicit instructions": explicit_instructions,
                 "Case Type": case_type,
                 "Facility or System": facility,
-                "Defendant Role": defendant_role
+                "Recipient Role": defendant_role
             }])
 
             output_paths = run_foia(df)
@@ -411,7 +411,7 @@ Use this tool to generate **individual FOIA request letters** using form fields 
 **Step-by-step:**
 1. **Fill Out the Form**
    - Enter details like Client ID, Recipient info, Synopsis, Requested Records, and any Explicit Instructions (Optional but typically helpful to establish scope).
-   - Enter the case type (Not Neos case type, get specific. Ex: Motorcycle Accident), the Facility or System (Ex: Municpal Police Department, DCFS, etc.), and the Defendant Role (Ex. Responding Officers). 
+   - Enter the case type (Not Neos case type, get specific. Ex: Motorcycle Accident), the Facility or System (Ex: Municpal Police Department, DCFS, etc.), and the Recipient Role (Ex. Responding Officers). 
    - All inputs are required unless marked optional.
 
 2. **Click 'Generate FOIA Letter'**
