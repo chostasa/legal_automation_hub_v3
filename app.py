@@ -375,16 +375,53 @@ if tool == "📄 Batch Doc Generator":
             st.warning("⚠️ No templates found matching your search.")
 
 elif tool == "📊 Litigation Dashboard":
-    st.header("📊 Live Litigation Dashboard")
+    st.header("📊 Interactive Litigation Dashboard")
+    from streamlit_autorefresh import st_autorefresh
+    st_autorefresh(interval=60000, key="refresh_dashboard")  # refreshes every 60 seconds
 
-    import streamlit.components.v1 as components
 
-    components.iframe(
-        src="https://netorgft11884955-my.sharepoint.com/personal/chostasa_sgghlaw_com/_layouts/15/Doc.aspx?sourcedoc={438ee21a-9742-4741-aa88-0d1a09caca5b}&action=embededit&wdHideGridlines=True&wdHideHeaders=True&wdDownloadButton=True&wdInConfigurator=True&wdInConfigurator=True",
-        height=1100,
-        width=1600,
-        scrolling=True
-    )
+    # === Load Excel Data from Dropbox ===
+    try:
+        dropbox_url = "https://www.dropbox.com/scl/fi/hen7cwn0jiaxa1vujeyj4/Litigation_Dashboard.xlsx?rlkey=o50y8egigwupgpyjgh1is7cso&st=splnq6y9&raw=1"
+        df = pd.read_excel(dropbox_url, sheet_name="Master Dashboard")
+
+        # Drop rows with missing essentials (optional)
+        df = df[df["Case Type"].notna()]
+
+        # === Sidebar Filters ===
+        with st.sidebar:
+            st.markdown("### 🔎 Filter by:")
+
+            case_types = sorted(df["Case Type"].dropna().unique())
+            class_codes = sorted(df["Class Code Title"].dropna().unique())
+            referred_by = sorted(df["Referred By Name (Full - Last, First)"].dropna().unique())
+
+            selected_case_types = st.multiselect("Case Type", case_types, default=case_types)
+            selected_class_codes = st.multiselect("Class Code Title", class_codes, default=class_codes)
+            selected_referrers = st.multiselect("Referred By", referred_by, default=referred_by)
+
+        # === Apply Filters ===
+        filtered_df = df[
+            df["Case Type"].isin(selected_case_types) &
+            df["Class Code Title"].isin(selected_class_codes) &
+            df["Referred By Name (Full - Last, First)"].isin(selected_referrers)
+        ]
+
+        # === Display Results ===
+        st.markdown(f"### 📁 Showing {len(filtered_df)} Case(s)")
+        st.dataframe(filtered_df, use_container_width=True)
+
+        # === Optional: Metrics Summary ===
+        st.markdown("### 📊 Summary")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Cases Shown", len(filtered_df))
+        col2.metric("Unique Referrers", filtered_df['Referred By Name (Full - Last, First)'].nunique())
+        col3.metric("Case Types", filtered_df['Case Type'].nunique())
+
+    except Exception as e:
+        st.error(f"❌ Could not load dashboard: {e}")
+
+
 
 elif tool == "📖 Instructions & Support":
     st.header("📘 Instructions & Support")

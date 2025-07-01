@@ -43,5 +43,6 @@ watchdog==6.0.0
 python-dotenv
 openai
 pypandoc
+streamlit-autorefresh
 
 
