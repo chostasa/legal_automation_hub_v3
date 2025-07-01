@@ -372,6 +372,27 @@ if tool == "📄 Batch Doc Generator":
         else:
             st.warning("⚠️ No templates found matching your search.")
 
+elif tool == "📊 Litigation Dashboard":
+    st.header("📊 Live Litigation Dashboard")
+
+    onedrive_url = "https://netorgft11884955-my.sharepoint.com/:x:/g/personal/chostasa_sgghlaw_com/ERrijkNCl0FHqogNGgnKylsBjvIOZAsxlloAQ23QNO1Bzg?download=1"
+
+    try:
+        df = pd.read_excel(onedrive_url)
+
+        st.success("✅ Live dashboard loaded from OneDrive")
+        st.dataframe(df, use_container_width=True)
+
+        # Optional: Add a campaign filter if relevant
+        if "Campaign" in df.columns:
+            selected_campaign = st.selectbox("📁 Filter by Campaign", df["Campaign"].dropna().unique())
+            filtered_df = df[df["Campaign"] == selected_campaign]
+            st.dataframe(filtered_df, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"❌ Could not load dashboard: {e}")
+
+
 elif tool == "📖 Instructions & Support":
     st.header("📘 Instructions & Support")
 
