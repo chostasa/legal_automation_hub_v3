@@ -361,8 +361,6 @@ def fill_mediation_template(data, template_path, output_path):
 
 
 import time
-import openai
-import streamlit as st
 
 # --- Safe wrapper to handle OpenAI rate limits ---
 from openai import APIStatusError
