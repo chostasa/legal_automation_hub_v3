@@ -449,33 +449,28 @@ if tool == "📊 Litigation Dashboard":
         st.error(f"❌ Could not load dashboard: {e}")
         st.stop()
 
-# === Mediation Memo Generator ===
-if tool == "🧾 Mediation Memos":
-    st.header("🧾 Generate Confidential Mediation Memo")
+# === Mediation Memo Generator (Simplified Input) ===
+if st.sidebar.radio("Choose Tool", [
+    "🧾 Mediation Memos (Simplified)",
+]) == "🧾 Mediation Memos (Simplified)":
 
-    with st.form("mediation_form"):
+    st.header("🧾 Generate Confidential Mediation Memo")
+    st.markdown("""
+    Paste all relevant facts and medical information into one field.
+    We’ll format the complete memo automatically.
+    """)
+
+    with st.form("simple_mediation_form"):
         court = st.text_input("Court")
         case_number = st.text_input("Case Number")
-
         plaintiff = st.text_input("Plaintiff Name")
         defendant1 = st.text_input("Defendant 1 Name")
         defendant2 = st.text_input("Defendant 2 Name (optional)")
-
-        intro_raw = st.text_area("I. Introduction (factual background)")
-        bio_raw = st.text_area("II. Plaintiff Statement (bio & employment)")
-        def1_raw = st.text_area("Defendant 1 Statement (facts & history)")
-        def2_raw = st.text_area("Defendant 2 Statement (if applicable)")
-        demand_raw = st.text_area("III. Demand (facts or insurance info)")
-        facts_raw = st.text_area("IV. Facts / Liability")
-        causation_raw = st.text_area("V. Causation, Injuries, and Treatment")
-        harms_raw = st.text_area("VI. Additional Harms and Losses")
-        future_raw = st.text_area("VII. Future Medical Bills Related to the Collision")
-        conclusion_raw = st.text_area("VIII. Conclusion")
-
-        submitted = st.form_submit_button("Generate Mediation Memo")
+        raw_summary = st.text_area("📝 Paste Case Summary (facts, injuries, medicals, etc.)", height=500)
+        submitted = st.form_submit_button("Generate Memo")
 
     if submitted:
-        with st.spinner("✍️ Drafting memo..."):
+        with st.spinner("✍️ Drafting memo from summary..."):
             try:
                 output_dir = "outputs/mediation_memos"
                 os.makedirs(output_dir, exist_ok=True)
@@ -486,20 +481,11 @@ if tool == "🧾 Mediation Memos":
                     "plaintiff": plaintiff,
                     "defendant1": defendant1,
                     "defendant2": defendant2,
-                    "introduction": generate_introduction(intro_raw, plaintiff),
-                    "plaintiff_statement": generate_plaintiff_statement(bio_raw, plaintiff),
-                    "defendant1_statement": generate_defendant_statement(def1_raw, "Defendant 1"),
-                    "defendant2_statement": generate_defendant_statement(def2_raw, "Defendant 2") if defendant2 else "",
-                    "demand": generate_demand_section(demand_raw, plaintiff),
-                    "facts_liability": generate_facts_liability_section(facts_raw),
-                    "causation_injuries": generate_causation_injuries(causation_raw),
-                    "additional_harms": generate_additional_harms(harms_raw),
-                    "future_bills": generate_future_medical(future_raw),
-                    "conclusion": generate_conclusion_section(conclusion_raw),
+                    "summary": raw_summary
                 }
 
                 template_path = "templates/mediation_template.docx"
-                file_path = fill_mediation_template(data, template_path, output_dir)
+                file_path = generate_memo_from_summary(data, template_path, output_dir)
 
                 with open(file_path, "rb") as f:
                     st.success("✅ Mediation memo generated!")
