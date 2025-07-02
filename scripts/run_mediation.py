@@ -101,10 +101,10 @@ Bio:
     return generate_with_openai(prompt)
 
 DEFENDANT_STATEMENT_EXAMPLE = """
+
 On August 8, 2018, {{Defendant1}}, then 43, was driving a commercial truck for the first time in the right lane of I-65 when he ran through Mr. Efimov’s truck. The police who responded to the accident cited Defendant Rakhimdjanov with following too closely behind Mr. Doe (Ex. C, Indiana Crash Report). After colliding into Mr. Efimov, Mr. Rakhimdjanov veered into the left, crashing into another vehicle, which crashed into the vehicle in front of it, before coming to a stop in the left lane (Ex. D, Rakhimdjanov Dep. 53). 
 At the time of the collision, Mr. Rakhimdjanov had been driving commercially for less than one day.  This was his first commercial driving job (Ex. D, Rakhimdjanov Dep. 30). Mr. Rakhimdjanov used an interpreter when he gave his deposition on December 16, 2021 and when he signed his employment contracts with STL Truckers. (Ex. D, Rakhimdjanov Dep. 73). However, Mr. Rakhimdjanov did not have an interpreter during his training with STL Truckers. (Ex. D, Rakhimdjanov Dep. 73). It is clear from the documents from STL that he did not even write his own name.
 """
-
 def generate_defendant_statement(def_text, label="Defendant"):
     prompt = f"""
 {NO_HALLUCINATION_NOTE}
@@ -119,6 +119,7 @@ Input:
 {def_text}
 """
     return generate_with_openai(prompt)
+
 
 DEMAND_EXAMPLE = """
 STL Trucking has represented to Plaintiff’s counsel that they only have a $1 million policy available for Mr. Efimov’s losses. To date, STL has yet to sign an affidavit verifying coverage. (Ex. F, Affidavit of No Excess Coverage). 
@@ -317,7 +318,12 @@ def generate_memo_from_summary(data, template_path, output_dir):
     memo_data["introduction"] = generate_introduction(data["complaint_narrative"], data["plaintiff"])
     memo_data["plaintiff_statement"] = generate_plaintiff_statement(data["complaint_narrative"], data["plaintiff"])
     memo_data["defendant1_statement"] = generate_defendant_statement(data["complaint_narrative"], data["defendant1"])
-    memo_data["defendant2_statement"] = generate_defendant_statement(data["complaint_narrative"], data.get("defendant2", ""), label="Defendant 2")
+    
+    if data.get("defendant2"):
+        memo_data["defendant2_statement"] = generate_defendant_statement(data["complaint_narrative"], data["defendant2"])
+    else:
+        memo_data["defendant2_statement"] = ""
+
     memo_data["demand"] = generate_demand_section(data["settlement_summary"], data["plaintiff"])
     memo_data["facts_liability"] = generate_facts_liability_section(data["complaint_narrative"])
     memo_data["causation_injuries"] = generate_causation_injuries(data["medical_summary"])
