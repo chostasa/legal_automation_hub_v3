@@ -4,6 +4,8 @@ st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 # ✅ Correct way to import modules from scripts folder
 from scripts.run_foia import run_foia
 from scripts.run_demand import run
+from scripts.run_mediation import fill_mediation_template, generate_introduction, generate_plaintiff_statement, generate_defendant_statement, generate_demand_section, generate_facts_liability_section, generate_causation_injuries, generate_additional_harms, generate_future_medical, generate_conclusion_section
+
 
 import pandas as pd
 import os
@@ -83,6 +85,7 @@ with st.sidebar:
         "📬 FOIA Requests",
         "📂 Demands",
         "📊 Litigation Dashboard",
+        "🧾 Mediation Memos",
         "🚧 Complaint (In Progress)",
         "🚧 Subpoenas (In Progress)",
     ])
@@ -446,7 +449,64 @@ if tool == "📊 Litigation Dashboard":
         st.error(f"❌ Could not load dashboard: {e}")
         st.stop()
 
+# === Mediation Memo Generator ===
+if tool == "🧾 Mediation Memos":
+    st.header("🧾 Generate Confidential Mediation Memo")
 
+    with st.form("mediation_form"):
+        court = st.text_input("Court")
+        case_number = st.text_input("Case Number")
+
+        plaintiff = st.text_input("Plaintiff Name")
+        defendant1 = st.text_input("Defendant 1 Name")
+        defendant2 = st.text_input("Defendant 2 Name (optional)")
+
+        intro_raw = st.text_area("I. Introduction (factual background)")
+        bio_raw = st.text_area("II. Plaintiff Statement (bio & employment)")
+        def1_raw = st.text_area("Defendant 1 Statement (facts & history)")
+        def2_raw = st.text_area("Defendant 2 Statement (if applicable)")
+        demand_raw = st.text_area("III. Demand (facts or insurance info)")
+        facts_raw = st.text_area("IV. Facts / Liability")
+        causation_raw = st.text_area("V. Causation, Injuries, and Treatment")
+        harms_raw = st.text_area("VI. Additional Harms and Losses")
+        future_raw = st.text_area("VII. Future Medical Bills Related to the Collision")
+        conclusion_raw = st.text_area("VIII. Conclusion")
+
+        submitted = st.form_submit_button("Generate Mediation Memo")
+
+    if submitted:
+        with st.spinner("✍️ Drafting memo..."):
+            try:
+                output_dir = "outputs/mediation_memos"
+                os.makedirs(output_dir, exist_ok=True)
+
+                data = {
+                    "court": court,
+                    "case_number": case_number,
+                    "plaintiff": plaintiff,
+                    "defendant1": defendant1,
+                    "defendant2": defendant2,
+                    "introduction": generate_introduction(intro_raw, plaintiff),
+                    "plaintiff_statement": generate_plaintiff_statement(bio_raw, plaintiff),
+                    "defendant1_statement": generate_defendant_statement(def1_raw, "Defendant 1"),
+                    "defendant2_statement": generate_defendant_statement(def2_raw, "Defendant 2") if defendant2 else "",
+                    "demand": generate_demand_section(demand_raw, plaintiff),
+                    "facts_liability": generate_facts_liability_section(facts_raw),
+                    "causation_injuries": generate_causation_injuries(causation_raw),
+                    "additional_harms": generate_additional_harms(harms_raw),
+                    "future_bills": generate_future_medical(future_raw),
+                    "conclusion": generate_conclusion_section(conclusion_raw),
+                }
+
+                template_path = "templates/mediation_template.docx"
+                file_path = fill_mediation_template(data, template_path, output_dir)
+
+                with open(file_path, "rb") as f:
+                    st.success("✅ Mediation memo generated!")
+                    st.download_button("📥 Download Mediation Memo", f, file_name=os.path.basename(file_path))
+
+            except Exception as e:
+                st.error(f"❌ Error: {e}")
 
 if tool == "📖 Instructions & Support":
     st.header("📘 Instructions & Support")
@@ -485,7 +545,7 @@ Use this tool to generate **individual FOIA request letters** using form fields 
 **Step-by-step:**
 1. **Fill Out the Form**
    - Enter details like Client ID, Recipient info, Synopsis, Requested Records, and any Explicit Instructions (Optional but typically helpful to establish scope).
-   - Enter the case type (Not Neos case type, get specific. Ex: Motorcycle Accident), the Facility or System (Ex: Municpal Police Department, DCFS, etc.), and the Recipient Role (Ex. Responding Officers). 
+   - Enter the case type (Not Neos case type, get specific. Ex: Motorcycle Accident), the Facility or System (Ex: Municipal Police Department, DCFS, etc.), and the Recipient Role (Ex. Responding Officers). 
    - All inputs are required unless marked optional.
 
 2. **Click 'Generate FOIA Letter'**
@@ -508,6 +568,22 @@ Use this tool to generate **individual demand letters** using a manual entry for
 
 3. **Download**
    - A finished letter will be available for download after approximately a minute.
+        """)
+
+    with st.expander("🧾 Mediation Memos – How to Use", expanded=False):
+        st.markdown("""
+Use this tool to generate **confidential mediation memorandums** from structured prompts.
+
+**Step-by-step:**
+1. **Fill Out Each Section**
+   - Court name, case number, and all memo sections (Intro through Conclusion).
+   - AI will convert each input into a professional paragraph in your memo.
+
+2. **Click 'Generate Mediation Memo'**
+   - A final Word document will be created with your inputs formatted and polished.
+
+3. **Download**
+   - You'll get a download button to retrieve the complete mediation memorandum.
         """)
 
     with st.expander("🚧 Complaints – Coming Soon", expanded=False):
