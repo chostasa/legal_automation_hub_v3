@@ -499,7 +499,13 @@ elif tool == "🧾 Mediation Memos":
         plaintiff = st.text_input("Plaintiff Name")
         defendant1 = st.text_input("Defendant 1 Name")
         defendant2 = st.text_input("Defendant 2 Name (optional)")
+        defendant3 = st.text_input("Defendant 3 Name (optional)")
+        defendant4 = st.text_input("Defendant 4 Name (optional)")
+        defendant5 = st.text_input("Defendant 5 Name (optional)")
+        defendant6 = st.text_input("Defendant 6 Name (optional)")
+        defendant7 = st.text_input("Defendant 7 Name (optional)")
         complaint_narrative = st.text_area("📔 Complaint Narrative", height=200)
+        party_info = st.text_area("Party Information from Complaint", height=200)
         settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
         medical_summary = st.text_area("🏥 Medical Summary", height=200)
 
@@ -516,7 +522,13 @@ elif tool == "🧾 Mediation Memos":
                 "plaintiff": plaintiff,
                 "defendant1": defendant1,
                 "defendant2": defendant2,
+                "defendant3": defendant3,
+                "defendant4": defendant4,
+                "defendant5": defendant5,
+                "defendant6": defendant6,
+                "defendant7": defendant7,
                 "complaint_narrative": complaint_narrative,
+                "party_info": party_info,  # ✅ ADD THIS LINE HERE
                 "settlement_summary": settlement_summary,
                 "medical_summary": medical_summary
             }
