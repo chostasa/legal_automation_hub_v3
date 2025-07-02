@@ -3,6 +3,7 @@ st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
 from scripts.run_foia import run_foia
 from scripts.run_demand import run
+from scripts.run_mediation import extract_and_redact_text_from_pdf
 from scripts.run_mediation import (
     fill_mediation_template,
     generate_introduction,
@@ -509,21 +510,33 @@ elif tool == "🧾 Mediation Memos":
     st.markdown("Paste all relevant facts...")
     st.subheader("📎 Upload a Deposition or Record for OCR Quote Extraction (Optional)")
 
+
+    # ✅ Initialize session state
+    if "ocr_text" not in st.session_state:
+        st.session_state.ocr_text = ""
+
+    if "quotes" not in st.session_state:
+        st.session_state.quotes = ""
+
+    st.subheader("📎 Upload a Deposition or Record for OCR Quote Extraction (Optional)")
     uploaded_pdf = st.file_uploader("Upload PDF for OCR", type=["pdf"])
 
-    ocr_text = ""
-    quotes = ""
     if uploaded_pdf:
+        st.success(f"📄 Uploaded: {uploaded_pdf.name}")
+        st.markdown("**Uploader recognized your file. Running OCR...**")
         with st.spinner("Running OCR..."):
-            ocr_text = extract_and_redact_text_from_pdf(uploaded_pdf)
-            st.subheader("🔍 OCR’d and Redacted Text")
-            st.text_area("Review before AI sees it", ocr_text, height=300)
+            st.session_state.ocr_text = extract_and_redact_text_from_pdf(uploaded_pdf)
 
-        if ocr_text:
-            if st.button("🧠 Extract Key Quotes from OCR"):
-                quotes = extract_quotes_from_text(ocr_text)
-                st.success("✅ Quotes identified.")
-                st.text_area("🗣️ Key Quotes", quotes, height=200)
+    if st.session_state.ocr_text:
+        st.subheader("🔍 OCR’d and Redacted Text")
+        st.text_area("Review before AI sees it", st.session_state.ocr_text, height=300)
+
+        if st.button("🧠 Extract Key Quotes from OCR"):
+            st.session_state.quotes = extract_quotes_from_text(st.session_state.ocr_text)
+            st.success("✅ Quotes identified.")
+
+    if st.session_state.quotes:
+        st.text_area("🗣️ Key Quotes", st.session_state.quotes, height=200)
 
     with st.form("simple_mediation_form"):
         court = st.text_input("Court")
@@ -566,8 +579,8 @@ elif tool == "🧾 Mediation Memos":
                 "deposition_damages": deposition_damages,
                 **plaintiffs,
                 **defendants,
-                "ocr_notes": ocr_text,
-                "extracted_quotes": quotes,
+                "ocr_notes": st.session_state.ocr_text,
+                "extracted_quotes": st.session_state.quotes,
             }
 
             template_path = "templates/mediation_template.docx"
