@@ -306,6 +306,8 @@ def fill_mediation_template(data, template_path, output_path):
 
     return output_file_path
 
+import time
+
 def generate_memo_from_summary(data, template_path, output_dir):
     memo_data = {}
 
@@ -316,20 +318,37 @@ def generate_memo_from_summary(data, template_path, output_dir):
     memo_data["defendant2"] = data.get("defendant2", "")
 
     memo_data["introduction"] = generate_introduction(data["complaint_narrative"], data["plaintiff"])
+    time.sleep(10)
+
     memo_data["plaintiff_statement"] = generate_plaintiff_statement(data["complaint_narrative"], data["plaintiff"])
+    time.sleep(10)
+
     memo_data["defendant1_statement"] = generate_defendant_statement(data["complaint_narrative"], data["defendant1"])
-    
+    time.sleep(10)
+
     if data.get("defendant2"):
         memo_data["defendant2_statement"] = generate_defendant_statement(data["complaint_narrative"], data["defendant2"])
     else:
         memo_data["defendant2_statement"] = ""
+    time.sleep(10)
 
     memo_data["demand"] = generate_demand_section(data["settlement_summary"], data["plaintiff"])
+    time.sleep(10)
+
     memo_data["facts_liability"] = generate_facts_liability_section(data["complaint_narrative"])
+    time.sleep(10)
+
     memo_data["causation_injuries"] = generate_causation_injuries(data["medical_summary"])
+    time.sleep(10)
+
     memo_data["additional_harms"] = generate_additional_harms(data["medical_summary"])
+    time.sleep(10)
+
     memo_data["future_bills"] = generate_future_medical(data["medical_summary"])
+    time.sleep(10)
+
     memo_data["conclusion"] = generate_conclusion_section(data["settlement_summary"])
 
     return fill_mediation_template(memo_data, template_path, output_dir)
+
 
