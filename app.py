@@ -1,10 +1,22 @@
 import streamlit as st
 st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
-# ✅ Correct way to import modules from scripts folder
 from scripts.run_foia import run_foia
 from scripts.run_demand import run
-from scripts.run_mediation import fill_mediation_template, generate_introduction, generate_plaintiff_statement, generate_defendant_statement, generate_demand_section, generate_facts_liability_section, generate_causation_injuries, generate_additional_harms, generate_future_medical, generate_conclusion_section
+from scripts.run_mediation import (
+    fill_mediation_template,
+    generate_introduction,
+    generate_plaintiff_statement,
+    generate_defendant_statement,
+    generate_demand_section,
+    generate_facts_liability_section,
+    generate_causation_injuries,
+    generate_additional_harms,
+    generate_future_medical,
+    generate_conclusion_section,
+    generate_memo_from_summary  
+)
+
 
 
 import pandas as pd
@@ -450,9 +462,7 @@ if tool == "📊 Litigation Dashboard":
         st.stop()
 
 # === Mediation Memo Generator (Simplified Input) ===
-if st.sidebar.radio("Choose Tool", [
-    "🧾 Mediation Memos (Simplified)",
-]) == "🧾 Mediation Memos (Simplified)":
+elif tool == "🧾 Mediation Memos":
 
     st.header("🧾 Generate Confidential Mediation Memo")
     st.markdown("""
@@ -466,7 +476,10 @@ if st.sidebar.radio("Choose Tool", [
         plaintiff = st.text_input("Plaintiff Name")
         defendant1 = st.text_input("Defendant 1 Name")
         defendant2 = st.text_input("Defendant 2 Name (optional)")
-        raw_summary = st.text_area("📝 Paste Case Summary (facts, injuries, medicals, etc.)", height=500)
+        complaint_narrative = st.text_area("📄 Complaint Narrative", height=200)
+        settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
+        medical_summary = st.text_area("🏥 Medical Summary", height=200)
+
         submitted = st.form_submit_button("Generate Memo")
 
     if submitted:
@@ -481,7 +494,10 @@ if st.sidebar.radio("Choose Tool", [
                     "plaintiff": plaintiff,
                     "defendant1": defendant1,
                     "defendant2": defendant2,
-                    "summary": raw_summary
+                    "complaint_narrative": complaint_narrative,
+                    "settlement_summary": settlement_summary,
+                    "medical_summary": medical_summary
+
                 }
 
                 template_path = "templates/mediation_template.docx"

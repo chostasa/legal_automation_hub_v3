@@ -62,19 +62,6 @@ The jury will punish defendants and STL Truckers for their conscious disregard f
 Defendants state they have a $1,000,000.00 eroding policy for this case.  They refuse to sign an affidavit that there is excess or umbrella coverage.  Plaintiff made a pre-suit demand of $1,000,000.00.  Defendants had offered a nominal amount of $50,000.00.  Stan will begin negotiating when Plaintiff is aware of the true policy limits. Verdict potential exceeds $3,000,000.00 for a case that has life altering injuries and punitive damages. 
 """
 
-def generate_introduction(input_text, client_name):
-    prompt = f"""
-{NO_HALLUCINATION_NOTE}
-{LEGAL_FLUENCY_NOTE}
-{BAN_PHRASING_NOTE}
-{FORBIDDEN_PHRASES}
-{NO_PASSIVE_LANGUAGE_NOTE}
-
-Use the following example as a style guide only. DO NOT copy content or facts.
-
-Example:
-{INTRO_EXAMPLE}
-
 Now write the Introduction section of a confidential mediation memorandum for {client_name}. Focus on tone, structure, and legal fluency. Use only the information provided below:
 
 {input_text}
