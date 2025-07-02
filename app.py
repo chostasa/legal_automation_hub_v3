@@ -16,7 +16,7 @@ from scripts.run_mediation import (
     generate_additional_harms,
     generate_future_medical,
     generate_conclusion_section,
-    generate_memo_from_summary  
+    generate_memo_from_summary,
 )
 
 import pandas as pd
