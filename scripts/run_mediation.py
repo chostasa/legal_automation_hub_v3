@@ -5,6 +5,11 @@ from docx.table import _Cell
 from docx.text.paragraph import Paragraph
 from openai import OpenAI
 import streamlit as st
+import pytesseract
+from pdf2image import convert_from_bytes
+import re
+from PIL import Image
+
 
 api_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=api_key)
@@ -374,6 +379,21 @@ def safe_generate(fn, *args, retries=3, wait_time=10):
                 raise e
     raise Exception("❌ gpt-4-turbo rate limit error after multiple attempts.")
 
+def extract_and_redact_text_from_pdf(uploaded_file):
+    images = convert_from_bytes(uploaded_file.read())
+    full_text = ""
+    for img in images:
+        text = pytesseract.image_to_string(img)
+        full_text += text + "\n"
+
+    # Redact PHI / sensitive info (basic safeguards)
+    full_text = re.sub(r"\b(?:DOB|D\.O\.B)\s*[:\-]?\s*\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}", "[REDACTED DOB]", full_text, flags=re.I)
+    full_text = re.sub(r"\b\d{3}-\d{2}-\d{4}\b", "[REDACTED SSN]", full_text)  # SSNs
+    full_text = re.sub(r"\b(Name|Patient)\s*[:\-]?\s*[A-Z][a-z]+\s[A-Z][a-z]+", "[REDACTED NAME]", full_text)
+
+    return full_text
+
+
 # --- Main generation function ---
 def generate_memo_from_summary(data, template_path, output_dir):
     memo_data = {}
@@ -409,8 +429,9 @@ def generate_memo_from_summary(data, template_path, output_dir):
     memo_data["facts_liability"] = safe_generate(
         generate_facts_liability_section,
         data["complaint_narrative"],
-        data.get("deposition_liability", "")
+        data.get("extracted_quotes", "") or data.get("deposition_liability", "")
     )
+
     memo_data["causation_injuries"] = safe_generate(generate_causation_injuries, data["medical_summary"])
     memo_data["additional_harms"] = safe_generate(
         generate_additional_harms,

@@ -56,6 +56,21 @@ def safe_generate(func, *args, max_retries=3, delay=5, **kwargs):
         except Exception as e:
             raise RuntimeError(f"Generation failed: {e}")
 
+def extract_quotes_from_text(ocr_text):
+    prompt = f"""
+You are a legal assistant. Given this deposition or record text, extract the most relevant direct quotes (verbatim, in quotes) that support either:
+- liability,
+- injuries,
+- or harm to quality of life.
+
+Only return a list of quotes. Do not paraphrase. Only use what is in the input.
+
+Input:
+{ocr_text}
+"""
+    return generate_with_openai(prompt)
+
+
 
 # === Username + Password Login ===
 if "logged_in" not in st.session_state:
@@ -492,10 +507,28 @@ if tool == "📊 Litigation Dashboard":
 elif tool == "🧾 Mediation Memos":
     st.header("🧾 Generate Confidential Mediation Memo")
     st.markdown("Paste all relevant facts...")
+    st.subheader("📎 Upload a Deposition or Record for OCR Quote Extraction (Optional)")
+
+    uploaded_pdf = st.file_uploader("Upload PDF for OCR", type=["pdf"])
+
+    ocr_text = ""
+    quotes = ""
+    if uploaded_pdf:
+        with st.spinner("Running OCR..."):
+            ocr_text = extract_and_redact_text_from_pdf(uploaded_pdf)
+            st.subheader("🔍 OCR’d and Redacted Text")
+            st.text_area("Review before AI sees it", ocr_text, height=300)
+
+        if ocr_text:
+            if st.button("🧠 Extract Key Quotes from OCR"):
+                quotes = extract_quotes_from_text(ocr_text)
+                st.success("✅ Quotes identified.")
+                st.text_area("🗣️ Key Quotes", quotes, height=200)
 
     with st.form("simple_mediation_form"):
         court = st.text_input("Court")
         case_number = st.text_input("Case Number")
+
         plaintiffs = {}
         for i in range(1, 4):
             label = f"Plaintiff {i} Name" + (" (required)" if i == 1 else " (optional)")
@@ -532,9 +565,10 @@ elif tool == "🧾 Mediation Memos":
                 "deposition_liability": deposition_liability,
                 "deposition_damages": deposition_damages,
                 **plaintiffs,
-                **defendants
+                **defendants,
+                "ocr_notes": ocr_text,
+                "extracted_quotes": quotes,
             }
-
 
             template_path = "templates/mediation_template.docx"
 
@@ -561,28 +595,32 @@ elif tool == "🧾 Mediation Memos":
             ]
 
             memo_data = {
-                "court": court,
-                "case_number": case_number,
-                "plaintiff": plaintiff,
+                "Court": court,
+                "Case Number": case_number,
+                "Plaintiff1": plaintiffs["plaintiff1"],
             }
 
+            for i in range(2, 4):
+                memo_data[f"Plaintiff{i}"] = data.get(f"plaintiff{i}", "")
+                memo_data[f"Plaintiff{i} Statement"] = ""
+
             for i in range(1, 8):
-                if defendants[f"defendant{i}"]:
-                    memo_data[f"defendant{i}"] = defendants[f"defendant{i}"]
+                memo_data[f"Defendant{i}"] = data.get(f"defendant{i}", "")
+                memo_data[f"Defendant{i} Statement"] = ""
 
             total = len(steps)
             for idx, (text, key) in enumerate(steps):
                 progress_text.text(text)
 
                 if key == "introduction":
-                    memo_data[key] = safe_generate(generate_introduction, data["complaint_narrative"], data["plaintiff"])
+                    memo_data[key] = safe_generate(generate_introduction, data["complaint_narrative"], data["plaintiff1"])
                 elif key == "plaintiff_statement":
-                    memo_data[key] = safe_generate(generate_plaintiff_statement, data["complaint_narrative"], data["plaintiff"])
+                    memo_data["Plaintiff1 Statement"] = safe_generate(generate_plaintiff_statement, data["complaint_narrative"], data["plaintiff1"])
                 elif key.startswith("defendant") and key.endswith("_statement"):
                     i = key.replace("defendant", "").replace("_statement", "")
-                    memo_data[key] = safe_generate(generate_defendant_statement, data["complaint_narrative"], data[f"defendant{i}"])
+                    memo_data[f"Defendant{i} Statement"] = safe_generate(generate_defendant_statement, data["complaint_narrative"], data[f"defendant{i}"])
                 elif key == "demand":
-                    memo_data[key] = safe_generate(generate_demand_section, data["settlement_summary"], data["plaintiff"])
+                    memo_data[key] = safe_generate(generate_demand_section, data["settlement_summary"], data["plaintiff1"])
                 elif key == "facts_liability":
                     memo_data[key] = safe_generate(generate_facts_liability_section, data["complaint_narrative"])
                 elif key == "causation_injuries":
@@ -596,16 +634,22 @@ elif tool == "🧾 Mediation Memos":
 
                 progress_bar.progress((idx + 1) / total)
 
+            memo_data["Introduction"] = memo_data.pop("introduction", "")
+            memo_data["Facts/Liability"] = memo_data.pop("facts_liability", "")
+            memo_data["Causation, Injuries, and Treatment"] = memo_data.pop("causation_injuries", "")
+            memo_data["Additional Harms and Losses"] = memo_data.pop("additional_harms", "")
+            memo_data["Future Medical Bills Related to the Collision"] = memo_data.pop("future_bills", "")
+            memo_data["Conclusion"] = memo_data.pop("conclusion", "")
+            memo_data["Demand"] = memo_data.pop("demand", "")
+
             file_path = fill_mediation_template(memo_data, template_path, output_dir)
 
             with open(file_path, "rb") as f:
                 st.success("✅ Mediation memo generated!")
-                st.download_button("🗕️ Download Mediation Memo", f, file_name=os.path.basename(file_path))
+                st.download_button("🗅️ Download Mediation Memo", f, file_name=os.path.basename(file_path))
 
         except Exception as e:
             st.error(f"❌ Error: {e}")
-
-
 
 if tool == "📖 Instructions & Support":
     st.header("📘 Instructions & Support")
