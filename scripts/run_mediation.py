@@ -62,18 +62,6 @@ The jury will punish defendants and STL Truckers for their conscious disregard f
 Defendants state they have a $1,000,000.00 eroding policy for this case.  They refuse to sign an affidavit that there is excess or umbrella coverage.  Plaintiff made a pre-suit demand of $1,000,000.00.  Defendants had offered a nominal amount of $50,000.00.  Stan will begin negotiating when Plaintiff is aware of the true policy limits. Verdict potential exceeds $3,000,000.00 for a case that has life altering injuries and punitive damages. 
 """
 
-Now write the Introduction section of a confidential mediation memorandum for {client_name}. Focus on tone, structure, and legal fluency. Use only the information provided below:
-
-{input_text}
-"""
-    return generate_with_openai(prompt)
-
-INTRO_EXAMPLE = """
-{{Plaintiff}}, 42, will require a L5-S1 decompressive hemilaminectomy and microdiscectomy as a result of the Defendant driver rear ending Stan at over 50 mph on his very first trip as a trucker. Plaintiff has been given leave to pursue punitive damages against the defendants. Defendant STL Trucking has failed to produce even one witness for deposition. STL claims that no STL personnel have knowledge of the crash and that depositions are not relevant. (Ex. A, Plaintiff’s Complaint at Law)
-The jury will punish defendants and STL Truckers for their conscious disregard for safety and training of the Defendant driver. Mr. Doe has permanent disc herniations at L3-4, L4-5, and L5-S1. Plaintiff will require future medical care including surgery, injections and physical therapy for the rest of his life. Mr. Doe will require $869,952.41 related to the August 8, 2018 crash. 
-Defendants state they have a $1,000,000.00 eroding policy for this case.  They refuse to sign an affidavit that there is excess or umbrella coverage.  Plaintiff made a pre-suit demand of $1,000,000.00.  Defendants had offered a nominal amount of $50,000.00.  Stan will begin negotiating when Plaintiff is aware of the true policy limits. Verdict potential exceeds $3,000,000.00 for a case that has life altering injuries and punitive damages. 
-"""
-
 def generate_introduction(input_text, client_name):
     prompt = f"""
 {NO_HALLUCINATION_NOTE}
