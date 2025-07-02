@@ -32,7 +32,14 @@ from users import USERS, hash_password
 
 import time
 import openai
-from openai.errors import RateLimitError
+try:
+    from openai.error import RateLimitError  # older SDKs
+except ImportError:
+    try:
+        from openai.errors import RateLimitError  # newer SDKs
+    except ImportError:
+        RateLimitError = Exception  # fallback
+
 
 def safe_generate(func, *args, max_retries=3, delay=5, **kwargs):
     """
