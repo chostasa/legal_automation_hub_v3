@@ -1,6 +1,8 @@
 import streamlit as st
 st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
+from scripts.run_foia import run_foia
+from scripts.run_demand import run
 from scripts.run_mediation import (
     extract_and_redact_text_from_pdf,
     generate_with_openai,
