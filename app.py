@@ -30,6 +30,26 @@ from docx import Document
 from datetime import datetime
 from users import USERS, hash_password
 
+import time
+import openai
+from openai.error import RateLimitError
+
+def safe_generate(func, *args, max_retries=3, delay=5, **kwargs):
+    """
+    Retry wrapper to safely call GPT-powered functions like generate_xxx with backoff on RateLimitError.
+    """
+    for attempt in range(max_retries):
+        try:
+            return func(*args, **kwargs)
+        except RateLimitError:
+            if attempt < max_retries - 1:
+                time.sleep(delay * (attempt + 1))  # Exponential backoff
+            else:
+                raise
+        except Exception as e:
+            raise RuntimeError(f"Generation failed: {e}")
+
+
 # === Username + Password Login ===
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
