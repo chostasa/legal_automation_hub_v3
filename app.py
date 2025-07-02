@@ -561,7 +561,6 @@ elif tool == "🧾 Mediation Memos":
                     memo_data[key] = safe_generate(generate_defendant_statement, data["complaint_narrative"], data["defendant2"])
                 elif key == "demand":
                     memo_data[key] = safe_generate(generate_demand_section, data["settlement_summary"], data["plaintiff"])
-                    time.sleep(60)  # 1-minute delay to avoid token-per-minute rate limits
                 elif key == "facts_liability":
                     memo_data[key] = safe_generate(generate_facts_liability_section, data["complaint_narrative"])
                 elif key == "causation_injuries":
