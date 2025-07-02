@@ -499,7 +499,7 @@ elif tool == "🧾 Mediation Memos":
         plaintiff = st.text_input("Plaintiff Name")
         defendant1 = st.text_input("Defendant 1 Name")
         defendant2 = st.text_input("Defendant 2 Name (optional)")
-        complaint_narrative = st.text_area("📄 Complaint Narrative", height=200)
+        complaint_narrative = st.text_area("📔 Complaint Narrative", height=200)
         settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
         medical_summary = st.text_area("🏥 Medical Summary", height=200)
 
@@ -561,6 +561,7 @@ elif tool == "🧾 Mediation Memos":
                     memo_data[key] = safe_generate(generate_defendant_statement, data["complaint_narrative"], data["defendant2"])
                 elif key == "demand":
                     memo_data[key] = safe_generate(generate_demand_section, data["settlement_summary"], data["plaintiff"])
+                    time.sleep(60)  # 1-minute delay to avoid token-per-minute rate limits
                 elif key == "facts_liability":
                     memo_data[key] = safe_generate(generate_facts_liability_section, data["complaint_narrative"])
                 elif key == "causation_injuries":
@@ -578,7 +579,7 @@ elif tool == "🧾 Mediation Memos":
 
             with open(file_path, "rb") as f:
                 st.success("✅ Mediation memo generated!")
-                st.download_button("📥 Download Mediation Memo", f, file_name=os.path.basename(file_path))
+                st.download_button("📅 Download Mediation Memo", f, file_name=os.path.basename(file_path))
 
         except Exception as e:
             st.error(f"❌ Error: {e}")
