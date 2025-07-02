@@ -496,7 +496,11 @@ elif tool == "🧾 Mediation Memos":
     with st.form("simple_mediation_form"):
         court = st.text_input("Court")
         case_number = st.text_input("Case Number")
-        plaintiff = st.text_input("Plaintiff Name")
+        plaintiffs = {}
+        for i in range(1, 4):
+            label = f"Plaintiff {i} Name" + (" (required)" if i == 1 else " (optional)")
+            plaintiffs[f"plaintiff{i}"] = st.text_input(label)
+
         defendants = {}
         for i in range(1, 8):
             label = f"Defendant {i} Name" + (" (optional)" if i > 1 else "")
@@ -506,6 +510,10 @@ elif tool == "🧾 Mediation Memos":
         party_info = st.text_area("Party Information from Complaint", height=200)
         settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
         medical_summary = st.text_area("🏥 Medical Summary", height=200)
+        explicit_instructions = st.text_area("📝 Additional Instructions for Memo (optional)", height=100)
+
+        deposition_liability = st.text_area("📄 Deposition Excerpts (Liability)", height=150)
+        deposition_damages = st.text_area("📄 Deposition Excerpts (Damages)", height=150)
 
         submitted = st.form_submit_button("Generate Memo")
 
@@ -517,13 +525,16 @@ elif tool == "🧾 Mediation Memos":
             data = {
                 "court": court,
                 "case_number": case_number,
-                "plaintiff": plaintiff,
                 "complaint_narrative": complaint_narrative,
                 "party_info": party_info,
                 "settlement_summary": settlement_summary,
                 "medical_summary": medical_summary,
+                "deposition_liability": deposition_liability,
+                "deposition_damages": deposition_damages,
+                **plaintiffs,
                 **defendants
             }
+
 
             template_path = "templates/mediation_template.docx"
 

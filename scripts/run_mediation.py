@@ -146,8 +146,26 @@ Defendant driver’s truck knocked Stan’s truck off its frame.
 The force of the collision caused Mr. Efimov’s head to violently snap forwards and backwards (Ex. A, Doe Dep. 86). Mr. Doe heard no warning sounds, no horns, and no break noises prior to the collision, and later found no skid marks on the road (Ex. A, Doe Dep. 39). In fact, defendant’s vehicle had so much momentum at the point of impact that defendant’s vehicle displaced Mr. Efimov’s commercial semi-tractor nearly 15 feet forward, causing the cab to come off its frame (Ex. A, Doe Dep. 41).
 After making contact with Mr. Efimov’s truck, defendant veered into the left lane and collided with another vehicle (Ex. B, Indiana Crash Report). This vehicle was pushed forward, striking the vehicle in front of it, eventually coming to rest in the median (Ex. B, Indiana Crash Report). Three of the four vehicles involved in this incident had to be towed away (Ex. B, Indiana Crash Report). That day, Mr. Doe began experiencing neck pain, back pain, and dizziness (Ex. A, Doe Dep. 49). At his hotel in the morning, his pain was so extreme that he had to call his father to physically help him get out of bed, to go to the restroom, and to get into his car. He sought medical the next day back in Chicago (Ex. A, Doe Dep. 49).
 """
+PARTIES_EXAMPLE = """
+Plaintiff Stan Efimov is a resident of Cook County, Illinois. Defendant STL Truckers is a commercial carrier incorporated in Indiana, conducting business in Illinois, and was the employer of Defendant driver Arsen Rakhimdjanov. Defendant Arsen Rakhimdjanov was operating a commercial truck within the scope of his employment with STL Truckers at the time of the collision.
+"""
 
-def generate_facts_liability_section(facts):
+def generate_party_section(party_details):
+    prompt = f"""
+{NO_HALLUCINATION_NOTE}
+{LEGAL_FLUENCY_NOTE}
+
+Write a “Parties” section using only the information below. Describe the Plaintiff and all Defendants, including any employer or corporate affiliations. Keep it factual, professional, and concise.
+
+Example:
+{PARTIES_EXAMPLE}
+
+Input:
+{party_details}
+"""
+    return generate_with_openai(prompt)
+
+def generate_facts_liability_section(facts, deposition_text=None):
     prompt = f"""
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
@@ -177,6 +195,17 @@ On March 4, 2021, Mr. Doe reported to Dr. Farag that he had an improvement in pa
 His most recent MRI occurred on June 20, 2022 at Empire Imaging in Pembroke Pines, FL. This scan found a disc bulge with a superimposed right foraminal disc herniation at L3-4 and a disc bulge with a left foraminal disc herniation at L4-5. At L5-S1 there is a disc bulge with superimposed right posterior disc herniation. 
 At present, Mr. Doe reports that his conditions remain symptomatic and cause ongoing disability including sciatic nerve pain. He reports that his low back and lower extremity pain remains present despite undergoing extensive therapy. 
 """
+    if deposition_text:
+        prompt += f"""
+
+You may reference **direct quotes** from the following deposition excerpts if they support liability. Introduce them professionally (e.g., "As {plaintiff} testified, ..." or "Deposition excerpts confirm..."):
+
+Deposition excerpts for liability:
+{deposition_text}
+"""
+
+    prompt += f"\n\nExample:\n{FACTS_LIABILITY_EXAMPLE}"
+    return generate_with_openai(prompt)
 
 def generate_causation_injuries(causation_info):
     prompt = f"""
@@ -198,27 +227,29 @@ Prior to this collision, Mr. Doe was a healthy and active 38-year-old man who en
 Since the day of the crash, Stan has not been able to drive a truck.  He physically cannot climb into a truck, sit for long hours, work to unhitch the trailer, and climb out of the truck.  He enjoyed playing with and lifting up his niece, who weighs 25 pounds (Ex. A, Doe Dep. 79). Since the accident, he has been unable to partake in these activities that once brought him great joy. Mr. Doe had been driving commercial trucks since 2014 and was forced to step away from driving because of the intense pain he experienced after sitting for prolonged periods of time (Ex. A, Doe Dep. 67). As a result of the collision and to this date, he has been unable to do any these activities without experiencing severe, debilitating pain and has, therefore, lost the quality of life he once had. He had no previous neck or back injuries before this accident.
 """
 
-def generate_additional_harms(harm_info):
+def generate_additional_harms(harm_info, deposition_text=None):
     prompt = f"""
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
 Write the “Additional Harms and Losses” section based on the information below.
 
-Example:
-{HARMS_EXAMPLE}
-
 Input:
 {harm_info}
 """
-    return generate_with_openai(prompt)
+    if deposition_text:
+        prompt += f"""
 
-FUTURE_BILLS_EXAMPLE = """
-As a result of the occurrence, Stan will require surgery at L5-S1 – specifically a 
-decompressive hemilaminectomy and microdiscectomy.  Plaintiff was also seen by Dr. Bowman who examined the patient and rendered an opinion that Stan will require in excess of $869,000.00 in future medical care which does not account for the surgery recently recommended by the surgeon.  (Ex. H, Dr. Bowman Life Care Plan and Data)
+You may quote directly from the following deposition excerpts to reinforce impact on daily life, work, or emotional well-being:
+
+Deposition excerpts for damages:
+{deposition_text}
 """
 
-def generate_future_medical(future_info):
+    prompt += f"\n\nExample:\n{HARMS_EXAMPLE}"
+    return generate_with_openai(prompt)
+
+def generate_future_medical(future_info, deposition_text=None):
     prompt = f"""
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
@@ -229,6 +260,14 @@ Draft a future medical expenses section using this tone:
 
 Input:
 {future_info}
+"""
+    if deposition_text:
+        prompt += f"""
+
+You may quote directly from the following deposition excerpts to reinforce impact on daily life, work, or emotional well-being:
+
+Deposition excerpts for damages:
+{deposition_text}
 """
     return generate_with_openai(prompt)
 
@@ -280,16 +319,14 @@ def replace_placeholders(doc, replacements):
 def fill_mediation_template(data, template_path, output_path):
     doc = Document(template_path)
 
+    # Start with static placeholders
     replacements = {
         "{{Court}}": data.get("court", ""),
         "{{Plaintiff}}": data.get("plaintiff", ""),
-        "{{Defendant1}}": data.get("defendant1", ""),
-        "{{Defendant2}}": data.get("defendant2", ""),
         "Case Number": data.get("case_number", ""),
         "{{Introduction}}": data.get("introduction", ""),
+        "{{Parties}}": data.get("parties", ""),
         "{{Plaintiff Statement}}": data.get("plaintiff_statement", ""),
-        "{{Defendant1 Statement}}": data.get("defendant1_statement", ""),
-        "{{Defendant2 Statement}}": data.get("defendant2_statement", ""),
         "{{Demand}}": data.get("demand", ""),
         "{{Facts/Liability}}": data.get("facts_liability", ""),
         "{{Causation, Injuries, and Treatment}}": data.get("causation_injuries", ""),
@@ -298,6 +335,17 @@ def fill_mediation_template(data, template_path, output_path):
         "{{Conclusion}}": data.get("conclusion", "")
     }
 
+    # Add up to 3 plaintiffs
+    for i in range(1, 4):
+        replacements[f"{{{{Plaintiff{i}}}}}"] = data.get(f"plaintiff{i}", "")
+        replacements[f"{{{{Plaintiff{i} Statement}}}}"] = data.get(f"plaintiff{i}_statement", "")
+
+
+    # Dynamically add up to 7 defendants
+    for i in range(1, 8):
+        replacements[f"{{{{Defendant{i}}}}}"] = data.get(f"defendant{i}", "")
+        replacements[f"{{{{Defendant{i} Statement}}}}"] = data.get(f"defendant{i}_statement", "")
+
     replace_placeholders(doc, replacements)
 
     filename = f"Mediation_Memo_{data.get('plaintiff', '').replace(' ', '_')}_{datetime.today().strftime('%Y-%m-%d')}.docx"
@@ -305,6 +353,7 @@ def fill_mediation_template(data, template_path, output_path):
     doc.save(output_file_path)
 
     return output_file_path
+
 
 import time
 import openai
@@ -328,27 +377,54 @@ def safe_generate(fn, *args, retries=3, wait_time=10):
 # --- Main generation function ---
 def generate_memo_from_summary(data, template_path, output_dir):
     memo_data = {}
-
+    
     memo_data["court"] = data["court"]
     memo_data["case_number"] = data["case_number"]
-    memo_data["plaintiff"] = data["plaintiff"]
-    memo_data["defendant1"] = data["defendant1"]
-    memo_data["defendant2"] = data.get("defendant2", "")
+    # Determine primary plaintiff
+    plaintiff1 = data.get("plaintiff1") or data.get("plaintiff") or "Plaintiff"
+    memo_data["plaintiff"] = plaintiff1
+    memo_data["plaintiff1"] = plaintiff1
+    memo_data["plaintiff1_statement"] = safe_generate(generate_plaintiff_statement, data["complaint_narrative"], plaintiff1)
 
-    memo_data["introduction"] = safe_generate(generate_introduction, data["complaint_narrative"], data["plaintiff"])
-    memo_data["plaintiff_statement"] = safe_generate(generate_plaintiff_statement, data["complaint_narrative"], data["plaintiff"])
-    memo_data["defendant1_statement"] = safe_generate(generate_defendant_statement, data["complaint_narrative"], data["defendant1"])
+    # Handle up to 3 plaintiffs
+    for i in range(2, 4):
+        name = data.get(f"plaintiff{i}", "").strip()
+        if name:
+            memo_data[f"plaintiff{i}"] = name
+            memo_data[f"plaintiff{i}_statement"] = safe_generate(generate_plaintiff_statement, data["complaint_narrative"], name)
 
-    if data.get("defendant2"):
-        memo_data["defendant2_statement"] = safe_generate(generate_defendant_statement, data["complaint_narrative"], data["defendant2"])
-    else:
-        memo_data["defendant2_statement"] = ""
+    # Handle up to 7 defendants dynamically
+    for i in range(1, 8):
+        key = f"defendant{i}"
+        name = data.get(key, "")
+        memo_data[key] = name
+        if name:
+            memo_data[f"{key}_statement"] = safe_generate(generate_defendant_statement, data["complaint_narrative"], name)
+        else:
+            memo_data[f"{key}_statement"] = ""
 
-    memo_data["demand"] = safe_generate(generate_demand_section, data["settlement_summary"], data["plaintiff"])
-    memo_data["facts_liability"] = safe_generate(generate_facts_liability_section, data["complaint_narrative"])
+    # Main body content
+    memo_data["introduction"] = safe_generate(generate_introduction, data["complaint_narrative"], plaintiff1)
+    memo_data["demand"] = safe_generate(generate_demand_section, data["settlement_summary"], plaintiff1)
+    memo_data["facts_liability"] = safe_generate(
+        generate_facts_liability_section,
+        data["complaint_narrative"],
+        data.get("deposition_liability", "")
+    )
     memo_data["causation_injuries"] = safe_generate(generate_causation_injuries, data["medical_summary"])
-    memo_data["additional_harms"] = safe_generate(generate_additional_harms, data["medical_summary"])
-    memo_data["future_bills"] = safe_generate(generate_future_medical, data["medical_summary"])
+    memo_data["additional_harms"] = safe_generate(
+        generate_additional_harms,
+        data["medical_summary"],
+        data.get("deposition_damages", "")
+    )
+
+
+    memo_data["future_bills"] = safe_generate(
+        generate_future_medical,
+        data["medical_summary"],
+        data.get("deposition_damages", "")
+    )
+
     memo_data["conclusion"] = safe_generate(generate_conclusion_section, data["settlement_summary"])
 
     return fill_mediation_template(memo_data, template_path, output_dir)
