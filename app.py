@@ -509,10 +509,20 @@ elif tool == "🧾 Mediation Memos":
     st.subheader("📎 Upload a Deposition or Record for OCR Quote Extraction (Optional)")
     uploaded_pdf = st.file_uploader("Upload PDF for OCR", type=["pdf"])
 
-    full_depo_txt = st.file_uploader("📄 Or Upload Full Deposition Transcript (.txt)", type=["txt"])
-    if full_depo_txt:
-        depo_text = full_depo_txt.read().decode("utf-8")
-        st.text_area("📜 Full Deposition Preview", depo_text[:3000], height=300)
+    full_depo_txts = st.file_uploader(
+        "📄 Upload Full Deposition Transcripts (.txt)", type=["txt"], accept_multiple_files=True
+    )
+    if full_depo_txts:
+        combined_texts = []
+        for uploaded_file in full_depo_txts:
+            text = uploaded_file.read().decode("utf-8")
+            combined_texts.append(text)
+            st.subheader(f"Preview: {uploaded_file.name}")
+            st.text_area(f"Preview of {uploaded_file.name}", text[:3000], height=300)
+
+        depo_text = "\n\n".join(combined_texts)
+    else:
+        depo_text = ""
 
     if st.button("🧠 Extract Key Quotes from Deposition"):
         with st.spinner("Analyzing deposition..."):

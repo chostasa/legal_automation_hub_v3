@@ -128,7 +128,10 @@ def generate_defendant_statement(def_text, label="Defendant"):
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
-Write a concise paragraph introducing {label} using the info below. Do not repeat facts from other sections. Match the example's tone and precision.
+Write a detailed “Role” section for {label}.  
+Describe who {label} is, their official role, what they were responsible for, and their relationship to the case.  
+Use only the information below. Do not repeat facts from other sections.  
+Match the professional tone and style of the example.
 
 Example:
 {DEFENDANT_STATEMENT_EXAMPLE}
@@ -346,7 +349,7 @@ def fill_mediation_template(data, template_path, output_path):
     replacements = {
         "{{Court}}": data.get("court", ""),
         "{{Plaintiff}}": data.get("plaintiff", ""),
-        "Case Number": data.get("case_number", ""),
+        "{{Case Number}}": data.get("case_number", ""),
         "{{Introduction}}": data.get("introduction", ""),
         "{{Parties}}": data.get("parties", ""),
         "{{Plaintiff Statement}}": data.get("plaintiff_statement", ""),
@@ -461,6 +464,7 @@ def generate_memo_from_summary(data, template_path, output_dir):
 
     memo_data["causation_injuries"] = safe_generate(
         generate_causation_injuries, data["medical_summary"])
+
     memo_data["additional_harms"] = safe_generate(
         generate_additional_harms,
         data["medical_summary"],
