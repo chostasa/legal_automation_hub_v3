@@ -517,10 +517,11 @@ elif tool == "🧾 Mediation Memos":
     if full_depo_txts:
         combined_texts = []
         for uploaded_file in full_depo_txts:
+            content = uploaded_file.read()
             try:
-                text = uploaded_file.read().decode("utf-8")
+                text = content.decode("utf-8")
             except UnicodeDecodeError:
-                text = uploaded_file.read().decode("latin-1")
+                text = content.decode("latin-1")
             combined_texts.append(text)
             st.subheader(f"Preview: {uploaded_file.name}")
             st.text_area(f"Preview of {uploaded_file.name}", text[:3000], height=300)
