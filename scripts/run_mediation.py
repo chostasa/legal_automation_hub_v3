@@ -22,7 +22,7 @@ client = OpenAI(api_key=api_key)
 
 def generate_with_openai(prompt):
     response = client.chat.completions.create(
-        model="gpt-4-turbo",
+        model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": "You are a professional legal writer."},
             {"role": "user", "content": prompt}
@@ -397,7 +397,7 @@ def safe_generate(fn, *args, retries=3, wait_time=10):
                 time.sleep(wait_time)
             else:
                 raise e
-    raise Exception("❌ gpt-4-turbo rate limit error after multiple attempts.")
+    raise Exception("❌ gpt-3.5-turbo rate limit error after multiple attempts.")
 
 
 def extract_and_redact_text_from_pdf(uploaded_file):
