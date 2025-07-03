@@ -5,8 +5,6 @@ from scripts.run_foia import run_foia
 from scripts.run_demand import run
 from scripts.run_mediation import extract_and_redact_text_from_pdf
 from scripts.run_mediation import generate_with_openai
-from scripts.run_mediation import generate_quotes_in_chunks
-
 
 import pandas as pd
 import os
