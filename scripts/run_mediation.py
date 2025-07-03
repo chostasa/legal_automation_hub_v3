@@ -194,15 +194,13 @@ def generate_facts_liability_section(facts, deposition_text=None):
 
 Draft the Facts / Liability section using only this information:
 {facts}
-
 """
     if deposition_text:
         prompt += f"""
-You may reference **direct quotes** from the following deposition excerpts if they support liability. Introduce them professionally (e.g., "As {plaintiff} testified, ..." or "Deposition excerpts confirm..."):
+You may reference **direct quotes** from the following deposition excerpts if they support liability. Introduce them professionally (e.g., \"As {{plaintiff}} testified, ...\" or \"Deposition excerpts confirm...\"):
 
 Deposition excerpts for liability:
 {deposition_text}
-
 """
 
     prompt += f"\n\nExample:\n{FACTS_LIABILITY_EXAMPLE}"
