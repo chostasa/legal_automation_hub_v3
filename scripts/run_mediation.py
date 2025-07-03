@@ -10,8 +10,11 @@ from pdf2image import convert_from_bytes
 import re
 from PIL import Image
 
+try:
+    api_key = st.secrets["OPENAI_API_KEY"]
+except Exception:
+    api_key = os.getenv("OPENAI_API_KEY", "")  # fallback for local dev
 
-api_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=api_key)
 
 def generate_with_openai(prompt):
