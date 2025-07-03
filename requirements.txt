@@ -47,6 +47,10 @@ streamlit-autorefresh
 docx-mailmerge
 dropbox
 openai>=1.0.0
+pytesseract
+pdf2image
+pillow
+
 
 
 
