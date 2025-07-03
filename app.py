@@ -516,13 +516,11 @@ elif tool == "🧾 Mediation Memos":
     )
 
     # Upload multiple deposition text files (plain text)
-    full_depo_txts = None
     full_depo_txts = st.file_uploader(
         "Upload deposition text files (.txt)",
         type=["txt"],
         accept_multiple_files=True
     )
-
     pdf_texts = []
 
     if uploaded_pdfs:
