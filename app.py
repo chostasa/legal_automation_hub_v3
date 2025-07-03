@@ -509,15 +509,15 @@ elif tool == "🧾 Mediation Memos":
     st.subheader("📎 Upload a Deposition or Record for OCR Quote Extraction (Optional)")
     uploaded_pdf = st.file_uploader("Upload PDF for OCR", type=["pdf"])
 
-    if uploaded_pdf:
-        st.success(f"📄 Uploaded: {uploaded_pdf.name}")
-        if st.secrets.get("cloud", "true") == "true":
-            st.warning("⚠️ OCR is not supported on Streamlit Cloud. Please paste relevant deposition text manually below.")
-            st.session_state.ocr_text = ""
-        else:
-            st.markdown("**Uploader recognized your file. Running OCR...**")
-            with st.spinner("Running OCR..."):
-                st.session_state.ocr_text = extract_and_redact_text_from_pdf(uploaded_pdf)
+    full_depo_txt = st.file_uploader("📄 Or Upload Full Deposition Transcript (.txt)", type=["txt"])
+    if full_depo_txt:
+        depo_text = full_depo_txt.read().decode("utf-8")
+        st.text_area("📜 Full Deposition Preview", depo_text[:3000], height=300)
+
+    if st.button("🧠 Extract Key Quotes from Deposition"):
+        with st.spinner("Analyzing deposition..."):
+            st.session_state.quotes = extract_quotes_from_text(depo_text)
+        st.success("✅ Quotes extracted.")
 
     if st.session_state.ocr_text:
         st.subheader("🔍 OCR’d and Redacted Text")
