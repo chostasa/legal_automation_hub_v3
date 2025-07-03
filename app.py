@@ -496,7 +496,6 @@ if tool == "📊 Litigation Dashboard":
 elif tool == "🧾 Mediation Memos":
     st.header("🧾 Generate Confidential Mediation Memo")
     st.markdown("Paste all relevant facts...")
-    st.subheader("📎 Upload a Deposition or Record for OCR Quote Extraction (Optional)")
 
 
     # ✅ Initialize session state
