@@ -16,6 +16,7 @@ import tempfile
 from docx import Document
 from datetime import datetime
 from users import USERS, hash_password
+import fitz 
 
 
 
@@ -505,14 +506,57 @@ elif tool == "🧾 Mediation Memos":
     if "quotes" not in st.session_state:
         st.session_state.quotes = ""
 
-    st.subheader("📎 Upload a Deposition or Record for OCR Quote Extraction (Optional)")
-    uploaded_pdf = st.file_uploader("Upload PDF for OCR", type=["pdf"])
+    st.subheader("📎 Upload OCR'd PDFs for Quote Extraction (Optional)")
 
+    # Upload multiple PDFs
+    uploaded_pdfs = st.file_uploader(
+        "Upload one or more OCR'd PDFs",
+        type=["pdf"],
+        accept_multiple_files=True
+    )
+
+    # Upload multiple deposition text files (plain text)
     full_depo_txts = st.file_uploader(
-        "📄 Upload Full Deposition Transcripts (.txt)",
+        "Upload deposition text files (.txt)",
         type=["txt"],
         accept_multiple_files=True
     )
+
+    pdf_texts = []
+
+    if uploaded_pdfs:
+        for pdf_file in uploaded_pdfs:
+            pdf = fitz.open(stream=pdf_file.read(), filetype="pdf")
+            text = ""
+            for page in pdf:
+                text += page.get_text()
+            pdf_texts.append(text)
+            st.subheader(f"Preview of {pdf_file.name}")
+            st.text_area(f"Preview text: {pdf_file.name}", text[:3000], height=300)
+
+    combined_pdf_text = "\n\n".join(pdf_texts) if pdf_texts else ""
+
+# Instructions text area for GPT prompt
+    instructions = st.text_area(
+        "Instructions for quote extraction",
+        value="Extract the most relevant direct quotes (verbatim, in quotes) that support liability, injuries, or harm to quality of life."
+    )
+
+    if st.button("🧠 Extract Quotes from PDFs"):
+        if combined_pdf_text.strip() == "":
+            st.warning("No PDF text available for extraction.")
+        else:
+            prompt = f"""
+    You are a legal assistant. {instructions}
+
+    Input:
+    {combined_pdf_text}
+    """
+            with st.spinner("Extracting quotes..."):
+                st.session_state.quotes = generate_with_openai(prompt)
+            st.success("✅ Quotes extracted.")
+            st.text_area("Extracted Quotes", st.session_state.quotes, height=300)
+
 
     if full_depo_txts:
         combined_texts = []
