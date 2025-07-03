@@ -511,9 +511,13 @@ elif tool == "🧾 Mediation Memos":
 
     if uploaded_pdf:
         st.success(f"📄 Uploaded: {uploaded_pdf.name}")
-        st.markdown("**Uploader recognized your file. Running OCR...**")
-        with st.spinner("Running OCR..."):
-            st.session_state.ocr_text = extract_and_redact_text_from_pdf(uploaded_pdf)
+        if st.secrets.get("cloud", "true") == "true":
+            st.warning("⚠️ OCR is not supported on Streamlit Cloud. Please paste relevant deposition text manually below.")
+            st.session_state.ocr_text = ""
+        else:
+            st.markdown("**Uploader recognized your file. Running OCR...**")
+            with st.spinner("Running OCR..."):
+                st.session_state.ocr_text = extract_and_redact_text_from_pdf(uploaded_pdf)
 
     if st.session_state.ocr_text:
         st.subheader("🔍 OCR’d and Redacted Text")
