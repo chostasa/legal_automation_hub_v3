@@ -509,12 +509,18 @@ elif tool == "🧾 Mediation Memos":
     uploaded_pdf = st.file_uploader("Upload PDF for OCR", type=["pdf"])
 
     full_depo_txts = st.file_uploader(
-        "📄 Upload Full Deposition Transcripts (.txt)", type=["txt"], accept_multiple_files=True
+        "📄 Upload Full Deposition Transcripts (.txt)",
+        type=["txt"],
+        accept_multiple_files=True
     )
+
     if full_depo_txts:
         combined_texts = []
         for uploaded_file in full_depo_txts:
-            text = uploaded_file.read().decode("utf-8")
+            try:
+                text = uploaded_file.read().decode("utf-8")
+            except UnicodeDecodeError:
+                text = uploaded_file.read().decode("latin-1")
             combined_texts.append(text)
             st.subheader(f"Preview: {uploaded_file.name}")
             st.text_area(f"Preview of {uploaded_file.name}", text[:3000], height=300)
