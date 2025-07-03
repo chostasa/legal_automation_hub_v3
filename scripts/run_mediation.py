@@ -224,11 +224,6 @@ His most recent MRI occurred on June 20, 2022 at Empire Imaging in Pembroke Pine
 At present, Mr. Doe reports that his conditions remain symptomatic and cause ongoing disability including sciatic nerve pain. He reports that his low back and lower extremity pain remains present despite undergoing extensive therapy.
 
 """
-
-    prompt += f"\n\nExample:\n{FACTS_LIABILITY_EXAMPLE}"
-    return generate_with_openai(prompt)
-
-
 def generate_causation_injuries(causation_info):
     prompt = f"""
 {NO_HALLUCINATION_NOTE}
