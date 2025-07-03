@@ -47,6 +47,8 @@ streamlit-autorefresh
 docx-mailmerge
 dropbox
 openai>=1.0.0
+PyMuPDF
+
 
 
 
