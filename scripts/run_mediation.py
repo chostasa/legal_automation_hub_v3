@@ -417,6 +417,38 @@ def extract_and_redact_text_from_pdf(uploaded_file):
 
     return full_text
 
+# --- Main time split function ---
+def generate_quotes_in_chunks(text_chunks, delay_seconds=10):
+    """
+    Generate quotes for each chunk sequentially with delay to avoid rate limits.
+    Combine all results into one string at the end.
+    """
+    all_quotes = []
+
+    for i, chunk in enumerate(text_chunks):
+        prompt = f"""
+You are a legal assistant. Extract the most relevant direct quotes (verbatim, in quotes) supporting liability, injuries, or harm from this text:
+
+{chunk}
+"""
+        try:
+            quotes = safe_generate(generate_with_openai, prompt)
+            all_quotes.append(quotes)
+            print(f"Processed chunk {i+1}/{len(text_chunks)}")
+        except APIStatusError as e:
+            print(f"API error on chunk {i+1}: {e}")
+            raise e
+
+        if i < len(text_chunks) - 1:
+            time.sleep(delay_seconds)  # delay to avoid rate limit
+
+    combined_quotes = "\n\n".join(all_quotes)
+    return combined_quotes
+
+
+def generate_memo_from_summary(data, template_path, output_dir):
+    # your existing code here
+    ...
 
 # --- Main generation function ---
 def generate_memo_from_summary(data, template_path, output_dir):

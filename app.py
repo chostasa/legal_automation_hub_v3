@@ -5,6 +5,8 @@ from scripts.run_foia import run_foia
 from scripts.run_demand import run
 from scripts.run_mediation import extract_and_redact_text_from_pdf
 from scripts.run_mediation import generate_with_openai
+from scripts.run_mediation import generate_quotes_in_chunks
+
 
 import pandas as pd
 import os
@@ -537,85 +539,96 @@ elif tool == "🧾 Mediation Memos":
     combined_pdf_text = "\n\n".join(pdf_texts) if pdf_texts else ""
 
 # Instructions text area for GPT prompt
-    instructions = st.text_area(
-        "Instructions for quote extraction",
-        value="Extract the most relevant direct quotes (verbatim, in quotes) that support liability, injuries, or harm to quality of life."
-    )
+instructions = st.text_area(
+    "Instructions for quote extraction",
+    value="Extract the most relevant direct quotes (verbatim, in quotes) that support liability, injuries, or harm to quality of life."
+)
 
-    if st.button("🧠 Extract Quotes from PDFs"):
-        if combined_pdf_text.strip() == "":
-            st.warning("No PDF text available for extraction.")
+def split_text_into_chunks(text, max_tokens=2000):
+    paragraphs = text.split("\n\n")
+    chunks = []
+    current_chunk = ""
+
+    for para in paragraphs:
+        if len(current_chunk) + len(para) < max_tokens:
+            current_chunk += para + "\n\n"
         else:
-            prompt = f"""
-    You are a legal assistant. {instructions}
+            chunks.append(current_chunk.strip())
+            current_chunk = para + "\n\n"
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+    return chunks
 
-    Input:
-    {combined_pdf_text}
-    """
-            with st.spinner("Extracting quotes..."):
-                st.session_state.quotes = generate_with_openai(prompt)
-            st.success("✅ Quotes extracted.")
-            st.text_area("Extracted Quotes", st.session_state.quotes, height=300)
-
-
-    if full_depo_txts:
-        combined_texts = []
-        for uploaded_file in full_depo_txts:
-            content = uploaded_file.read()
-            try:
-                text = content.decode("utf-8")
-            except UnicodeDecodeError:
-                text = content.decode("latin-1")
-            combined_texts.append(text)
-            st.subheader(f"Preview: {uploaded_file.name}")
-            st.text_area(f"Preview of {uploaded_file.name}", text[:3000], height=300)
-
-        depo_text = "\n\n".join(combined_texts)
+if st.button("🧠 Extract Quotes from PDFs"):
+    if combined_pdf_text.strip() == "":
+        st.warning("No PDF text available for extraction.")
     else:
-        depo_text = ""
-
-    if st.button("🧠 Extract Key Quotes from Deposition"):
-        with st.spinner("Analyzing deposition..."):
-            st.session_state.quotes = extract_quotes_from_text(depo_text)
+        chunks = split_text_into_chunks(combined_pdf_text, max_tokens=2000)
+        with st.spinner(f"Extracting quotes from {len(chunks)} chunks..."):
+            st.session_state.quotes = generate_quotes_in_chunks(chunks, delay_seconds=10)
         st.success("✅ Quotes extracted.")
+        st.text_area("Extracted Quotes", st.session_state.quotes, height=300)
 
-    if st.session_state.ocr_text:
-        st.subheader("🔍 OCR’d and Redacted Text")
-        st.text_area("Review before AI sees it", st.session_state.ocr_text, height=300)
 
-        if st.button("🧠 Extract Key Quotes from OCR"):
-            st.session_state.quotes = extract_quotes_from_text(st.session_state.ocr_text)
-            st.success("✅ Quotes identified.")
+if full_depo_txts:
+    combined_texts = []
+    for uploaded_file in full_depo_txts:
+        content = uploaded_file.read()
+        try:
+            text = content.decode("utf-8")
+        except UnicodeDecodeError:
+            text = content.decode("latin-1")
+        combined_texts.append(text)
+        st.subheader(f"Preview: {uploaded_file.name}")
+        st.text_area(f"Preview of {uploaded_file.name}", text[:3000], height=300)
 
-    if st.session_state.quotes:
-        st.text_area("🗣️ Key Quotes", st.session_state.quotes, height=200)
+    depo_text = "\n\n".join(combined_texts)
+else:
+    depo_text = ""
 
-    with st.form("simple_mediation_form"):
-        court = st.text_input("Court")
-        case_number = st.text_input("Case Number")
+if st.button("🧠 Extract Key Quotes from Deposition"):
+    with st.spinner("Analyzing deposition..."):
+        st.session_state.quotes = extract_quotes_from_text(depo_text)
+    st.success("✅ Quotes extracted.")
 
-        plaintiffs = {}
-        for i in range(1, 4):
-            label = f"Plaintiff {i} Name" + (" (required)" if i == 1 else " (optional)")
-            plaintiffs[f"plaintiff{i}"] = st.text_input(label)
+if st.session_state.ocr_text:
+    st.subheader("🔍 OCR’d and Redacted Text")
+    st.text_area("Review before AI sees it", st.session_state.ocr_text, height=300)
 
-        defendants = {}
-        for i in range(1, 8):
-            label = f"Defendant {i} Name" + (" (optional)" if i > 1 else "")
-            defendants[f"defendant{i}"] = st.text_input(label)
+    if st.button("🧠 Extract Key Quotes from OCR"):
+        st.session_state.quotes = extract_quotes_from_text(st.session_state.ocr_text)
+        st.success("✅ Quotes identified.")
 
-        complaint_narrative = st.text_area("📔 Complaint Narrative", height=200)
-        party_info = st.text_area("Party Information from Complaint", height=200)
-        settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
-        medical_summary = st.text_area("🏥 Medical Summary", height=200)
-        explicit_instructions = st.text_area("📝 Additional Instructions for Memo (optional)", height=100)
+if st.session_state.quotes:
+    st.text_area("🗣️ Key Quotes", st.session_state.quotes, height=200)
 
-        deposition_liability = st.text_area("📄 Deposition Excerpts (Liability)", height=150)
-        deposition_damages = st.text_area("📄 Deposition Excerpts (Damages)", height=150)
+with st.form("simple_mediation_form"):
+    court = st.text_input("Court")
+    case_number = st.text_input("Case Number")
 
-        submitted = st.form_submit_button("Generate Memo")
+    plaintiffs = {}
+    for i in range(1, 4):
+        label = f"Plaintiff {i} Name" + (" (required)" if i == 1 else " (optional)")
+        plaintiffs[f"plaintiff{i}"] = st.text_input(label)
 
-    if submitted:
+    defendants = {}
+    for i in range(1, 8):
+        label = f"Defendant {i} Name" + (" (optional)" if i > 1 else "")
+        defendants[f"defendant{i}"] = st.text_input(label)
+
+    complaint_narrative = st.text_area("📔 Complaint Narrative", height=200)
+    party_info = st.text_area("Party Information from Complaint", height=200)
+    settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
+    medical_summary = st.text_area("🏥 Medical Summary", height=200)
+    explicit_instructions = st.text_area("📝 Additional Instructions for Memo (optional)", height=100)
+
+    deposition_liability = st.text_area("📄 Deposition Excerpts (Liability)", height=150)
+    deposition_damages = st.text_area("📄 Deposition Excerpts (Damages)", height=150)
+
+    submitted = st.form_submit_button("Generate Memo")
+
+if submitted:
+    # [rest of your try/except block for memo generation]
         try:
             output_dir = "outputs/mediation_memos"
             os.makedirs(output_dir, exist_ok=True)
