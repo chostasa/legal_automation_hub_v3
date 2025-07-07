@@ -17,9 +17,9 @@ except Exception:
 client = OpenAI(api_key=api_key)
 
 
-def generate_with_openai(prompt):
+def generate_with_openai(prompt, model="gpt-4-turbo"):
     response = client.chat.completions.create(
-        model="gpt-4-turbo",
+        model=model,
         messages=[
             {"role": "system", "content": "You are a professional legal writer."},
             {"role": "user", "content": prompt}
@@ -440,7 +440,7 @@ def fill_mediation_template(data, template_path, output_path):
 # --- Safe wrapper to handle OpenAI rate limits ---
 
 
-def safe_generate(fn, *args, retries=3, wait_time=10):
+def safe_generate(fn, *args, retries=3, wait_time=10, **kwargs):
     for attempt in range(retries):
         try:
             return fn(*args)
