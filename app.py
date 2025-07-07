@@ -528,12 +528,6 @@ if tool == "📊 Litigation Dashboard":
 elif tool == "🧾 Mediation Memos":
     st.header("🧾 Generate Confidential Mediation Memo")
 
-    # === First Page Template Preview ===
-    template_path = "templates/mediation_template.docx"
-    st.subheader("📄 Preview of Mediation Template (First Page)")
-    preview_text = preview_first_page(template_path)
-    st.text_area("First Page Preview", preview_text, height=400, disabled=True)
-
     if "depositions" not in st.session_state:
         st.session_state.depositions = []
 
@@ -594,7 +588,7 @@ Ignore all other content.
 {depo_text}
 """
                     try:
-                        result = safe_generate(generate_with_openai, prompt, model="gpt-4-turbo")
+                        result = safe_generate(generate_with_openai, prompt, model="gpt-3.5-turbo")
                         if "**Damages**" in result:
                             liability_part, damages_part = result.split("**Damages**", 1)
                             st.session_state.quote_outputs["Liability"].append(liability_part.strip())
@@ -735,6 +729,7 @@ Ignore all other content.
             with open(file_path, "rb") as f:
                 st.success("✅ Mediation memo generated!")
                 st.download_button("🗅️ Download Mediation Memo", f, file_name=os.path.basename(file_path))
+
 
         except Exception as e:
             st.error(f"❌ Error: {e}")

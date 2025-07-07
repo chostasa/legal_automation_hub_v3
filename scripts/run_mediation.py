@@ -17,7 +17,7 @@ except Exception:
 client = OpenAI(api_key=api_key)
 
 
-def generate_with_openai(prompt, model="gpt-4-turbo"):
+def generate_with_openai(prompt, model="gpt-3.5-turbo"):
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -406,33 +406,31 @@ def replace_placeholders(doc, replacements):
 def fill_mediation_template(data, template_path, output_path):
     doc = Document(template_path)
 
-    # Start with static placeholders
+    # Start with static placeholders (match the updated keys)
     replacements = {
         "{{Court}}": data.get("court", ""),
-        "{{Plaintiff}}": data.get("plaintiff", ""),
         "{{Case Number}}": data.get("case_number", ""),
-        "{{Introduction}}": data.get("introduction", ""),
-        "{{Parties}}": data.get("parties", ""),
-        "{{Plaintiff Statement}}": data.get("plaintiff_statement", ""),
-        "{{Demand}}": data.get("demand", ""),
-        "{{Facts/Liability}}": data.get("facts_liability", ""),
-        "{{Causation, Injuries, and Treatment}}": data.get("causation_injuries", ""),
-        "{{Additional Harms and Losses}}": data.get("additional_harms", ""),
-        "{{Future Medical Bills Related to the Collision}}": data.get("future_bills", ""),
-        "{{Conclusion}}": data.get("conclusion", "")
+        "{{Plaintiff}}": data.get("plaintiff", ""),
+        "{{Parties}}": data.get("Parties", ""),
+        "{{Introduction}}": data.get("Introduction", ""),
+        "{{Plaintiff Statement}}": data.get("Plaintiff1 Statement", ""),
+        "{{Demand}}": data.get("Demand", ""),
+        "{{Facts/Liability}}": data.get("Facts/Liability", ""),
+        "{{Causation, Injuries, and Treatment}}": data.get("Causation, Injuries, and Treatment", ""),
+        "{{Additional Harms and Losses}}": data.get("Additional Harms and Losses", ""),
+        "{{Future Medical Bills Related to the Collision}}": data.get("Future Medical Bills Related to the Collision", ""),
+        "{{Conclusion}}": data.get("Conclusion", "")
     }
 
     # Add up to 3 plaintiffs
     for i in range(1, 4):
         replacements[f"{{{{Plaintiff{i}}}}}"] = data.get(f"plaintiff{i}", "")
-        replacements[f"{{{{Plaintiff{i} Statement}}}}"] = data.get(
-            f"plaintiff{i}_statement", "")
+        replacements[f"{{{{Plaintiff{i} Statement}}}}"] = data.get(f"Plaintiff{i} Statement", "")
 
-    # Dynamically add up to 7 defendants
+    # Add up to 7 defendants
     for i in range(1, 8):
         replacements[f"{{{{Defendant{i}}}}}"] = data.get(f"defendant{i}", "")
-        replacements[f"{{{{Defendant{i} Statement}}}}"] = data.get(
-            f"defendant{i}_statement", "")
+        replacements[f"{{{{Defendant{i} Statement}}}}"] = data.get(f"defendant{i}_statement", "")
 
     replace_placeholders(doc, replacements)
 
@@ -441,7 +439,6 @@ def fill_mediation_template(data, template_path, output_path):
     doc.save(output_file_path)
 
     return output_file_path
-
 
 
 # --- Safe wrapper to handle OpenAI rate limits ---
