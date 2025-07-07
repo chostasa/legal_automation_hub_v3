@@ -7,6 +7,7 @@ from docx.table import _Cell
 from docx.text.paragraph import Paragraph
 from openai import OpenAI
 import streamlit as st
+import re
 
 try:
     api_key = st.secrets["OPENAI_API_KEY"]
@@ -26,6 +27,63 @@ def generate_with_openai(prompt):
         temperature=0.5
     )
     return response.choices[0].message.content.strip()
+
+# === NEW FUNCTIONS FOR PREPROCESSING TRANSCRIPTS ===
+
+def normalize_deposition_lines(raw_text):
+    """
+    Attaches the current page number to each line using format 0004:12.
+    """
+    lines = raw_text.splitlines()
+    current_page = None
+    numbered_lines = []
+
+    for line in lines:
+        page_match = re.match(r"^(0\d{3})\s*$", line.strip())
+        if page_match:
+            current_page = page_match.group(1)
+            continue
+
+        line_match = re.match(r"^\s*(\d{1,2})\s+(.*)$", line)
+        if line_match and current_page:
+            line_num = int(line_match.group(1))
+            content = line_match.group(2).strip()
+            full_id = f"{current_page}:{line_num:02d}"
+            numbered_lines.append((full_id, content))
+
+    return numbered_lines
+
+
+def merge_multiline_qas(numbered_lines):
+    """
+    Rebuilds full Q/A blocks including multi-line content.
+    Returns a string of the cleaned transcript.
+    """
+    qa_blocks = []
+    buffer = []
+    current_type = None
+
+    for id_line, content in numbered_lines:
+        if content.startswith("Q:"):
+            if buffer:
+                qa_blocks.append("\n".join(buffer))
+                buffer = []
+            current_type = "Q"
+            buffer.append(f"{id_line} {content}")
+        elif content.startswith("A:"):
+            if buffer:
+                qa_blocks.append("\n".join(buffer))
+                buffer = []
+            current_type = "A"
+            buffer.append(f"{id_line} {content}")
+        elif current_type in {"Q", "A"}:
+            buffer.append(f"{id_line} {content}")
+
+    if buffer:
+        qa_blocks.append("\n".join(buffer))
+
+    return "\n".join(qa_blocks)
+
 
 
 # === Prompt Guidelines ===

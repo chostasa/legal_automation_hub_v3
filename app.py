@@ -581,7 +581,21 @@ elif tool == "🧾 Mediation Memos":
                 st.subheader(f"Preview: {uploaded_file.name}")
                 st.text_area(f"Preview of {uploaded_file.name}", text[:3000], height=300)
 
-            depo_text = "\n\n".join(combined_texts)
+            # === Process uploaded deposition text ===
+            from scripts.run_mediation import normalize_deposition_lines, merge_multiline_qas
+            raw_text = "\n\n".join(combined_texts)
+            numbered_lines = normalize_deposition_lines(raw_text)
+            cleaned_text = merge_multiline_qas(numbered_lines)
+
+            # Break into chunks and run GPT-powered extraction
+            chunk_size = 8000
+            text_chunks = [cleaned_text[i:i+chunk_size] for i in range(0, len(cleaned_text), chunk_size)]
+
+            with st.spinner("🔍 Extracting quotes from structured deposition..."):
+                st.session_state.quotes = generate_quotes_in_chunks(text_chunks)
+            st.success("✅ Structured quotes extracted.")
+            st.text_area("🗣️ Extracted Quotes", st.session_state.quotes, height=300)
+
         else:
             depo_text = ""
 
@@ -645,6 +659,7 @@ elif tool == "🧾 Mediation Memos":
                     **defendants,
                     "ocr_notes": st.session_state.ocr_text,
                     "extracted_quotes": st.session_state.quotes,
+                    "all_quotes_pool": st.session_state.quotes,
                 }
 
                 template_path = "templates/mediation_template.docx"
