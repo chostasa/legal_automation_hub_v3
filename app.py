@@ -716,16 +716,7 @@ Ignore all other content.
 
                 progress_bar.progress((idx + 1) / total)
 
-            memo_data["Introduction"] = memo_data.pop("introduction", "")
-            memo_data["Demand"] = memo_data.pop("demand", "")
-            memo_data["Facts/Liability"] = memo_data.pop("facts_liability", "")
-            memo_data["Causation, Injuries, and Treatment"] = memo_data.pop("causation_injuries", "")
-            memo_data["Additional Harms and Losses"] = memo_data.pop("additional_harms", "")
-            memo_data["Future Medical Bills Related to the Collision"] = memo_data.pop("future_bills", "")
-            memo_data["Conclusion"] = memo_data.pop("conclusion", "")
-
-
-            file_path = fill_mediation_template(memo_data, template_path, output_dir)
+            file_path = fill_mediation_template(data | memo_data, template_path, output_dir)
 
             with open(file_path, "rb") as f:
                 st.success("✅ Mediation memo generated!")

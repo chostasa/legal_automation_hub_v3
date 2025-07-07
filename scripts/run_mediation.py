@@ -376,15 +376,16 @@ Input:
 # === Improved Placeholder Replacer ===
 def replace_placeholders(doc, replacements):
     def rebuild_paragraph(paragraph):
-        full_text = "".join(run.text for run in paragraph.runs)
+        combined_text = "".join(run.text for run in paragraph.runs)
         for key, val in replacements.items():
-            full_text = re.sub(re.escape(key), val, full_text, flags=re.IGNORECASE)
-        if paragraph.runs:
+            combined_text = combined_text.replace(key, val)
+        if combined_text.strip():  # Only replace if there's something to write
+            # Clear and reset
             for run in paragraph.runs:
                 run.clear()
-            paragraph.runs[0].text = full_text
-        else:
-            paragraph.add_run(full_text)
+            paragraph.clear()
+            paragraph.add_run(combined_text)
+
 
     def replace_in_cell(cell: _Cell):
         for paragraph in cell.paragraphs:
@@ -419,11 +420,12 @@ def fill_mediation_template(data, template_path, output_path):
         "{{Additional Harms and Losses}}": data.get("additional_harms", ""),
         "{{Future Medical Bills Related to the Collision}}": data.get("future_bills", ""),
         "{{Conclusion}}": data.get("conclusion", ""),
-
-        # Updated placeholders to reflect new template fields
         "{{Plaintiffs}}": data.get("plaintiffs", ""),
         "{{Defendants}}": data.get("defendants", "")
     }
+
+
+
 
     def rebuild_paragraph(paragraph):
         combined_text = "".join(run.text for run in paragraph.runs)
