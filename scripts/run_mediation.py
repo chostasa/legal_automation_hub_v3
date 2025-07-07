@@ -415,28 +415,31 @@ def redact_text(text):
 # --- Main time split function ---
 def generate_quotes_in_chunks(text_chunks, delay_seconds=10):
     """
-    Generate quotes for each chunk sequentially with delay to avoid rate limits.
-    Extract both questions and answers clearly labeled as Q: and A: with line numbers preserved.
-    Combine all results into one string at the end.
+    Generate categorized Q&A quotes for each chunk with line numbers preserved.
+    Organize quotes into specific categories and combine all results at the end.
     """
     all_quotes = []
 
     for i, chunk in enumerate(text_chunks):
         prompt = f"""
-You are a legal assistant. Extract the most relevant direct quotes (verbatim, in quotes) supporting liability, injuries, or harm from this text.
+You are a legal analyst extracting key testimony from the following deposition excerpt.
 
-Include both questions and answers in the format below, preserving all original line numbers exactly as they appear in the deposition transcript:
+Each line is preceded by a line number. Every quote is part of either a question or an answer. Maintain the link between question and answer. Always include:
+- The **question line number**, the **full question**,  
+- The **answer line number**, and the **exact quote** in quotes.
 
-[Line number]   Q/A   "Quote text here"
+Organize your output into the following categories:
 
-Example:
-18         A     "Yes."
-19         Q     "I don't want to -- any time I ask you a question and the only source of information that would be responsive to that question came directly from your lawyer, please let me know so I don't invade the attorney-client privilege. All right?"
+1. Responsibility for patching the road  
+2. Responsibility for traffic control or maintaining traffic control  
+3. Causation of the incident or hazard  
+4. Damages or injuries resulting from the incident  
+5. Harm to quality of life after the incident  
 
-Return all quotes as a bulleted list, preserving line numbers and Q/A labels.
+Only include direct quotes. Do not paraphrase or summarize.  
+If no quote exists for a category, write: “None found.”
 
-Deposition text:
-
+Deposition excerpt:
 {chunk}
 """
         try:
