@@ -498,8 +498,8 @@ if tool == "📊 Litigation Dashboard":
         st.stop()
 
 # === Mediation Memo Generator (Simplified Input) ===
-elif tool == "🦾 Mediation Memos":
-    st.header("🦾 Generate Confidential Mediation Memo")
+elif tool == "🧾 Mediation Memos":
+    st.header("🧾 Generate Confidential Mediation Memo")
 
     if "quotes" not in st.session_state:
         st.session_state.quotes = extract_quotes_from_text(depo_text, quote_instructions)
