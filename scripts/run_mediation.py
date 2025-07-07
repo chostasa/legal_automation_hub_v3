@@ -594,7 +594,6 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     liability_quotes = quotes_dict["liability_quotes"]
     damages_quotes = quotes_dict["damages_quotes"]
 
-
     memo_data["facts_liability"] = safe_generate(
         generate_facts_liability_section,
         data["complaint_narrative"],  
@@ -617,4 +616,26 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         generate_causation_injuries,
         data["medical_summary"]
     )
-    return fill_mediation_template(memo_data, template_path, output_dir)
+
+    # === DYNAMIC PARTIES SECTION ===
+    plaintiff_sections = []
+    for i in range(1, 4):
+        name = memo_data.get(f"plaintiff{i}", "").strip()
+        statement = memo_data.get(f"plaintiff{i}_statement", "").strip()
+        if name and statement:
+            plaintiff_sections.append(f"Plaintiff, {name}\n{statement}")
+
+    defendant_sections = []
+    for i in range(1, 8):
+        name = memo_data.get(f"defendant{i}", "").strip()
+        statement = memo_data.get(f"defendant{i}_statement", "").strip()
+        if name and statement:
+            defendant_sections.append(f"Defendant, {name}\n{statement}")
+
+    # Add labeled sections
+    memo_data["parties"] = ""
+    if plaintiff_sections:
+        memo_data["parties"] += "PLAINTIFFS:\n" + "\n\n".join(plaintiff_sections) + "\n\n"
+
+    if defendant_sections:
+        memo_data["parties"] += "DEFENDANTS:\n" + "\n\n".join(defendant_sections)
