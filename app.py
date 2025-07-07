@@ -567,21 +567,22 @@ if st.button("🧠 Extract Quotes from PDFs"):
         st.text_area("Extracted Quotes", st.session_state.quotes, height=300)
 
 
-if full_depo_txts:
-    combined_texts = []
-    for uploaded_file in full_depo_txts:
-        content = uploaded_file.read()
-        try:
-            text = content.decode("utf-8")
-        except UnicodeDecodeError:
-            text = content.decode("latin-1")
-        combined_texts.append(text)
-        st.subheader(f"Preview: {uploaded_file.name}")
-        st.text_area(f"Preview of {uploaded_file.name}", text[:3000], height=300)
+if tool == "🧾 Mediation Memos":
+    if full_depo_txts:
+        combined_texts = []
+        for uploaded_file in full_depo_txts:
+            content = uploaded_file.read()
+            try:
+                text = content.decode("utf-8")
+            except UnicodeDecodeError:
+                text = content.decode("latin-1")
+            combined_texts.append(text)
+            st.subheader(f"Preview: {uploaded_file.name}")
+            st.text_area(f"Preview of {uploaded_file.name}", text[:3000], height=300)
 
-    depo_text = "\n\n".join(combined_texts)
-else:
-    depo_text = ""
+        depo_text = "\n\n".join(combined_texts)
+    else:
+        depo_text = ""
 
 if st.button("🧠 Extract Key Quotes from Deposition"):
     with st.spinner("Analyzing deposition..."):
