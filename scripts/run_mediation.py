@@ -416,13 +416,26 @@ def redact_text(text):
 def generate_quotes_in_chunks(text_chunks, delay_seconds=10):
     """
     Generate quotes for each chunk sequentially with delay to avoid rate limits.
+    Extract both questions and answers clearly labeled as Q: and A: with line numbers preserved.
     Combine all results into one string at the end.
     """
     all_quotes = []
 
     for i, chunk in enumerate(text_chunks):
         prompt = f"""
-You are a legal assistant. Extract the most relevant direct quotes (verbatim, in quotes) supporting liability, injuries, or harm from this text:
+You are a legal assistant. Extract the most relevant direct quotes (verbatim, in quotes) supporting liability, injuries, or harm from this text.
+
+Include both questions and answers in the format below, preserving all original line numbers exactly as they appear in the deposition transcript:
+
+[Line number]   Q/A   "Quote text here"
+
+Example:
+18         A     "Yes."
+19         Q     "I don't want to -- any time I ask you a question and the only source of information that would be responsive to that question came directly from your lawyer, please let me know so I don't invade the attorney-client privilege. All right?"
+
+Return all quotes as a bulleted list, preserving line numbers and Q/A labels.
+
+Deposition text:
 
 {chunk}
 """
@@ -439,11 +452,6 @@ You are a legal assistant. Extract the most relevant direct quotes (verbatim, in
 
     combined_quotes = "\n\n".join(all_quotes)
     return combined_quotes
-
-
-def generate_memo_from_summary(data, template_path, output_dir):
-    # your existing code here
-    ...
 
 # --- Main generation function ---
 def generate_memo_from_summary(data, template_path, output_dir):
@@ -482,26 +490,25 @@ def generate_memo_from_summary(data, template_path, output_dir):
         generate_introduction, data["complaint_narrative"], plaintiff1)
     memo_data["demand"] = safe_generate(
         generate_demand_section, data["settlement_summary"], plaintiff1)
+
+    all_quotes_pool = data.get("all_quotes_pool", "")
+
     memo_data["facts_liability"] = safe_generate(
         generate_facts_liability_section,
-        data["complaint_narrative"],
-        data.get("extracted_quotes", "") or data.get(
-            "deposition_liability", "")
+        data["complaint_narrative"],  
+        all_quotes_pool              
     )
-
-    memo_data["causation_injuries"] = safe_generate(
-        generate_causation_injuries, data["medical_summary"])
 
     memo_data["additional_harms"] = safe_generate(
         generate_additional_harms,
-        data["medical_summary"],
-        data.get("deposition_damages", "")
+        data["medical_summary"],      
+        all_quotes_pool               
     )
 
     memo_data["future_bills"] = safe_generate(
         generate_future_medical,
-        data["medical_summary"],
-        data.get("deposition_damages", "")
+        data["medical_summary"],      
+        all_quotes_pool              
     )
 
     memo_data["conclusion"] = safe_generate(
