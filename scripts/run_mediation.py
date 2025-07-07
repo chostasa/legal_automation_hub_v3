@@ -644,3 +644,10 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
 
     if defendant_sections:
         memo_data["parties"] += "DEFENDANTS:\n" + "\n\n".join(defendant_sections)
+
+    memo_data["conclusion"] = safe_generate(generate_conclusion_section, data["settlement_summary"])
+
+
+    file_path = fill_mediation_template(memo_data, template_path, output_dir)
+    return file_path
+
