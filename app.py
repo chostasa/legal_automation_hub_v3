@@ -588,7 +588,7 @@ Ignore all other content.
 {depo_text}
 """
                     try:
-                        result = safe_generate(generate_with_openai, prompt, model="gpt-3.5-turbo")
+                        result = safe_generate(generate_with_openai, prompt, model="gpt-4-turbo")
                         if "**Damages**" in result:
                             liability_part, damages_part = result.split("**Damages**", 1)
                             st.session_state.quote_outputs["Liability"].append(liability_part.strip())
