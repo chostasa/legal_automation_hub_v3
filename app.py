@@ -16,7 +16,6 @@ import tempfile
 from docx import Document
 from datetime import datetime
 from users import USERS, hash_password
-import fitz 
 
 
 
@@ -496,123 +495,44 @@ if tool == "📊 Litigation Dashboard":
 # === Mediation Memo Generator (Simplified Input) ===
 elif tool == "🧾 Mediation Memos":
     st.header("🧾 Generate Confidential Mediation Memo")
-    st.markdown("Paste all relevant facts...")
-
-
-    # ✅ Initialize session state
-    if "ocr_text" not in st.session_state:
-        st.session_state.ocr_text = ""
 
     if "quotes" not in st.session_state:
         st.session_state.quotes = ""
 
-    st.subheader("📎 Upload OCR'd PDFs for Quote Extraction (Optional)")
+    st.subheader("📎 Upload Deposition Text Files")
+    full_depo_txts = st.file_uploader("Upload deposition text files (.txt)", type=["txt"], accept_multiple_files=True)
 
-    # Upload multiple PDFs
-    uploaded_pdfs = st.file_uploader(
-        "Upload one or more OCR'd PDFs",
-        type=["pdf"],
-        accept_multiple_files=True
-    )
+    if full_depo_txts:
+        combined_texts = []
+        for uploaded_file in full_depo_txts:
+            content = uploaded_file.read()
+            try:
+                text = content.decode("utf-8")
+            except UnicodeDecodeError:
+                text = content.decode("latin-1")
+            combined_texts.append(text)
+            st.subheader(f"Preview: {uploaded_file.name}")
+            st.text_area(f"Preview of {uploaded_file.name}", text[:3000], height=300)
 
-    # Upload multiple deposition text files (plain text)
-    full_depo_txts = st.file_uploader(
-        "Upload deposition text files (.txt)",
-        type=["txt"],
-        accept_multiple_files=True
-    )
-    pdf_texts = []
+        raw_text = "\n\n".join(combined_texts)
+        numbered_lines = normalize_deposition_lines(raw_text)
+        cleaned_text = merge_multiline_qas(numbered_lines)
+        depo_text = cleaned_text
 
-    if uploaded_pdfs:
-        for pdf_file in uploaded_pdfs:
-            pdf = fitz.open(stream=pdf_file.read(), filetype="pdf")
-            text = ""
-            for page in pdf:
-                text += page.get_text()
-            pdf_texts.append(text)
-            st.subheader(f"Preview of {pdf_file.name}")
-            st.text_area(f"Preview text: {pdf_file.name}", text[:3000], height=300)
+        chunk_size = 8000
+        text_chunks = [cleaned_text[i:i+chunk_size] for i in range(0, len(cleaned_text), chunk_size)]
 
-
-    combined_pdf_text = "\n\n".join(pdf_texts) if pdf_texts else ""
-
-    # Instructions text area for GPT prompt
-    instructions = st.text_area(
-        "Instructions for quote extraction",
-        value="Extract the most relevant direct quotes (verbatim, in quotes) that support liability, injuries, or harm to quality of life."
-    )
-
-    def split_text_into_chunks(text, max_tokens=2000):
-        paragraphs = text.split("\n\n")
-        chunks = []
-        current_chunk = ""
-
-        for para in paragraphs:
-            if len(current_chunk) + len(para) < max_tokens:
-                current_chunk += para + "\n\n"
-            else:
-                chunks.append(current_chunk.strip())
-                current_chunk = para + "\n\n"
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-        return chunks
-
-    if st.button("🧠 Extract Quotes from PDFs"):
-        if combined_pdf_text.strip() == "":
-            st.warning("No PDF text available for extraction.")
-        else:
-            chunks = split_text_into_chunks(combined_pdf_text, max_tokens=2000)
-            with st.spinner(f"Extracting quotes from {len(chunks)} chunks..."):
-                st.session_state.quotes = generate_quotes_in_chunks(chunks, delay_seconds=10)
-            st.success("✅ Quotes extracted.")
-            st.text_area("Extracted Quotes", st.session_state.quotes, height=300)
-
-
-    if tool == "🧾 Mediation Memos":
-        if full_depo_txts:
-            combined_texts = []
-            for uploaded_file in full_depo_txts:
-                content = uploaded_file.read()
-                try:
-                    text = content.decode("utf-8")
-                except UnicodeDecodeError:
-                    text = content.decode("latin-1")
-                combined_texts.append(text)
-                st.subheader(f"Preview: {uploaded_file.name}")
-                st.text_area(f"Preview of {uploaded_file.name}", text[:3000], height=300)
-
-            # === Process uploaded deposition text ===
-            from scripts.run_mediation import normalize_deposition_lines, merge_multiline_qas
-            raw_text = "\n\n".join(combined_texts)
-            numbered_lines = normalize_deposition_lines(raw_text)
-            cleaned_text = merge_multiline_qas(numbered_lines)
-
-            depo_text = cleaned_text
-
-            # Break into chunks and run GPT-powered extraction
-            chunk_size = 8000
-            text_chunks = [cleaned_text[i:i+chunk_size] for i in range(0, len(cleaned_text), chunk_size)]
-
-            with st.spinner("🔍 Extracting quotes from structured deposition..."):
-                st.session_state.quotes = generate_quotes_in_chunks(text_chunks)
-            st.success("✅ Structured quotes extracted.")
-            st.text_area("🗣️ Extracted Quotes", st.session_state.quotes, height=300)
-
-        else:
-            depo_text = ""
+        with st.spinner("🔍 Extracting quotes from structured deposition..."):
+            st.session_state.quotes = generate_quotes_in_chunks(text_chunks)
+        st.success("✅ Structured quotes extracted.")
+        st.text_area("🗣️ Extracted Quotes", st.session_state.quotes, height=300)
+    else:
+        depo_text = ""
 
     if st.button("🧠 Extract Key Quotes from Deposition"):
         with st.spinner("Analyzing deposition..."):
             st.session_state.quotes = extract_quotes_from_text(depo_text)
         st.success("✅ Quotes extracted.")
-
-    if st.session_state.ocr_text:
-        st.subheader("🔍 OCR’d and Redacted Text")
-        st.text_area("Review before AI sees it", st.session_state.ocr_text, height=300)
-
-    if st.button("🧠 Extract Key Quotes from OCR"):
-        st.session_state.quotes = extract_quotes_from_text(st.session_state.ocr_text)
-        st.success("✅ Quotes identified.")
 
     if st.session_state.quotes:
         st.text_area("🗣️ Key Quotes", st.session_state.quotes, height=200)
@@ -659,7 +579,6 @@ elif tool == "🧾 Mediation Memos":
                     "deposition_damages": deposition_damages,
                     **plaintiffs,
                     **defendants,
-                    "ocr_notes": st.session_state.ocr_text,
                     "extracted_quotes": st.session_state.quotes,
                     "all_quotes_pool": st.session_state.quotes,
                 }
