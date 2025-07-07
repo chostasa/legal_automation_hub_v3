@@ -18,7 +18,7 @@ client = OpenAI(api_key=api_key)
 
 def generate_with_openai(prompt):
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4-turbo",
         messages=[
             {"role": "system", "content": "You are a professional legal writer."},
             {"role": "user", "content": prompt}
@@ -422,19 +422,28 @@ def generate_quotes_in_chunks(text_chunks, delay_seconds=10):
 
     for i, chunk in enumerate(text_chunks):
         prompt = f"""
-You are a legal analyst reviewing a deposition excerpt. Each line has a line number.
+You are a legal analyst reviewing deposition testimony. Each line starts with a number and a "Q" or "A".
 
-Your task is to extract and organize the most relevant testimony into the categories below. For each relevant Q&A pair:
+Your task is to extract **only relevant Q&A pairs** into the correct categories listed below.
 
-You must strictly include:
-- The **line number** of the question, the full **question**.
-- The **line number** of the answer, and the **exact quote** in quotation marks.
+For each category, return a **bulleted list of line-numbered pairs**, like this:
 
-Format:
-123 Q: "Full question?"
-124 A: "Exact answer."
+- Q123: "Full question here?"
+  A124: "Exact answer here."
 
-If no quotes exist for a category, write: "None found."
+⚠️ Follow these rules:
+- DO NOT paraphrase.
+- DO NOT summarize.
+- DO NOT include answers without a corresponding question.
+- DO NOT remove or guess line numbers.
+- DO NOT output anything else besides direct Q&A in the format above.If no quotes exist for a category, write: "None found."
+
+📂 Categories:
+1. Responsibility or Duties of the Witness  
+2. Knowledge of Events or Conditions Related to the Incident  
+3. Cause or Contributing Factors to the Incident  
+4. Resulting Injuries, Damages, or Losses  
+5. Changes in Quality of Life, Function, or Employment  
 
 
 Only include direct testimony. Do not paraphrase. Do not include commentary. Skip any irrelevant lines.
