@@ -404,35 +404,52 @@ def replace_placeholders(doc, replacements):
 # === Template Filler ===
 
 def fill_mediation_template(data, template_path, output_path):
+    from docx import Document
+    import os
+    from datetime import datetime
+
     doc = Document(template_path)
 
-    # Start with static placeholders (match the updated keys)
+    # Start with updated static placeholders
     replacements = {
         "{{Court}}": data.get("court", ""),
         "{{Case Number}}": data.get("case_number", ""),
-        "{{Plaintiff}}": data.get("plaintiff", ""),
-        "{{Parties}}": data.get("Parties", ""),
-        "{{Introduction}}": data.get("Introduction", ""),
-        "{{Plaintiff Statement}}": data.get("Plaintiff1 Statement", ""),
-        "{{Demand}}": data.get("Demand", ""),
-        "{{Facts/Liability}}": data.get("Facts/Liability", ""),
-        "{{Causation, Injuries, and Treatment}}": data.get("Causation, Injuries, and Treatment", ""),
-        "{{Additional Harms and Losses}}": data.get("Additional Harms and Losses", ""),
-        "{{Future Medical Bills Related to the Collision}}": data.get("Future Medical Bills Related to the Collision", ""),
-        "{{Conclusion}}": data.get("Conclusion", "")
+        "{{Introduction}}": data.get("introduction", ""),
+        "{{Parties}}": data.get("parties", ""),
+        "{{Demand}}": data.get("demand", ""),
+        "{{Facts/Liability}}": data.get("facts_liability", ""),
+        "{{Causation, Injuries, and Treatment}}": data.get("causation_injuries", ""),
+        "{{Additional Harms and Losses}}": data.get("additional_harms", ""),
+        "{{Future Medical Bills Related to the Collision}}": data.get("future_bills", ""),
+        "{{Conclusion}}": data.get("conclusion", ""),
+
+        # Updated placeholders to reflect new template fields
+        "{{Plaintiffs}}": data.get("plaintiffs", ""),
+        "{{Defendants}}": data.get("defendants", "")
     }
 
-    # Add up to 3 plaintiffs
-    for i in range(1, 4):
-        replacements[f"{{{{Plaintiff{i}}}}}"] = data.get(f"plaintiff{i}", "")
-        replacements[f"{{{{Plaintiff{i} Statement}}}}"] = data.get(f"Plaintiff{i} Statement", "")
+    def rebuild_paragraph(paragraph):
+        combined_text = "".join(run.text for run in paragraph.runs)
+        for key, val in replacements.items():
+            if key in combined_text:
+                combined_text = combined_text.replace(key, val)
+        if combined_text != paragraph.text:
+            for run in paragraph.runs:
+                p_elem = run._element
+                p_elem.getparent().remove(p_elem)
+            paragraph.add_run(combined_text)
 
-    # Add up to 7 defendants
-    for i in range(1, 8):
-        replacements[f"{{{{Defendant{i}}}}}"] = data.get(f"defendant{i}", "")
-        replacements[f"{{{{Defendant{i} Statement}}}}"] = data.get(f"defendant{i}_statement", "")
+    def replace_in_cell(cell):
+        for paragraph in cell.paragraphs:
+            rebuild_paragraph(paragraph)
 
-    replace_placeholders(doc, replacements)
+    for paragraph in doc.paragraphs:
+        rebuild_paragraph(paragraph)
+
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                replace_in_cell(cell)
 
     filename = f"Mediation_Memo_{data.get('plaintiff', '').replace(' ', '_')}_{datetime.today().strftime('%Y-%m-%d')}.docx"
     output_file_path = os.path.join(output_path, filename)
