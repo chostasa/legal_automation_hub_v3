@@ -501,8 +501,8 @@ if tool == "📊 Litigation Dashboard":
 elif tool == "🧾 Mediation Memos":
     st.header("🧾 Generate Confidential Mediation Memo")
 
-if "quotes" not in st.session_state:
-    st.session_state.quotes = ""
+    if "quotes" not in st.session_state:
+        st.session_state.quotes = ""
 
     quote_instructions = st.text_area(
         "📝 Instructions for AI (optional)",
