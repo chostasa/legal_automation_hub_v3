@@ -428,8 +428,9 @@ Your task is to extract **only relevant Q&A pairs** into the correct categories 
 
 For each category, return a **bulleted list of line-numbered pairs**, like this:
 
-- Q123: "Full question here?"
-  A124: "Exact answer here."
+Format:
+- 0005:1 Q: "Question here?"
+  0005:2 A: "Answer here."
 
 ⚠️ Follow these rules:
 - DO NOT paraphrase.
