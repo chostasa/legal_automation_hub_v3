@@ -3,7 +3,6 @@ st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
 from scripts.run_foia import run_foia
 from scripts.run_demand import run
-from scripts.run_mediation import extract_and_redact_text_from_pdf
 from scripts.run_mediation import generate_with_openai
 
 import pandas as pd
@@ -532,6 +531,7 @@ elif tool == "🧾 Mediation Memos":
             pdf_texts.append(text)
             st.subheader(f"Preview of {pdf_file.name}")
             st.text_area(f"Preview text: {pdf_file.name}", text[:3000], height=300)
+
 
     combined_pdf_text = "\n\n".join(pdf_texts) if pdf_texts else ""
 

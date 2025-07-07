@@ -7,10 +7,6 @@ from docx.table import _Cell
 from docx.text.paragraph import Paragraph
 from openai import OpenAI
 import streamlit as st
-import pytesseract
-from pdf2image import convert_from_bytes
-import re
-from PIL import Image
 
 try:
     api_key = st.secrets["OPENAI_API_KEY"]
@@ -399,23 +395,22 @@ def safe_generate(fn, *args, retries=3, wait_time=10):
                 raise e
     raise Exception("❌ gpt-3.5-turbo rate limit error after multiple attempts.")
 
+import re
 
-def extract_and_redact_text_from_pdf(uploaded_file):
-    images = convert_from_bytes(uploaded_file.read())
-    full_text = ""
-    for img in images:
-        text = pytesseract.image_to_string(img)
-        full_text += text + "\n"
-
-    # Redact PHI / sensitive info (basic safeguards)
-    full_text = re.sub(
-        r"\b(?:DOB|D\.O\.B)\s*[:\-]?\s*\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}", "[REDACTED DOB]", full_text, flags=re.I)
-    full_text = re.sub(r"\b\d{3}-\d{2}-\d{4}\b",
-                       "[REDACTED SSN]", full_text)  # SSNs
-    full_text = re.sub(
-        r"\b(Name|Patient)\s*[:\-]?\s*[A-Z][a-z]+\s[A-Z][a-z]+", "[REDACTED NAME]", full_text)
-
-    return full_text
+def redact_text(text):
+    """
+    Redacts sensitive info (PHI) from already OCR'd or typed text.
+    """
+    text = re.sub(
+        r"\b(?:DOB|D\.O\.B)\s*[:\-]?\s*\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}", "[REDACTED DOB]", text, flags=re.I
+    )
+    text = re.sub(
+        r"\b\d{3}-\d{2}-\d{4}\b", "[REDACTED SSN]", text
+    )
+    text = re.sub(
+        r"\b(Name|Patient)\s*[:\-]?\s*[A-Z][a-z]+\s[A-Z][a-z]+", "[REDACTED NAME]", text
+    )
+    return text
 
 # --- Main time split function ---
 def generate_quotes_in_chunks(text_chunks, delay_seconds=10):
