@@ -523,8 +523,9 @@ elif tool == "🧾 Mediation Memos":
             st.session_state.quotes = extract_quotes_from_text(depo_text, quote_instructions)
         st.success("✅ Quotes extracted.")
 
-    if st.session_state.quotes:
+    if "quotes" in st.session_state and st.session_state.quotes:
         st.text_area("🗣️ Key Quotes", st.session_state.quotes, height=200)
+
 
     with st.form("simple_mediation_form"):
         court = st.text_input("Court")
