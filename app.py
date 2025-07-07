@@ -587,6 +587,8 @@ elif tool == "🧾 Mediation Memos":
             numbered_lines = normalize_deposition_lines(raw_text)
             cleaned_text = merge_multiline_qas(numbered_lines)
 
+            depo_text = cleaned_text
+
             # Break into chunks and run GPT-powered extraction
             chunk_size = 8000
             text_chunks = [cleaned_text[i:i+chunk_size] for i in range(0, len(cleaned_text), chunk_size)]
