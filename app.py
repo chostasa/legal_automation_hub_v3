@@ -717,18 +717,24 @@ Ignore all other content.
                 progress_bar.progress((idx + 1) / total)
 
             memo_data["Introduction"] = memo_data.pop("introduction", "")
+            memo_data["Demand"] = memo_data.pop("demand", "")
             memo_data["Facts/Liability"] = memo_data.pop("facts_liability", "")
             memo_data["Causation, Injuries, and Treatment"] = memo_data.pop("causation_injuries", "")
             memo_data["Additional Harms and Losses"] = memo_data.pop("additional_harms", "")
             memo_data["Future Medical Bills Related to the Collision"] = memo_data.pop("future_bills", "")
             memo_data["Conclusion"] = memo_data.pop("conclusion", "")
-            memo_data["Demand"] = memo_data.pop("demand", "")
+
 
             file_path = fill_mediation_template(memo_data, template_path, output_dir)
 
             with open(file_path, "rb") as f:
                 st.success("✅ Mediation memo generated!")
                 st.download_button("🗅️ Download Mediation Memo", f, file_name=os.path.basename(file_path))
+
+            # Fallback plaintext output
+            plaintext_output = generate_plaintext_memo(memo_data)
+            st.download_button("📄 Download Plaintext Version", plaintext_output, file_name="Mediation_Memo_Plaintext.txt")
+            st.text_area("📝 Memo Preview (Plaintext)", plaintext_output, height=700)
 
 
         except Exception as e:

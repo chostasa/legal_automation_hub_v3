@@ -376,18 +376,15 @@ Input:
 # === Improved Placeholder Replacer ===
 def replace_placeholders(doc, replacements):
     def rebuild_paragraph(paragraph):
-        """
-        Replaces placeholder text even if split across runs.
-        """
-        combined_text = "".join(run.text for run in paragraph.runs)
+        full_text = "".join(run.text for run in paragraph.runs)
         for key, val in replacements.items():
-            if key in combined_text:
-                combined_text = combined_text.replace(key, val)
-        if combined_text != paragraph.text:
+            full_text = re.sub(re.escape(key), val, full_text, flags=re.IGNORECASE)
+        if paragraph.runs:
             for run in paragraph.runs:
-                p_elem = run._element
-                p_elem.getparent().remove(p_elem)
-            paragraph.add_run(combined_text)
+                run.clear()
+            paragraph.runs[0].text = full_text
+        else:
+            paragraph.add_run(full_text)
 
     def replace_in_cell(cell: _Cell):
         for paragraph in cell.paragraphs:
@@ -664,4 +661,44 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
 
     file_path = fill_mediation_template(memo_data, template_path, output_dir)
     return file_path
+
+
+def generate_plaintext_memo(memo_data):
+    """
+    Fallback: Generate a plain text version of the memo from all memo_data.
+    """
+    sections = [
+        ("Court", memo_data.get("court", "")),
+        ("Case Number", memo_data.get("case_number", "")),
+        ("Introduction", memo_data.get("introduction", "")),
+        ("Parties", memo_data.get("parties", "")),
+        ("Demand", memo_data.get("demand", "")),
+        ("Facts / Liability", memo_data.get("facts_liability", "")),
+        ("Causation, Injuries, and Treatment", memo_data.get("causation_injuries", "")),
+        ("Additional Harms and Losses", memo_data.get("additional_harms", "")),
+        ("Future Medical Bills", memo_data.get("future_bills", "")),
+        ("Conclusion", memo_data.get("conclusion", ""))
+    ]
+
+    # Add plaintiff and defendant blocks
+    for i in range(1, 4):
+        name = memo_data.get(f"plaintiff{i}", "")
+        statement = memo_data.get(f"plaintiff{i}_statement", "")
+        if name or statement:
+            sections.append((f"Plaintiff {i}: {name}", statement))
+
+    for i in range(1, 8):
+        name = memo_data.get(f"defendant{i}", "")
+        statement = memo_data.get(f"defendant{i}_statement", "")
+        if name or statement:
+            sections.append((f"Defendant {i}: {name}", statement))
+
+    # Build plain text
+    lines = []
+    for title, content in sections:
+        if content.strip():
+            lines.append(f"=== {title.upper()} ===\n{content.strip()}\n")
+
+    return "\n".join(lines)
+
 
