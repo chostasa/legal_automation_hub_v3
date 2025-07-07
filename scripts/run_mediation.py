@@ -411,14 +411,14 @@ def fill_mediation_template(data, template_path, output_path):
     # Start with updated static placeholders
     replacements = {
         "{{Court}}": data.get("court", ""),
-        "{{Case Number}}": data.get("case_number", ""),
+        "{{Case_Number}}": data.get("case_number", ""),
         "{{Introduction}}": data.get("introduction", ""),
         "{{Parties}}": data.get("parties", ""),
         "{{Demand}}": data.get("demand", ""),
-        "{{Facts/Liability}}": data.get("facts_liability", ""),
-        "{{Causation, Injuries, and Treatment}}": data.get("causation_injuries", ""),
-        "{{Additional Harms and Losses}}": data.get("additional_harms", ""),
-        "{{Future Medical Bills Related to the Collision}}": data.get("future_bills", ""),
+        "{{Facts_Liability}}": data.get("facts_liability", ""),
+        "{{Causation_Injuries_Treatment}}": data.get("causation_injuries", ""),
+        "{{Additional_Harms_Losses}}": data.get("additional_harms", ""),
+        "{{Future_Medical_Bills}}": data.get("future_bills", ""),
         "{{Conclusion}}": data.get("conclusion", ""),
         "{{Plaintiffs}}": data.get("plaintiffs", ""),
         "{{Defendants}}": data.get("defendants", "")
@@ -450,7 +450,8 @@ def fill_mediation_template(data, template_path, output_path):
             for cell in row.cells:
                 replace_in_cell(cell)
 
-    filename = f"Mediation_Memo_{data.get('plaintiff', '').replace(' ', '_')}_{datetime.today().strftime('%Y-%m-%d')}.docx"
+    plaintiff_name = data.get("plaintiff", "Unknown").replace(" ", "_")
+    filename = f"Mediation_Memo_{plaintiff_name}_{datetime.today().strftime('%Y-%m-%d')}.docx"
     output_file_path = os.path.join(output_path, filename)
     doc.save(output_file_path)
 
