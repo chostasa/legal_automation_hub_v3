@@ -499,35 +499,16 @@ elif tool == "🧾 Mediation Memos":
     if "quotes" not in st.session_state:
         st.session_state.quotes = ""
 
-    st.subheader("📎 Upload Deposition Text Files")
-    full_depo_txts = st.file_uploader("Upload deposition text files (.txt)", type=["txt"], accept_multiple_files=True)
+    depo_text = st.text_area("📎 Paste deposition text here", height=300)
 
-    if full_depo_txts:
-        combined_texts = []
-        for uploaded_file in full_depo_txts:
-            content = uploaded_file.read()
-            try:
-                text = content.decode("utf-8")
-            except UnicodeDecodeError:
-                text = content.decode("latin-1")
-            combined_texts.append(text)
-            st.subheader(f"Preview: {uploaded_file.name}")
-            st.text_area(f"Preview of {uploaded_file.name}", text[:3000], height=300)
-
-        raw_text = "\n\n".join(combined_texts)
-        numbered_lines = normalize_deposition_lines(raw_text)
-        cleaned_text = merge_multiline_qas(numbered_lines)
-        depo_text = cleaned_text
-
+    if depo_text:
         chunk_size = 8000
-        text_chunks = [cleaned_text[i:i+chunk_size] for i in range(0, len(cleaned_text), chunk_size)]
+        text_chunks = [depo_text[i:i+chunk_size] for i in range(0, len(depo_text), chunk_size)]
 
         with st.spinner("🔍 Extracting quotes from structured deposition..."):
             st.session_state.quotes = generate_quotes_in_chunks(text_chunks)
         st.success("✅ Structured quotes extracted.")
         st.text_area("🗣️ Extracted Quotes", st.session_state.quotes, height=300)
-    else:
-        depo_text = ""
 
     if st.button("🧠 Extract Key Quotes from Deposition"):
         with st.spinner("Analyzing deposition..."):
