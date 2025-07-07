@@ -529,6 +529,17 @@ For each category, return a **bulleted list of line-numbered pairs**, like this:
     return combined_quotes
 
 
+def split_and_combine(fn, long_text, quotes="", chunk_size=3000):
+    chunks = [long_text[i:i+chunk_size] for i in range(0, len(long_text), chunk_size)]
+    results = []
+    for chunk in chunks:
+        if quotes:
+            results.append(safe_generate(fn, chunk, quotes))
+        else:
+            results.append(safe_generate(fn, chunk))
+    return "\n\n".join(results)
+
+
 # --- Main generation function ---
 def generate_memo_from_summary(data, template_path, output_dir):
     memo_data = {}
@@ -575,19 +586,20 @@ def generate_memo_from_summary(data, template_path, output_dir):
         all_quotes_pool              
     )
 
-    memo_data["additional_harms"] = safe_generate(
+    memo_data["additional_harms"] = split_and_combine(
         generate_additional_harms,
-        data["medical_summary"],      
-        all_quotes_pool               
+        data["medical_summary"],
+        all_quotes_pool
     )
 
-    memo_data["future_bills"] = safe_generate(
+    memo_data["future_bills"] = split_and_combine(
         generate_future_medical,
-        data["medical_summary"],      
-        all_quotes_pool              
+        data["medical_summary"],
+        all_quotes_pool
     )
 
-    memo_data["conclusion"] = safe_generate(
-        generate_conclusion_section, data["settlement_summary"])
-
+    memo_data["causation_injuries"] = split_and_combine(
+        generate_causation_injuries,
+        data["medical_summary"]
+    )
     return fill_mediation_template(memo_data, template_path, output_dir)
