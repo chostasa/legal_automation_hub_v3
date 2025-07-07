@@ -426,8 +426,16 @@ You are a legal analyst reviewing a deposition excerpt. Each line has a line num
 
 Your task is to extract and organize the most relevant testimony into the categories below. For each relevant Q&A pair:
 
-- Include the **question line number**, the **full question**,  
-- Then include the **answer line number**, and the **exact quote in quotes**.
+You must strictly include:
+- The **line number** of the question, the full **question**.
+- The **line number** of the answer, and the **exact quote** in quotation marks.
+
+Format:
+123 Q: "Full question?"
+124 A: "Exact answer."
+
+If no quotes exist for a category, write: "None found."
+
 
 Only include direct testimony. Do not paraphrase. Do not include commentary. Skip any irrelevant lines.
 
