@@ -206,7 +206,7 @@ def generate_demand_section(summary, client_name):
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
-Write a mediation demand letter for {client_name}. Use only the information below. Do NOT reuse any example language.
+Use the following example for tone and structure, but do not copy any of the specific facts. Use only the information below.
 
 Facts:
 {summary}
@@ -635,28 +635,25 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         data["medical_summary"]
     )
 
-    # === DYNAMIC PARTIES SECTION ===
-    plaintiff_sections = []
+# === FORMAL NARRATIVE PARTIES SECTION ===
+    parties_blocks = []
+
+    # Add plaintiff narratives
     for i in range(1, 4):
         name = memo_data.get(f"plaintiff{i}", "").strip()
         statement = memo_data.get(f"plaintiff{i}_statement", "").strip()
         if name and statement:
-            plaintiff_sections.append(f"Plaintiff, {name}\n{statement}")
+            parties_blocks.append(statement)
 
-    defendant_sections = []
+    # Add defendant narratives
     for i in range(1, 8):
         name = memo_data.get(f"defendant{i}", "").strip()
         statement = memo_data.get(f"defendant{i}_statement", "").strip()
         if name and statement:
-            defendant_sections.append(f"Defendant, {name}\n{statement}")
+            parties_blocks.append(statement)
 
-    # Add labeled sections
-    memo_data["parties"] = ""
-    if plaintiff_sections:
-        memo_data["parties"] += "PLAINTIFFS:\n" + "\n\n".join(plaintiff_sections) + "\n\n"
-
-    if defendant_sections:
-        memo_data["parties"] += "DEFENDANTS:\n" + "\n\n".join(defendant_sections)
+    # Merge into one formal narrative section
+    memo_data["parties"] = "\n\n".join(parties_blocks)
 
     memo_data["conclusion"] = safe_generate(generate_conclusion_section, data["settlement_summary"])
 
