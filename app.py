@@ -3,7 +3,20 @@ st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
 from scripts.run_foia import run_foia
 from scripts.run_demand import run
-from scripts.run_mediation import generate_with_openai
+from scripts.run_mediation import (
+    generate_with_openai,
+    generate_introduction,
+    generate_plaintiff_statement,
+    generate_defendant_statement,
+    generate_demand_section,
+    generate_facts_liability_section,
+    generate_causation_injuries,
+    generate_additional_harms,
+    generate_future_medical,
+    generate_conclusion_section,
+    generate_quotes_in_chunks,
+    fill_mediation_template,
+)
 from scripts.run_mediation import generate_quotes_in_chunks
 
 import pandas as pd
