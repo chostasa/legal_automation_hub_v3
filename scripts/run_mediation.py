@@ -422,11 +422,14 @@ def generate_quotes_in_chunks(text_chunks, delay_seconds=10):
 
     for i, chunk in enumerate(text_chunks):
         prompt = f"""
-You are a legal analyst extracting key testimony from the following deposition excerpt.
+You are a legal analyst reviewing a deposition excerpt. Each line has a line number.
 
-Each line is preceded by a line number. Every quote is part of either a question or an answer. Maintain the link between question and answer. Always include:
-- The **question line number**, the **full question**,  
-- The **answer line number**, and the **exact quote** in quotes.
+Your task is to extract and organize the most relevant testimony into the categories below. For each relevant Q&A pair:
+
+- Include the **question line number**, the **full question**,  
+- Then include the **answer line number**, and the **exact quote in quotes**.
+
+Only include direct testimony. Do not paraphrase. Do not include commentary. Skip any irrelevant lines.
 
 Organize your output into the following categories:
 
@@ -436,8 +439,7 @@ Organize your output into the following categories:
 4. Damages or injuries resulting from the incident  
 5. Harm to quality of life after the incident  
 
-Only include direct quotes. Do not paraphrase or summarize.  
-If no quote exists for a category, write: “None found.”
+If nothing is found for a category, write: "None found."
 
 Deposition excerpt:
 {chunk}
@@ -455,6 +457,7 @@ Deposition excerpt:
 
     combined_quotes = "\n\n".join(all_quotes)
     return combined_quotes
+
 
 # --- Main generation function ---
 def generate_memo_from_summary(data, template_path, output_dir):
