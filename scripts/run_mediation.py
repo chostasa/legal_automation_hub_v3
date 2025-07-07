@@ -206,12 +206,11 @@ def generate_demand_section(summary, client_name):
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
-Write the mediation demand for {client_name}. Use this example for tone and structure:
+Write a mediation demand letter for {client_name}. Use only the information below. Do NOT reuse any example language.
 
-{DEMAND_EXAMPLE}
-
-Summary of case:
+Facts:
 {summary}
+
 """
     return generate_with_openai(prompt)
 
@@ -426,7 +425,6 @@ def fill_mediation_template(data, template_path, output_path):
 
 
 
-
     def rebuild_paragraph(paragraph):
         combined_text = "".join(run.text for run in paragraph.runs)
         for key, val in replacements.items():
@@ -577,6 +575,7 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
 
     memo_data["court"] = data["court"]
     memo_data["case_number"] = data["case_number"]
+
     # Determine primary plaintiff
     plaintiff1 = data.get("plaintiff1") or data.get("plaintiff") or "Plaintiff"
     memo_data["plaintiff"] = plaintiff1
@@ -661,6 +660,13 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
 
     memo_data["conclusion"] = safe_generate(generate_conclusion_section, data["settlement_summary"])
 
+    memo_data["Introduction"] = memo_data.pop("introduction", "")
+    memo_data["Demand"] = memo_data.pop("demand", "")
+    memo_data["Facts_Liability"] = memo_data.pop("facts_liability", "")
+    memo_data["Causation_Injuries_Treatment"] = memo_data.pop("causation_injuries", "")
+    memo_data["Additional_Harms_Losses"] = memo_data.pop("additional_harms", "")
+    memo_data["Future_Medical_Bills"] = memo_data.pop("future_bills", "")
+    memo_data["Conclusion"] = memo_data.pop("conclusion", "")
 
     file_path = fill_mediation_template(memo_data, template_path, output_dir)
     return file_path
