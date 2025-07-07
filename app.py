@@ -44,6 +44,18 @@ except ImportError:
     except ImportError:
         RateLimitError = Exception  # fallback
 
+def preview_first_page(template_path):
+    """
+    Loads the first page of a Word document and returns its text.
+    """
+    try:
+        doc = Document(template_path)
+        text_lines = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+        first_page_text = "\n".join(text_lines[:25])  # Adjust line count as needed
+        return first_page_text
+    except Exception as e:
+        return f"❌ Error loading preview: {e}"
+
 
 def safe_generate(func, *args, max_retries=3, delay=5, **kwargs):
     """
@@ -515,6 +527,15 @@ if tool == "📊 Litigation Dashboard":
 # === Mediation Memo Generator (Simplified Input, Now with Multi-Depo Quote Support) ===
 elif tool == "🧾 Mediation Memos":
     st.header("🧾 Generate Confidential Mediation Memo")
+
+    # === First Page Template Preview ===
+    template_path = "templates/mediation_template.docx"
+    st.subheader("📄 Preview of Mediation Template (First Page)")
+    preview_text = preview_first_page(template_path)
+    st.text_area("First Page Preview", preview_text, height=400, disabled=True)
+
+    if "depositions" not in st.session_state:
+        st.session_state.depositions = []
 
     if "depositions" not in st.session_state:
         st.session_state.depositions = []
