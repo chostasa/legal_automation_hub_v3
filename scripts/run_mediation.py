@@ -373,23 +373,28 @@ Input:
     return generate_with_openai(prompt)
 
 
-# === Placeholder Replacer ===
+# === Improved Placeholder Replacer ===
 def replace_placeholders(doc, replacements):
-    def replace_in_paragraph(paragraph: Paragraph):
-        full_text = paragraph.text
+    def rebuild_paragraph(paragraph):
+        """
+        Replaces placeholder text even if split across runs.
+        """
+        combined_text = "".join(run.text for run in paragraph.runs)
         for key, val in replacements.items():
-            if key in full_text:
-                full_text = full_text.replace(key, val)
-        if paragraph.runs:
-            paragraph.clear()
-            paragraph.add_run(full_text)
+            if key in combined_text:
+                combined_text = combined_text.replace(key, val)
+        if combined_text != paragraph.text:
+            for run in paragraph.runs:
+                p_elem = run._element
+                p_elem.getparent().remove(p_elem)
+            paragraph.add_run(combined_text)
 
     def replace_in_cell(cell: _Cell):
         for paragraph in cell.paragraphs:
-            replace_in_paragraph(paragraph)
+            rebuild_paragraph(paragraph)
 
     for paragraph in doc.paragraphs:
-        replace_in_paragraph(paragraph)
+        rebuild_paragraph(paragraph)
 
     for table in doc.tables:
         for row in table.rows:
