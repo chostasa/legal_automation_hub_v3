@@ -473,61 +473,71 @@ def redact_text(text):
 # --- Main time split function ---
 def generate_quotes_in_chunks(text_chunks, delay_seconds=10):
     """
-    Generate categorized Q&A quotes for each chunk with line numbers preserved.
-    Organize quotes into specific categories and combine all results at the end.
+    Categorize Q&A deposition quotes by Liability and Damages.
+    Ensures line numbers, formatting, and strict legal output.
     """
-    all_quotes = []
+    liability_quotes = []
+    damages_quotes = []
 
     for i, chunk in enumerate(text_chunks):
         prompt = f"""
-You are a legal analyst reviewing a deposition transcript. Your task is to extract **relevant Q&A pairs** from the text and organize them into general-purpose categories.
+You are a litigation analyst. Categorize the following deposition excerpts into **Liability** or **Damages**. 
 
-For each category, return a **bulleted list of line-numbered pairs**, like this:
+🧾 **Return Format (strict)**:
+Only include bullet points like this:
+- **0012:25 Q:** "What were you responsible for on that day?"  
+  **0012:26 A:** "I was supervising the road closure."
 
-🧾 **Format (strict — required for every Q&A pair)**:
-- Must include both the **page number and line number**, like this:
-  0012:25 Q: "What were you responsible for on that day?"
-  0012:26 A: "I was supervising the road closure."
-- If either line is missing a number, do not include it.
-- Always present Q then A, even if the A appears first in the original.
+📂 **Categories**:
+**Liability** = Questions or answers about duties, fault, conduct, knowledge of events, observations, or cause of the incident.  
+**Damages** = Anything about pain, treatment, limitations, daily impact, job loss, suffering, or future care.
 
 ⚠️ **Rules**:
-- Every pair **must include both the page and line number** for the Q and the A, in the format shown above.
-- Always quote verbatim from the text in **quotation marks.**
-- Never paraphrase or summarize. No interpretations. No omissions.
-- Never guess or correct unclear grammar or misstatements—copy the text exactly.
-- Always list the Q followed by the A, even if the A appears first in the transcript.
-- If no quotes are found for a category, write: **"None found."**
-- If the answer is split across multiple lines, include only the first line.
-- If the answer is unclear or contains filler words (e.g., “I mean, uh...”), include them exactly as shown.
-- This tool is not allowed to infer or correct transcription mistakes.
+- Each bullet must include both the Q and A with proper line numbers.
+- Quotes must be exact. No paraphrasing. No summaries. No interpretation.
+- Use quotation marks. Do not reformat Qs or As.
+- If a line is cut off, include only the first full line.
+- No duplicates. Do not repeat quotes across categories or chunks.
 
-
-📂 **Categories (reusable for any case)**:
-1. Responsibilities, Duties, or Job Scope  
-2. Knowledge of Events, Conditions, or Observations  
-3. Cause or Contributing Factors to Key Events  
-4. Resulting Impacts, Damages, or Injuries  
-5. Changes in Health, Employment, or Daily Life  
-🛠️ These categories are intentionally broad and reusable across all case types. Do not tailor them to any specific incident.
-
-📄 **Deposition Excerpt**:
+📄 **Excerpt**:
 {chunk}
 """
+
         try:
-            quotes = safe_generate(generate_with_openai, prompt)
-            all_quotes.append(quotes)
+            result = safe_generate(generate_with_openai, prompt)
+            # Split output into sections
+            liability_section = re.findall(r"\*\*Liability\*\*(.*?)(?=\*\*Damages\*\*|$)", result, re.DOTALL)
+            damages_section = re.findall(r"\*\*Damages\*\*(.*)", result, re.DOTALL)
+
+            if liability_section:
+                liability_quotes.append(liability_section[0].strip())
+            if damages_section:
+                damages_quotes.append(damages_section[0].strip())
+
             print(f"Processed chunk {i+1}/{len(text_chunks)}")
         except APIStatusError as e:
             print(f"API error on chunk {i+1}: {e}")
             raise e
 
         if i < len(text_chunks) - 1:
-            time.sleep(delay_seconds)  # delay to avoid rate limit
+            time.sleep(delay_seconds)
 
-    combined_quotes = "\n\n".join(all_quotes)
-    return combined_quotes
+    # Combine and deduplicate
+    def clean_and_dedup(quotes):
+        combined = "\n".join(quotes)
+        seen = set()
+        cleaned = []
+        for line in combined.splitlines():
+            line = line.strip()
+            if line and line not in seen:
+                seen.add(line)
+                cleaned.append(line)
+        return "\n".join(cleaned)
 
+    return {
+        "liability_quotes": clean_and_dedup(liability_quotes),
+        "damages_quotes": clean_and_dedup(damages_quotes)
+    }
 
 def split_and_combine(fn, long_text, quotes="", chunk_size=3000):
     chunks = [long_text[i:i+chunk_size] for i in range(0, len(long_text), chunk_size)]
@@ -578,24 +588,27 @@ def generate_memo_from_summary(data, template_path, output_dir):
     memo_data["demand"] = safe_generate(
         generate_demand_section, data["settlement_summary"], plaintiff1)
 
-    all_quotes_pool = data.get("all_quotes_pool", "")
+    quotes_dict = generate_quotes_in_chunks(text_chunks)  # text_chunks is your OCR'ed and merged content
+    liability_quotes = quotes_dict["liability_quotes"]
+    damages_quotes = quotes_dict["damages_quotes"]
+
 
     memo_data["facts_liability"] = safe_generate(
         generate_facts_liability_section,
         data["complaint_narrative"],  
-        all_quotes_pool              
+        liability_quotes             
     )
 
     memo_data["additional_harms"] = split_and_combine(
         generate_additional_harms,
         data["medical_summary"],
-        all_quotes_pool
+        damages_quotes
     )
 
     memo_data["future_bills"] = split_and_combine(
         generate_future_medical,
         data["medical_summary"],
-        all_quotes_pool
+        damages_quotes
     )
 
     memo_data["causation_injuries"] = split_and_combine(
