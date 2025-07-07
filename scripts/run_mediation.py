@@ -17,7 +17,7 @@ except Exception:
 client = OpenAI(api_key=api_key)
 
 
-def generate_with_openai(prompt, model="gpt-4-turbo"):
+def generate_with_openai(prompt, model="gpt-3.5-turbo"):
     response = client.chat.completions.create(
         model=model,
         messages=[
