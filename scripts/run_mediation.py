@@ -18,7 +18,7 @@ client = OpenAI(api_key=api_key)
 
 def generate_with_openai(prompt):
     response = client.chat.completions.create(
-        model="gpt-4-turbo",
+        model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": "You are a professional legal writer."},
             {"role": "user", "content": prompt}
@@ -422,44 +422,38 @@ def generate_quotes_in_chunks(text_chunks, delay_seconds=10):
 
     for i, chunk in enumerate(text_chunks):
         prompt = f"""
-You are a legal analyst reviewing deposition testimony. Each line starts with a number and a "Q" or "A".
-
-Your task is to extract **only relevant Q&A pairs** into the correct categories listed below.
+You are a legal analyst reviewing a deposition transcript. Your task is to extract **relevant Q&A pairs** from the text and organize them into general-purpose categories.
 
 For each category, return a **bulleted list of line-numbered pairs**, like this:
 
-Format:
-- 0005:1 Q: "Question here?"
-  0005:2 A: "Answer here."
+🧾 **Format (strict — required for every Q&A pair)**:
+- Must include both the **page number and line number**, like this:
+  0012:25 Q: "What were you responsible for on that day?"
+  0012:26 A: "I was supervising the road closure."
+- If either line is missing a number, do not include it.
+- Always present Q then A, even if the A appears first in the original.
 
-⚠️ Follow these rules:
-- DO NOT paraphrase.
-- DO NOT summarize.
-- DO NOT include answers without a corresponding question.
-- DO NOT remove or guess line numbers.
-- DO NOT output anything else besides direct Q&A in the format above.If no quotes exist for a category, write: "None found."
-
-📂 Categories:
-1. Responsibility or Duties of the Witness  
-2. Knowledge of Events or Conditions Related to the Incident  
-3. Cause or Contributing Factors to the Incident  
-4. Resulting Injuries, Damages, or Losses  
-5. Changes in Quality of Life, Function, or Employment  
+⚠️ **Rules**:
+- Every pair **must include both the page and line number** for the Q and the A, in the format shown above.
+- Always quote verbatim from the text in **quotation marks.**
+- Never paraphrase or summarize. No interpretations. No omissions.
+- Never guess or correct unclear grammar or misstatements—copy the text exactly.
+- Always list the Q followed by the A, even if the A appears first in the transcript.
+- If no quotes are found for a category, write: **"None found."**
+- If the answer is split across multiple lines, include only the first line.
+- If the answer is unclear or contains filler words (e.g., “I mean, uh...”), include them exactly as shown.
+- This tool is not allowed to infer or correct transcription mistakes.
 
 
-Only include direct testimony. Do not paraphrase. Do not include commentary. Skip any irrelevant lines.
+📂 **Categories (reusable for any case)**:
+1. Responsibilities, Duties, or Job Scope  
+2. Knowledge of Events, Conditions, or Observations  
+3. Cause or Contributing Factors to Key Events  
+4. Resulting Impacts, Damages, or Injuries  
+5. Changes in Health, Employment, or Daily Life  
+🛠️ These categories are intentionally broad and reusable across all case types. Do not tailor them to any specific incident.
 
-Organize your output into the following categories:
-
-1. Responsibility for patching the road  
-2. Responsibility for traffic control or maintaining traffic control  
-3. Causation of the incident or hazard  
-4. Damages or injuries resulting from the incident  
-5. Harm to quality of life after the incident  
-
-If nothing is found for a category, write: "None found."
-
-Deposition excerpt:
+📄 **Deposition Excerpt**:
 {chunk}
 """
         try:
