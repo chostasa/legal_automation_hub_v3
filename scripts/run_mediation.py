@@ -301,7 +301,9 @@ HARMS_EXAMPLE = """
 Prior to this collision, Mr. Doe was a healthy and active 38-year-old man who enjoyed playing basketball, tennis, and soccer at the park with his friends (Ex. A, Doe Dep. 77). 
 Since the day of the crash, Stan has not been able to drive a truck.  He physically cannot climb into a truck, sit for long hours, work to unhitch the trailer, and climb out of the truck.  He enjoyed playing with and lifting up his niece, who weighs 25 pounds (Ex. A, Doe Dep. 79). Since the accident, he has been unable to partake in these activities that once brought him great joy. Mr. Doe had been driving commercial trucks since 2014 and was forced to step away from driving because of the intense pain he experienced after sitting for prolonged periods of time (Ex. A, Doe Dep. 67). As a result of the collision and to this date, he has been unable to do any these activities without experiencing severe, debilitating pain and has, therefore, lost the quality of life he once had. He had no previous neck or back injuries before this accident.
 """
-
+FUTURE_BILLS_EXAMPLE = """
+Mr. Doe’s ongoing symptoms will require lifelong pain management. Based on his treating providers’ evaluations and the history of pain persistence despite conservative treatment, Plaintiff is expected to undergo future interventions such as repeat TFESI injections and potentially spinal surgery. The cost of these procedures, including follow-up physical therapy, imaging, and medication, is estimated to exceed $150,000 over his lifetime.
+"""
 
 def generate_additional_harms(harm_info, deposition_text=None):
     prompt = f"""
@@ -551,7 +553,7 @@ def split_and_combine(fn, long_text, quotes="", chunk_size=3000):
 
 
 # --- Main generation function ---
-def generate_memo_from_summary(data, template_path, output_dir):
+def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     memo_data = {}
 
     memo_data["court"] = data["court"]
