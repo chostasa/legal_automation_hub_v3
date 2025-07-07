@@ -45,19 +45,24 @@ def safe_generate(func, *args, max_retries=3, delay=5, **kwargs):
         except Exception as e:
             raise RuntimeError(f"Generation failed: {e}")
 
-def extract_quotes_from_text(ocr_text):
-    prompt = f"""
+def extract_quotes_from_text(ocr_text, user_instructions=""):
+    base_prompt = """
 You are a legal assistant. Given this deposition or record text, extract the most relevant direct quotes (verbatim, in quotes) that support either:
 - liability,
 - injuries,
 - or harm to quality of life.
+"""
+    if user_instructions.strip():
+        base_prompt += f"\n\nThe user has provided the following additional instructions:\n{user_instructions.strip()}\n"
+
+    full_prompt = f"""{base_prompt}
 
 Only return a list of quotes. Do not paraphrase. Only use what is in the input.
 
 Input:
 {ocr_text}
 """
-    return generate_with_openai(prompt)
+    return generate_with_openai(full_prompt)
 
 
 
@@ -493,11 +498,17 @@ if tool == "📊 Litigation Dashboard":
         st.stop()
 
 # === Mediation Memo Generator (Simplified Input) ===
-elif tool == "🧾 Mediation Memos":
-    st.header("🧾 Generate Confidential Mediation Memo")
+elif tool == "🦾 Mediation Memos":
+    st.header("🦾 Generate Confidential Mediation Memo")
 
     if "quotes" not in st.session_state:
-        st.session_state.quotes = ""
+        st.session_state.quotes = extract_quotes_from_text(depo_text, quote_instructions)
+
+    quote_instructions = st.text_area(
+        "📝 Instructions for AI (optional)",
+        placeholder="E.g., Focus on quotes about emotional distress or negligent supervision...",
+        height=100
+    )
 
     depo_text = st.text_area("📎 Paste deposition text here", height=300)
 
@@ -512,7 +523,7 @@ elif tool == "🧾 Mediation Memos":
 
     if st.button("🧠 Extract Key Quotes from Deposition"):
         with st.spinner("Analyzing deposition..."):
-            st.session_state.quotes = extract_quotes_from_text(depo_text)
+            st.session_state.quotes = extract_quotes_from_text(depo_text, quote_instructions)
         st.success("✅ Quotes extracted.")
 
     if st.session_state.quotes:
