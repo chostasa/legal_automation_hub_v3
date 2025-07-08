@@ -28,6 +28,20 @@ def generate_with_openai(prompt, model="gpt-3.5-turbo"):
     )
     return response.choices[0].message.content.strip()
 
+def embed_quotes_in_section(text, quotes, heading="TESTIMONY"):
+    """
+    Append formatted quotes into a section body.
+    """
+    if not quotes.strip():
+        return text.strip()
+
+    return f"{text.strip()}\n\n{heading}:\n{quotes.strip()}"
+
+def chunk_text(text, max_tokens=3000):
+    words = text.split()
+    return [" ".join(words[i:i+max_tokens]) for i in range(0, len(words), max_tokens)]
+
+
 # === NEW FUNCTIONS FOR PREPROCESSING TRANSCRIPTS ===
 
 def normalize_deposition_lines(raw_text):
@@ -621,38 +635,51 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
             memo_data[f"{key}_statement"] = ""
 
     # Main body content
-    memo_data["introduction"] = safe_generate(
-        generate_introduction, data["complaint_narrative"], plaintiff1)
-    memo_data["demand"] = safe_generate(
-        generate_demand_section, data["settlement_summary"], plaintiff1)
+    memo_data["introduction"] = polish_text_for_legal_memo(
+        safe_generate(generate_introduction, data["complaint_narrative"], plaintiff1)
+    )
+    memo_data["demand"] = polish_text_for_legal_memo(
+        safe_generate(generate_demand_section, data["settlement_summary"], plaintiff1)
+    )
 
     quotes_dict = generate_quotes_in_chunks(text_chunks)  # text_chunks is your OCR'ed and merged content
     liability_quotes = quotes_dict["liability_quotes"]
     damages_quotes = quotes_dict["damages_quotes"]
 
-    memo_data["facts_liability"] = split_and_combine(
-        generate_facts_liability_section,
-        data["complaint_narrative"],  
-        liability_quotes             
+    memo_data["facts_liability"] = polish_text_for_legal_memo(
+        embed_quotes_in_section(
+            "\n\n".join([
+                safe_generate(generate_facts_liability_section, chunk, liability_quotes)
+                for chunk in chunk_text(data["complaint_narrative"])
+            ]),
+            liability_quotes,
+            heading="Liability Testimony"
+        )
     )
 
-    trimmed_medical_summary = trim_to_token_limit(data["medical_summary"])
-
-    memo_data["additional_harms"] = split_and_combine(
-        generate_additional_harms,
-        trimmed_medical_summary,
-        damages_quotes
+    memo_data["additional_harms"] = polish_text_for_legal_memo(
+        embed_quotes_in_section(
+            "\n\n".join([
+                safe_generate(generate_additional_harms, chunk, damages_quotes)
+                for chunk in chunk_text(trimmed_medical_summary)
+            ]),
+            damages_quotes,
+            heading="Damages Testimony"
+        )
     )
 
-    memo_data["future_bills"] = split_and_combine(
-        generate_future_medical,
-        trimmed_medical_summary,
-        damages_quotes
+    memo_data["future_bills"] = polish_text_for_legal_memo(
+        "\n\n".join([
+            safe_generate(generate_future_medical, chunk, damages_quotes)
+            for chunk in chunk_text(trimmed_medical_summary)
+        ])
     )
 
-    memo_data["causation_injuries"] = split_and_combine(
-        generate_causation_injuries,
-        trimmed_medical_summary
+    memo_data["causation_injuries"] = polish_text_for_legal_memo(
+        "\n\n".join([
+            safe_generate(generate_causation_injuries, chunk)
+            for chunk in chunk_text(trimmed_medical_summary)
+        ])
     )
 
     # === FORMAL NARRATIVE PARTIES SECTION WITH HEADINGS ===
@@ -678,7 +705,9 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         memo_data["parties"] += "DEFENDANTS:\n" + "\n\n".join(defendant_sections)
 
     # === Final cleanup and formatting ===
-    memo_data["conclusion"] = safe_generate(generate_conclusion_section, data["settlement_summary"])
+    memo_data["conclusion"] = polish_text_for_legal_memo(
+        safe_generate(generate_conclusion_section, data["settlement_summary"])
+    )
 
     memo_data["Introduction"] = memo_data.pop("introduction", "")
     memo_data["Demand"] = memo_data.pop("demand", "")
@@ -694,6 +723,21 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
 
     file_path = fill_mediation_template(memo_data, template_path, output_dir)
     return file_path
+
+
+def polish_text_for_legal_memo(text):
+    prompt = f"""
+You are a senior legal editor. Improve the following legal writing by:
+- Converting to active voice
+- Eliminating redundant or vague phrases
+- Removing repetition of facts already stated
+- Keeping it formal, persuasive, and professionally polished
+- Do not introduce new facts or change case theory
+
+Text:
+{text}
+"""
+    return safe_generate(generate_with_openai, prompt)
 
 
 def generate_plaintext_memo(memo_data):
