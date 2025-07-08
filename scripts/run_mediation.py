@@ -633,9 +633,6 @@ Only include bullet points like this:
 
 📄 **Excerpt**:
 {sub_chunk}
-"""
-
-"""
 
 """
             try:
