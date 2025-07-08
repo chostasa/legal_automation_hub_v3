@@ -37,10 +37,20 @@ def embed_quotes_in_section(text, quotes, heading="TESTIMONY"):
 
     return f"{text.strip()}\n\n{heading}:\n{quotes.strip()}"
 
-def chunk_text(text, max_tokens=3000):
-    words = text.split()
-    return [" ".join(words[i:i+max_tokens]) for i in range(0, len(words), max_tokens)]
-
+def chunk_text(text, max_chars=6000):
+    """
+    Safely chunk long text inputs by character length to stay under GPT's context limit.
+    """
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + max_chars
+        if end < len(text):
+            # Avoid cutting off mid-sentence
+            end = text.rfind(".", start, end) + 1 or end
+        chunks.append(text[start:end].strip())
+        start = end
+    return [c for c in chunks if c]
 
 # === NEW FUNCTIONS FOR PREPROCESSING TRANSCRIPTS ===
 
