@@ -618,7 +618,7 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     liability_quotes = quotes_dict["liability_quotes"]
     damages_quotes = quotes_dict["damages_quotes"]
 
-    memo_data["facts_liability"] = safe_generate(
+    memo_data["facts_liability"] = split_and_combine(
         generate_facts_liability_section,
         data["complaint_narrative"],  
         liability_quotes             
@@ -673,6 +673,10 @@ if defendant_sections:
     memo_data["Additional_Harms_Losses"] = memo_data.pop("additional_harms", "")
     memo_data["Future_Medical_Bills"] = memo_data.pop("future_bills", "")
     memo_data["Conclusion"] = memo_data.pop("conclusion", "")
+
+    for key in ["Introduction", "Facts_Liability", "Additional_Harms_Losses", "Future_Medical_Bills", "Conclusion"]:
+        if memo_data.get(key):
+            memo_data[key] = re.sub(r"\s{2,}", " ", memo_data[key].strip())
 
     file_path = fill_mediation_template(memo_data, template_path, output_dir)
     return file_path
