@@ -777,6 +777,17 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     )
     time.sleep(20)
 
+# 🔧 Format deposition text into structured Q/A format with page:line labels
+    all_depo_text = ""
+    for depo in data.get("depositions", []):  # expects a list of dicts with key "text"
+        raw_text = depo.get("text", "")
+        normalized = normalize_deposition_lines(raw_text)
+        cleaned = merge_multiline_qas(normalized)
+        all_depo_text += cleaned + "\n\n"
+
+# Split into chunks to pass to quote extraction
+    text_chunks = chunk_text(all_depo_text, max_chars=10000)
+
     quotes_dict = generate_quotes_in_chunks(text_chunks, delay_seconds=20)
     trimmed_medical_summary = trim_to_token_limit(data.get("medical_summary", ""), 10000)
     liability_quotes = quotes_dict["liability_quotes"]
