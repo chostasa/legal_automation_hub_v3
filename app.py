@@ -97,7 +97,7 @@ if not st.session_state.logged_in:
 
     st.stop()
 else:
-    st.sidebar.markdown(f"**Logged in as:** `{st.session_state.username}`")
+    st.sidebar.markdown(f"**Logged in as:** {st.session_state.username}")
 
 st.markdown("""
 <style>
@@ -273,7 +273,7 @@ if tool == "📄 Batch Doc Generator":
 
     st.markdown("""
     > **How it works:**  
-    > 1. Upload a template with `{placeholders}`  
+    > 1. Upload a template with {placeholders}  
     > 2. Upload Excel with matching column headers  
     > 3. Enter filename format, generate, and download
 
@@ -571,6 +571,19 @@ elif tool == "🧾 Mediation Memos":
         st.subheader("📂 Extracted Damages Quotes")
         st.text_area("Copy-ready Damages Quotes", "\n\n".join(st.session_state.quote_outputs["Damages"]), height=300)
 
+"""
+try:
+    result = safe_generate(rm.generate_with_openai, prompt, model="gpt-3.5-turbo")
+    if "**Damages**" in result:
+        liability_part, damages_part = result.split("**Damages**", 1)
+        st.session_state.quote_outputs["Liability"].append(liability_part.strip())
+        st.session_state.quote_outputs["Damages"].append(damages_part.strip())
+    else:
+        st.session_state.quote_outputs["Liability"].append(result.strip())
+except Exception as e:
+    st.error(f"Error processing Deposition {i}: {e}")
+"""
+
 
 # === Memo Form ===
 with st.form("simple_mediation_form"):
@@ -702,7 +715,7 @@ Use this tool to **automatically generate documents in bulk** by merging a Word 
 
 **Step-by-step:**
 1. **Upload a Word Template or Select an Existing Template**
-   - If uploading a new template, use placeholders inside of the document like `{{ClientName}}`, `{{Date}}`, etc.
+   - If uploading a new template, use placeholders inside of the document like {{ClientName}}, {{Date}}, etc.
    - These placeholders should mirror what is at the top of your excel columns
    - Save your template for reuse -- it will appear in the dropdown.
    - If selecting an existing template, choose 'Select a Saved Template' and search for the existing template. 
@@ -715,8 +728,8 @@ Use this tool to **automatically generate documents in bulk** by merging a Word 
    - View the first row to confirm the placeholder match.
 
 4. **Set Output Filename Format**
-   - Use any column name inside `{{ }}`.
-   - Example: `{{ClientName}}_Notice` -> `JohnDoe_Notice.docx`.
+   - Use any column name inside {{ }}.
+   - Example: {{ClientName}}_Notice -> JohnDoe_Notice.docx.
 
 5. **Generate Documents**
    - Click "Generate Files."
