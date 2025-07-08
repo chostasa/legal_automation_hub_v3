@@ -706,8 +706,11 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     memo_data["plaintiff"] = plaintiff1
     memo_data["plaintiff1"] = plaintiff1
     memo_data["plaintiff1_statement"] = safe_generate(
-        generate_plaintiff_statement, trim_to_token_limit(data["complaint_narrative"], 4000), plaintiff1
+        generate_plaintiff_statement,
+        trim_to_token_limit(data.get("party_information", "") + "\n" + data.get("settlement_summary", ""), 4000),
+        plaintiff1
     )
+
     time.sleep(20)
 
     # Handle up to 3 plaintiffs
@@ -716,7 +719,11 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         if name:
             memo_data[f"plaintiff{i}"] = name
             memo_data[f"plaintiff{i}_statement"] = safe_generate(
-                generate_plaintiff_statement, data["complaint_narrative"], name)
+                generate_plaintiff_statement,
+                trim_to_token_limit(data.get("party_information", "") + "\n" + data.get("settlement_summary", ""), 4000),
+                name
+            )
+
             time.sleep(20)
 
     # Handle up to 7 defendants dynamically
@@ -725,8 +732,12 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         name = data.get(key, "")
         memo_data[key] = name
         if name:
-            memo_data[f"{key}_statement"] = safe_generate(
-                generate_defendant_statement, data["complaint_narrative"], name)
+        memo_data[f"{key}_statement"] = safe_generate(
+            generate_defendant_statement,
+            trim_to_token_limit(data.get("party_information", "") + "\n" + data.get("settlement_summary", ""), 4000),
+            name
+        )
+
             time.sleep(20)
         else:
             memo_data[f"{key}_statement"] = ""
@@ -742,10 +753,15 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     )
     time.sleep(20)
 
-    quotes_dict = generate_quotes_in_chunks(text_chunks, delay_seconds=20)
-    trimmed_medical_summary = trim_to_token_limit(data.get("medical_summary", ""), 10000)
-    liability_quotes = quotes_dict["liability_quotes"]
-    damages_quotes = quotes_dict["damages_quotes"]
+    liability_quotes = data.get("liability_quotes", "").strip()
+    damages_quotes = data.get("damages_quotes", "").strip()
+
+    # Fallback to generate if not already extracted
+    if not liability_quotes or not damages_quotes:
+        quotes_dict = generate_quotes_in_chunks(text_chunks, delay_seconds=20)
+        liability_quotes = quotes_dict["liability_quotes"]
+        damages_quotes = quotes_dict["damages_quotes"]
+
 
     memo_data["facts_liability"] = polish_text_for_legal_memo(
         embed_quotes_in_section(
