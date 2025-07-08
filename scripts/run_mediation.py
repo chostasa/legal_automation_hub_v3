@@ -529,7 +529,10 @@ def generate_quotes_in_chunks(text_chunks, delay_seconds=10):
     damages_quotes = []
 
     for i, chunk in enumerate(text_chunks):
-        prompt = f"""
+        sub_chunks = chunk_text(chunk, max_chars=6000)  # Safely re-chunk each chunk
+
+        for j, sub_chunk in enumerate(sub_chunks):
+            prompt = f"""
 You are a litigation analyst. Categorize the following deposition excerpts into **Liability** or **Damages**. 
 
 🧾 **Return Format (strict)**:
@@ -549,7 +552,45 @@ Only include bullet points like this:
 - No duplicates. Do not repeat quotes across categories or chunks.
 
 📄 **Excerpt**:
-{chunk}
+{sub_chunk}
+"""
+
+            try:
+                result = safe_generate(generate_with_openai, prompt)
+
+                # Parse out the quotes
+                liability_section = re.findall(r"\*\*Liability\*\*(.*?)(?=\*\*Damages\*\*|$)", result, re.DOTALL)
+                damages_section = re.findall(r"\*\*Damages\*\*(.*)", result, re.DOTALL)
+
+                if liability_section:
+                    liability_quotes.append(liability_section[0].strip())
+                if damages_section:
+                    damages_quotes.append(damages_section[0].strip())
+
+                print(f"Processed chunk {i+1}.{j+1}/{len(text_chunks)}")
+            except APIStatusError as e:
+                print(f"API error on chunk {i+1}.{j+1}: {e}")
+                raise e
+
+            if j < len(sub_chunks) - 1:
+                time.sleep(delay_seconds)
+
+    def clean_and_dedup(quotes):
+        combined = "\n".join(quotes)
+        seen = set()
+        cleaned = []
+        for line in combined.splitlines():
+            line = line.strip()
+            if line and line not in seen:
+                seen.add(line)
+                cleaned.append(line)
+        return "\n".join(cleaned)
+
+    return {
+        "liability_quotes": clean_and_dedup(liability_quotes),
+        "damages_quotes": clean_and_dedup(damages_quotes)
+    }
+
 """
 
         try:
