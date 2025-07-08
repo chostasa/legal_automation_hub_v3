@@ -810,7 +810,7 @@ Use this tool to generate **confidential mediation memorandums** from structured
    - A final Word document will be created with your inputs formatted and polished.
 
 3. **Download**
-   - You'll get a download button to retrieve the complete mediation memorandum.
+   - You will get a download button to retrieve the complete mediation memorandum.
         """)
 
     with st.expander("🚧 Complaints – Coming Soon", expanded=False):
