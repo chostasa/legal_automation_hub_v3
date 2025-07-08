@@ -1,13 +1,12 @@
-from openai import APIStatusError
-import time
 import os
+import re
+import time
 from datetime import datetime
+import streamlit as st
 from docx import Document
 from docx.table import _Cell
 from docx.text.paragraph import Paragraph
-from openai import OpenAI
-import streamlit as st
-import re
+from openai import OpenAI, APIStatusError
 
 try:
     api_key = st.secrets["OPENAI_API_KEY"]
