@@ -525,16 +525,20 @@ elif tool == "🧾 Mediation Memos":
     )
 
     st.subheader("📌 Add Deposition Excerpts One at a Time")
-    new_depo_name = st.text_input("💿 Deposition Name (e.g., Efimov Deposition)")
-    new_depo_text = st.text_area("✍️ Paste New Deposition Text", height=300)
+    with st.expander("➕ Add a Deposition"):
+        with st.form(f"depo_form_{len(st.session_state.depositions)}"):
+            custom_name = st.text_input("💿 Deposition Label (e.g., Efimov Deposition)")
+            depo_text = st.text_area("✍️ Paste Deposition Excerpt", height=300)
+            add_clicked = st.form_submit_button("Add Deposition")
 
-    if st.button("➕ Add Deposition"):
-        if new_depo_text.strip() and new_depo_name.strip():
-            st.session_state.depositions.append(new_depo_text.strip())
-            st.session_state.deposition_names.append(new_depo_name.strip())
-            st.success(f"✅ '{new_depo_name.strip()}' added as Deposition #{len(st.session_state.depositions)}.")
-        else:
-            st.warning("Please provide both deposition text and a name.")
+            if add_clicked:
+                if custom_name.strip() and depo_text.strip():
+                    st.session_state.depositions.append(depo_text.strip())
+                    st.session_state.deposition_names.append(custom_name.strip())
+                    st.success(f"✅ '{custom_name.strip()}' added as Deposition #{len(st.session_state.depositions)}.")
+                else:
+                    st.warning("Please enter both a name and the deposition text.")
+
 
     if st.session_state.depositions:
         st.markdown("✅ **Depositions Loaded:**")
