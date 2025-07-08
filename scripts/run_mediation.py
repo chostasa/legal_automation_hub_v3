@@ -664,14 +664,64 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
             memo_data[f"{key}_statement"] = ""
 
     # Main body content
+    # --- Main generation function ---
+
+def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
+    import time
+    memo_data = {}
+
+    memo_data["Plaintiffs"] = ", ".join(
+        [data.get(f"plaintiff{i}", "") for i in range(1, 4) if data.get(f"plaintiff{i}", "")]
+    )
+    memo_data["Defendants"] = ", ".join(
+        [data.get(f"defendant{i}", "") for i in range(1, 8) if data.get(f"defendant{i}", "")]
+    )
+
+    memo_data["court"] = data["court"]
+    memo_data["case_number"] = data["case_number"]
+
+    # Determine primary plaintiff
+    plaintiff1 = data.get("plaintiff1") or data.get("plaintiff") or "Plaintiff"
+    memo_data["plaintiff"] = plaintiff1
+    memo_data["plaintiff1"] = plaintiff1
+    memo_data["plaintiff1_statement"] = safe_generate(
+        generate_plaintiff_statement, trim_to_token_limit(data["complaint_narrative"], 4000), plaintiff1
+    )
+    time.sleep(20)
+
+    # Handle up to 3 plaintiffs
+    for i in range(2, 4):
+        name = data.get(f"plaintiff{i}", "").strip()
+        if name:
+            memo_data[f"plaintiff{i}"] = name
+            memo_data[f"plaintiff{i}_statement"] = safe_generate(
+                generate_plaintiff_statement, data["complaint_narrative"], name)
+            time.sleep(20)
+
+    # Handle up to 7 defendants dynamically
+    for i in range(1, 8):
+        key = f"defendant{i}"
+        name = data.get(key, "")
+        memo_data[key] = name
+        if name:
+            memo_data[f"{key}_statement"] = safe_generate(
+                generate_defendant_statement, data["complaint_narrative"], name)
+            time.sleep(20)
+        else:
+            memo_data[f"{key}_statement"] = ""
+
+    # Main body content
     memo_data["introduction"] = polish_text_for_legal_memo(
         safe_generate(generate_introduction, trim_to_token_limit(data["complaint_narrative"], 4000), plaintiff1)
     )
+    time.sleep(20)
+
     memo_data["demand"] = polish_text_for_legal_memo(
         safe_generate(generate_demand_section, trim_to_token_limit(data["settlement_summary"], 2000), plaintiff1)
     )
+    time.sleep(20)
 
-    quotes_dict = generate_quotes_in_chunks(text_chunks)
+    quotes_dict = generate_quotes_in_chunks(text_chunks, delay_seconds=20)
     trimmed_medical_summary = trim_to_token_limit(data.get("medical_summary", ""), 10000)
     liability_quotes = quotes_dict["liability_quotes"]
     damages_quotes = quotes_dict["damages_quotes"]
@@ -686,6 +736,7 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
             heading="Liability Testimony"
         )
     )
+    time.sleep(20)
 
     memo_data["additional_harms"] = polish_text_for_legal_memo(
         embed_quotes_in_section(
@@ -697,6 +748,7 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
             heading="Damages Testimony"
         )
     )
+    time.sleep(20)
 
     memo_data["future_bills"] = polish_text_for_legal_memo(
         "\n\n".join([
@@ -704,6 +756,7 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
             for chunk in chunk_text(trimmed_medical_summary)
         ])
     )
+    time.sleep(20)
 
     memo_data["causation_injuries"] = polish_text_for_legal_memo(
         "\n\n".join([
@@ -711,6 +764,9 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
             for chunk in chunk_text(trimmed_medical_summary)
         ])
     )
+    time.sleep(20)
+
+    return memo_data
 
     # === FORMAL NARRATIVE PARTIES SECTION WITH HEADINGS ===
     plaintiff_sections = []
