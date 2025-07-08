@@ -621,7 +621,16 @@ Ignore all other content.
                     try:
                         result = safe_generate(generate_with_openai, prompt, model="gpt-3.5-turbo")
 
+                        st.subheader(f"🧾 Raw GPT Output for {depo_name}")
+                        st.code(result, language="markdown")
+
+
                         liability_quotes, damages_quotes = parse_and_label_quotes(result, depo_name)
+
+                        st.subheader(f"🧾 Parsed Quotes for {depo_name}")
+                        st.text_area("🧷 Liability", liability_quotes or "No Liability Quotes Found", height=150)
+                        st.text_area("🧷 Damages", damages_quotes or "No Damages Quotes Found", height=150)
+
 
                         if liability_quotes:
                             st.session_state.quote_outputs["Liability"].append(liability_quotes)
