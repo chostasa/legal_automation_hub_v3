@@ -788,7 +788,7 @@ Use this tool to generate **individual demand letters** using a manual entry for
 
 **Step-by-step:**
 1. **Fill Out the Form**
-   - Enter the client’s name, defendant, incident date, location, summary, and damages (damages should be a dollar figure. Ex. $100,000 One Hundred Thousand Dollars).
+   - Enter the clients name, defendant, incident date, location, summary, and damages (damages should be a dollar figure. Ex. $100,000 One Hundred Thousand Dollars).
 
 2. **Click 'Generate Demand Letter'**
    - The app will insert your responses into a Word template.
