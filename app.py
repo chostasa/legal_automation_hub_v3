@@ -750,24 +750,69 @@ Ignore all other content.
                 progress_text.text(text)
 
                 if key == "introduction":
-                    memo_data[key] = safe_generate(generate_introduction, data["complaint_narrative"], data["plaintiff1"])
+                    memo_data[key] = safe_generate(
+                        generate_introduction,
+                        data["complaint_narrative"],
+                        data["plaintiff1"]
+                    )
+
                 elif key == "plaintiff_statement":
-                    memo_data["Plaintiff1 Statement"] = safe_generate(generate_plaintiff_statement, data["complaint_narrative"], data["plaintiff1"])
+                    memo_data["Plaintiff1 Statement"] = safe_generate(
+                        generate_plaintiff_statement,
+                        data["party_info"],
+                        data["plaintiff1"]
+                    )
+
                 elif key.startswith("defendant") and key.endswith("_statement"):
                     i = key.replace("defendant", "").replace("_statement", "")
-                    memo_data[f"Defendant{i} Statement"] = safe_generate(generate_defendant_statement, data["complaint_narrative"], data[f"defendant{i}"])
+                    defendant_key = f"defendant{i}"
+                    statement_key = f"Defendant{i} Statement"
+
+                    memo_data[statement_key] = safe_generate(
+                        generate_defendant_statement,
+                        data.get("party_info", "") + "\n\n" + data.get("settlement_summary", ""),
+                        data.get(defendant_key, "")
+                    )
+
                 elif key == "demand":
-                    memo_data[key] = safe_generate(generate_demand_section, data["settlement_summary"], data["plaintiff1"])
+                    memo_data[key] = safe_generate(
+                        generate_demand_section,
+                        data["settlement_summary"],
+                        data["plaintiff1"]
+                    )
+
                 elif key == "facts_liability":
-                    memo_data[key] = safe_generate(generate_facts_liability_section, data["complaint_narrative"], data["deposition_liability"])
+                    memo_data[key] = safe_generate(
+                        generate_facts_liability_section,
+                        data["complaint_narrative"],
+                        data["deposition_liability"]
+                    )
+
                 elif key == "causation_injuries":
-                    memo_data[key] = safe_generate(generate_causation_injuries, data["medical_summary"])
+                    memo_data[key] = safe_generate(
+                        generate_causation_injuries,
+                        data["medical_summary"]
+                    )
+
                 elif key == "additional_harms":
-                    memo_data[key] = safe_generate(generate_additional_harms, data["medical_summary"], data["deposition_damages"])
+                    memo_data[key] = safe_generate(
+                        generate_additional_harms,
+                        data["medical_summary"],
+                        data["deposition_damages"]
+                    )
+
                 elif key == "future_bills":
-                    memo_data[key] = safe_generate(generate_future_medical, data["medical_summary"], data["deposition_damages"])
+                    memo_data[key] = safe_generate(
+                        generate_future_medical,
+                        data["medical_summary"],
+                        data["deposition_damages"]
+                    )
+
                 elif key == "conclusion":
-                    memo_data[key] = safe_generate(generate_conclusion_section, data["settlement_summary"])
+                    memo_data[key] = safe_generate(
+                        generate_conclusion_section,
+                        data["settlement_summary"]
+                    )
 
                 progress_bar.progress((idx + 1) / total)
 
