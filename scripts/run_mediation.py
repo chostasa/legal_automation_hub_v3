@@ -793,8 +793,9 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         name = memo_data.get(f"plaintiff{i}", "")
         statement = memo_data.get(f"plaintiff{i}_statement", "")
         if name:
-            memo_data[f"Plaintiff_{i}_Name"] = name
-            memo_data[f"Plaintiff_{i}_Statement"] = statement
+            # ✅ Fix: match the expected keys used in fill_mediation_template()
+            memo_data[f"{{{{Plaintiff_{i}_Name}}}}"] = name
+            memo_data[f"{{{{Plaintiff_{i}_Statement}}}}"] = statement
             plaintiff_sections.append(f"Plaintiff {name} Statement:\n{statement}")
 
     # === Fill {{Defendant_1_Name}}, etc. ===
@@ -802,8 +803,9 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         name = memo_data.get(f"defendant{i}", "")
         statement = memo_data.get(f"defendant{i}_statement", "")
         if name:
-            memo_data[f"Defendant_{i}_Name"] = name
-            memo_data[f"Defendant_{i}_Statement"] = statement
+            # ✅ Fix: match the expected keys used in fill_mediation_template()
+            memo_data[f"{{{{Defendant_{i}_Name}}}}"] = name
+            memo_data[f"{{{{Defendant_{i}_Statement}}}}"] = statement
             defendant_sections.append(f"Defendant {name} Statement:\n{statement}")
 
     # === Generate narrative and full parties section ===
