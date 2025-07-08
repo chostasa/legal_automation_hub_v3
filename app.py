@@ -1,24 +1,7 @@
 import streamlit as st
 st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
-from scripts.run_foia import run_foia
-from scripts.run_demand import run
-from scripts.run_mediation import (
-    generate_with_openai,
-    generate_introduction,
-    generate_plaintiff_statement,
-    generate_defendant_statement,
-    generate_demand_section,
-    generate_facts_liability_section,
-    generate_causation_injuries,
-    generate_additional_harms,
-    generate_future_medical,
-    generate_conclusion_section,
-    generate_quotes_in_chunks,
-    fill_mediation_template,
-)
-from scripts.run_mediation import split_and_combine
-from scripts.run_mediation import generate_quotes_in_chunks
+import scripts.run_mediation as rm
 
 
 import pandas as pd
@@ -89,7 +72,7 @@ Only return a list of quotes. Do not paraphrase. Only use what is in the input.
 Input:
 {ocr_text}
 """
-    return generate_with_openai(full_prompt)
+    return rm.generate_with_openai(full_prompt)
 
 
 
@@ -565,14 +548,14 @@ elif tool == "🧾 Mediation Memos":
 
             for i, (depo_text, depo_name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
                 with st.spinner(f"Analyzing {depo_name}..."):
-                    from scripts.run_mediation import normalize_deposition_lines, merge_multiline_qas, generate_quotes_in_chunks
+                    from scripts import run_mediation as rm
 
                     try:
-                        numbered_lines = normalize_deposition_lines(depo_text)
-                        merged_text = merge_multiline_qas(numbered_lines)
+                        numbered_lines = rm.normalize_deposition_lines(depo_text)
+                        merged_text = rm.merge_multiline_qas(numbered_lines)
                         text_chunks = [merged_text]
 
-                        result = generate_quotes_in_chunks(
+                        result = rm.generate_quotes_in_chunks(
                             text_chunks,
                             depo_label=depo_name,
                             delay_seconds=5,
@@ -592,7 +575,7 @@ elif tool == "🧾 Mediation Memos":
 
 """
 try:
-    result = safe_generate(generate_with_openai, prompt, model="gpt-3.5-turbo")
+    result = safe_generate(rm.generate_with_openai, prompt, model="gpt-3.5-turbo")
     if "**Damages**" in result:
         liability_part, damages_part = result.split("**Damages**", 1)
         st.session_state.quote_outputs["Liability"].append(liability_part.strip())
@@ -652,7 +635,6 @@ if submitted:
 
         template_path = "templates/mediation_template.docx"
 
-        from scripts.run_mediation import safe_generate, generate_introduction, generate_plaintiff_statement, generate_defendant_statement, generate_demand_section, generate_facts_liability_section, generate_causation_injuries, generate_additional_harms, generate_future_medical, generate_conclusion_section, fill_mediation_template
 
         progress_text = st.empty()
         progress_bar = st.progress(0)
@@ -695,37 +677,32 @@ if submitted:
             progress_text.text(text)
 
             if key == "introduction":
-                memo_data[key] = safe_generate(generate_introduction, data["complaint_narrative"], data["plaintiff1"])
+                memo_data[key] = safe_generate(rm.generate_introduction, data["complaint_narrative"], data["plaintiff1"])
             elif key == "plaintiff_statement":
-                memo_data["Plaintiff1 Statement"] = safe_generate(generate_plaintiff_statement, data["complaint_narrative"], data["plaintiff1"])
+                memo_data["Plaintiff1 Statement"] = safe_generate(rm.generate_plaintiff_statement, data["complaint_narrative"], data["plaintiff1"])
             elif key.startswith("defendant") and key.endswith("_statement"):
                 i = key.replace("defendant", "").replace("_statement", "")
-                memo_data[f"Defendant{i} Statement"] = safe_generate(generate_defendant_statement, data["complaint_narrative"], data[f"defendant{i}"])
+                memo_data[f"Defendant{i} Statement"] = safe_generate(rm.generate_defendant_statement, data["complaint_narrative"], data[f"defendant{i}"])
             elif key == "demand":
-                memo_data[key] = safe_generate(generate_demand_section, data["settlement_summary"], data["plaintiff1"])
+                memo_data[key] = safe_generate(rm.generate_demand_section, data["settlement_summary"], data["plaintiff1"])
             elif key == "facts_liability":
-                memo_data[key] = safe_generate(generate_facts_liability_section, data["complaint_narrative"], data["deposition_liability"])
+                memo_data[key] = safe_generate(rm.generate_facts_liability_section, data["complaint_narrative"], data["deposition_liability"])
             elif key == "causation_injuries":
-                memo_data[key] = safe_generate(generate_causation_injuries, data["medical_summary"])
+                memo_data[key] = safe_generate(rm.generate_causation_injuries, data["medical_summary"])
             elif key == "additional_harms":
-                memo_data[key] = safe_generate(generate_additional_harms, data["medical_summary"], data["deposition_damages"])
+                memo_data[key] = safe_generate(rm.generate_additional_harms, data["medical_summary"], data["deposition_damages"])
             elif key == "future_bills":
-                memo_data[key] = safe_generate(generate_future_medical, data["medical_summary"], data["deposition_damages"])
+                memo_data[key] = safe_generate(rm.generate_future_medical, data["medical_summary"], data["deposition_damages"])
             elif key == "conclusion":
-                memo_data[key] = safe_generate(generate_conclusion_section, data["settlement_summary"])
+                memo_data[key] = safe_generate(rm.generate_conclusion_section, data["settlement_summary"])
 
             progress_bar.progress((idx + 1) / total)
 
-        file_path = fill_mediation_template(data | memo_data, template_path, output_dir)
+        file_path = rm.fill_mediation_template(data | memo_data, template_path, output_dir)
 
         with open(file_path, "rb") as f:
             st.success("\u2705 Mediation memo generated!")
             st.download_button("\ud83d\uddc5\ufe0f Download Mediation Memo", f, file_name=os.path.basename(file_path))
-
-        # Fallback plaintext output
-        plaintext_output = generate_plaintext_memo(memo_data)
-        st.download_button("\ud83d\udcc4 Download Plaintext Version", plaintext_output, file_name="Mediation_Memo_Plaintext.txt")
-        st.text_area("\ud83d\udcdd Memo Preview (Plaintext)", plaintext_output, height=700)
 
     except Exception as e:
         st.error(f"\u274c Error: {e}")
