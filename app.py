@@ -567,7 +567,7 @@ elif tool == "🧾 Mediation Memos":
             from scripts.run_mediation import safe_generate, generate_with_openai
             st.session_state.quote_outputs = {"Liability": [], "Damages": []}
 
-            for i, depo_text in enumerate(st.session_state.depositions, 1):
+            for i, (depo_text, depo_name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
                 with st.spinner(f"Analyzing Deposition #{i}..."):
                     prompt = f"""
 You are a legal analyst reviewing deposition excerpts in a {case_synopsis.strip() or 'civil lawsuit'}.
