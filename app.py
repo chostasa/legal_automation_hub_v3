@@ -1,8 +1,6 @@
 import streamlit as st
 st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
-import scripts.run_mediation as rm
-
 
 import pandas as pd
 import os
@@ -15,6 +13,7 @@ from docx import Document
 from datetime import datetime
 from users import USERS, hash_password
 from streamlit_autorefresh import st_autorefresh
+import scripts.run_mediation as rm
 
 
 import time
