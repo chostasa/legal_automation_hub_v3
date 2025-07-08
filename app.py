@@ -761,7 +761,7 @@ Use this tool to **automatically generate documents in bulk** by merging a Word 
    - Example: `{{ClientName}}_Notice` -> `JohnDoe_Notice.docx`.
 
 5. **Generate Documents**
-   - Click "Generate Files.”
+   - Click "Generate Files."
    - Download a ZIP file with all Word documents.
         """)
 
