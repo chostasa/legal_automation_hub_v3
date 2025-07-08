@@ -509,24 +509,30 @@ if tool == "📊 Litigation Dashboard":
 elif tool == "🧾 Mediation Memos":
     st.header("🧾 Generate Confidential Mediation Memo")
 
-    if "depositions" not in st.session_state:
-        st.session_state.depositions = []
-    if "deposition_names" not in st.session_state:
-        st.session_state.deposition_names = []
-    if "quote_outputs" not in st.session_state:
-        st.session_state.quote_outputs = {"Liability": [], "Damages": []}
+    # Initialize state
+    for key in ["depositions", "deposition_names", "quote_outputs"]:
+        if key not in st.session_state:
+            st.session_state[key] = [] if "outputs" not in key else {"Liability": [], "Damages": []}
+
+    if "case_synopsis" not in st.session_state:
+        st.session_state.case_synopsis = ""
+    if "quote_instructions" not in st.session_state:
+        st.session_state.quote_instructions = ""
 
     st.subheader("📘 Case Synopsis & Instructions")
-    case_synopsis = st.text_area("💼 Brief Case Synopsis (optional)", height=100)
-    quote_instructions = st.text_area(
-        "📝 Instructions for AI (optional)",
-        placeholder="E.g., Focus on quotes about emotional distress or negligent supervision...",
+
+    st.session_state.case_synopsis = st.text_area(
+        "💼 Brief Case Synopsis (optional)",
+        value=st.session_state.case_synopsis,
         height=100
     )
 
-    # Save to session_state for use during rerun
-    st.session_state.case_synopsis = case_synopsis
-    st.session_state.quote_instructions = quote_instructions
+    st.session_state.quote_instructions = st.text_area(
+        "📝 Instructions for AI (optional)",
+        value=st.session_state.quote_instructions,
+        placeholder="E.g., Focus on quotes about emotional distress or negligent supervision...",
+        height=100
+    )
 
     st.subheader("🔐 Add Deposition Excerpts One at a Time")
     with st.expander("➕ Add a Deposition"):
@@ -546,17 +552,17 @@ elif tool == "🧾 Mediation Memos":
     if st.session_state.depositions:
         st.markdown("✅ **Depositions Loaded:**")
         for i, (depo, name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
-            st.text_area(f"{name} (Deposition {i})", depo, height=150)
+            st.text_area(f"{name} (Deposition {i})", depo, height=150, key=f"depo_display_{i}")
 
-        if st.button("🤮 Extract Quotes from All Depositions"):
+        if st.button("🧐 Extract Quotes from All Depositions"):
             st.session_state.quote_outputs = {"Liability": [], "Damages": []}
 
-            case_synopsis_text = st.session_state.get("case_synopsis", "")
-            quote_instruction_text = st.session_state.get("quote_instructions", "")
-            combined_prompt = f"{case_synopsis_text}\n\n{quote_instruction_text}".strip()
+            combined_prompt = (
+                f"{st.session_state.case_synopsis}\n\n{st.session_state.quote_instructions}"
+            ).strip()
 
             for i, (depo_text, depo_name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
-                with st.spinner(f"Analyzing {depo_name}..."):
+                with st.spinner(f"🔍 Extracting from {depo_name}..."):
                     try:
                         numbered = rm.normalize_deposition_lines(depo_text)
                         merged = rm.merge_multiline_qas(numbered)
@@ -576,11 +582,18 @@ elif tool == "🧾 Mediation Memos":
                         st.error(f"❌ Error processing {depo_name}: {e}")
 
             st.subheader("📂 Extracted Liability Quotes")
-            st.text_area("Copy-ready Liability Quotes", "\n\n".join(st.session_state.quote_outputs["Liability"]), height=300)
+            st.text_area(
+                "Copy-ready Liability Quotes",
+                "\n\n".join(st.session_state.quote_outputs["Liability"]),
+                height=300
+            )
 
             st.subheader("📂 Extracted Damages Quotes")
-            st.text_area("Copy-ready Damages Quotes", "\n\n".join(st.session_state.quote_outputs["Damages"]), height=300)
-
+            st.text_area(
+                "Copy-ready Damages Quotes",
+                "\n\n".join(st.session_state.quote_outputs["Damages"]),
+                height=300
+            )
 
 
     # === Memo Form ===
