@@ -16,6 +16,26 @@ except Exception:
 
 client = OpenAI(api_key=api_key)
 
+def trim_to_token_limit(text, max_tokens=12000):
+    tokens = text.split()
+    if len(tokens) <= max_tokens:
+        return text
+    half = max_tokens // 2
+    return " ".join(tokens[:half]) + "\n...\n" + " ".join(tokens[-half:])
+
+def safe_generate(fn, *args, retries=3, wait_time=10, **kwargs):
+    trimmed_args = [trim_to_token_limit(arg, 6000) if isinstance(arg, str) else arg for arg in args]
+    for attempt in range(retries):
+        try:
+            return fn(*trimmed_args)
+        except APIStatusError as e:
+            if e.status_code == 429 and "rate_limit_exceeded" in str(e):
+                st.warning(f"Rate limit hit. Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                raise e
+    raise Exception("❌ gpt-3.5-turbo rate limit error after multiple attempts.")
+
 
 def generate_with_openai(prompt, model="gpt-3.5-turbo"):
     response = client.chat.completions.create(
@@ -601,22 +621,17 @@ def split_and_combine(fn, long_text, quotes="", chunk_size=3000):
             results.append(safe_generate(fn, chunk))
     return "\n\n".join(results)
 
-
-def trim_to_token_limit(text, max_tokens=12000):
-    """
-    Trims input text to ensure it stays within OpenAI model context limits.
-    Keeps the beginning and end of the text, cutting out the middle if necessary.
-    """
-    tokens = text.split()
-    if len(tokens) <= max_tokens:
-        return text
-    half = max_tokens // 2
-    return " ".join(tokens[:half]) + "\n...\n" + " ".join(tokens[-half:])
-
-
 # --- Main generation function ---
+
 def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     memo_data = {}
+
+    memo_data["Plaintiffs"] = ", ".join(
+        [data.get(f"plaintiff{i}", "") for i in range(1, 4) if data.get(f"plaintiff{i}", "")]
+    )
+    memo_data["Defendants"] = ", ".join(
+        [data.get(f"defendant{i}", "") for i in range(1, 8) if data.get(f"defendant{i}", "")]
+    )
 
     memo_data["court"] = data["court"]
     memo_data["case_number"] = data["case_number"]
@@ -626,7 +641,8 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     memo_data["plaintiff"] = plaintiff1
     memo_data["plaintiff1"] = plaintiff1
     memo_data["plaintiff1_statement"] = safe_generate(
-        generate_plaintiff_statement, data["complaint_narrative"], plaintiff1)
+        generate_plaintiff_statement, trim_to_token_limit(data["complaint_narrative"], 4000), plaintiff1
+    )
 
     # Handle up to 3 plaintiffs
     for i in range(2, 4):
@@ -649,20 +665,21 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
 
     # Main body content
     memo_data["introduction"] = polish_text_for_legal_memo(
-        safe_generate(generate_introduction, data["complaint_narrative"], plaintiff1)
+        safe_generate(generate_introduction, trim_to_token_limit(data["complaint_narrative"], 4000), plaintiff1)
     )
     memo_data["demand"] = polish_text_for_legal_memo(
-        safe_generate(generate_demand_section, data["settlement_summary"], plaintiff1)
+        safe_generate(generate_demand_section, trim_to_token_limit(data["settlement_summary"], 2000), plaintiff1)
     )
 
-    quotes_dict = generate_quotes_in_chunks(text_chunks)  # text_chunks is your OCR'ed and merged content
+    quotes_dict = generate_quotes_in_chunks(text_chunks)
+    trimmed_medical_summary = trim_to_token_limit(data.get("medical_summary", ""), 10000)
     liability_quotes = quotes_dict["liability_quotes"]
     damages_quotes = quotes_dict["damages_quotes"]
 
     memo_data["facts_liability"] = polish_text_for_legal_memo(
         embed_quotes_in_section(
             "\n\n".join([
-                safe_generate(generate_facts_liability_section, chunk, liability_quotes)
+                safe_generate(generate_facts_liability_section, chunk, trim_to_token_limit(liability_quotes, 2000))
                 for chunk in chunk_text(data["complaint_narrative"])
             ]),
             liability_quotes,
@@ -673,7 +690,7 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     memo_data["additional_harms"] = polish_text_for_legal_memo(
         embed_quotes_in_section(
             "\n\n".join([
-                safe_generate(generate_additional_harms, chunk, damages_quotes)
+                safe_generate(generate_additional_harms, chunk, trim_to_token_limit(damages_quotes, 2000))
                 for chunk in chunk_text(trimmed_medical_summary)
             ]),
             damages_quotes,
@@ -683,7 +700,7 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
 
     memo_data["future_bills"] = polish_text_for_legal_memo(
         "\n\n".join([
-            safe_generate(generate_future_medical, chunk, damages_quotes)
+            safe_generate(generate_future_medical, chunk, trim_to_token_limit(damages_quotes, 2000))
             for chunk in chunk_text(trimmed_medical_summary)
         ])
     )
@@ -735,7 +752,7 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
             memo_data[key] = re.sub(r"\s{2,}", " ", memo_data[key].strip())
 
     file_path = fill_mediation_template(memo_data, template_path, output_dir)
-    return file_path
+    return file_path, memo_data
 
 
 def polish_text_for_legal_memo(text):
