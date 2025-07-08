@@ -591,44 +591,6 @@ Only include bullet points like this:
         "damages_quotes": clean_and_dedup(damages_quotes)
     }
 
-"""
-
-        try:
-            result = safe_generate(generate_with_openai, prompt)
-            # Split output into sections
-            liability_section = re.findall(r"\*\*Liability\*\*(.*?)(?=\*\*Damages\*\*|$)", result, re.DOTALL)
-            damages_section = re.findall(r"\*\*Damages\*\*(.*)", result, re.DOTALL)
-
-            if liability_section:
-                liability_quotes.append(liability_section[0].strip())
-            if damages_section:
-                damages_quotes.append(damages_section[0].strip())
-
-            print(f"Processed chunk {i+1}/{len(text_chunks)}")
-        except APIStatusError as e:
-            print(f"API error on chunk {i+1}: {e}")
-            raise e
-
-        if i < len(text_chunks) - 1:
-            time.sleep(delay_seconds)
-
-    # Combine and deduplicate
-    def clean_and_dedup(quotes):
-        combined = "\n".join(quotes)
-        seen = set()
-        cleaned = []
-        for line in combined.splitlines():
-            line = line.strip()
-            if line and line not in seen:
-                seen.add(line)
-                cleaned.append(line)
-        return "\n".join(cleaned)
-
-    return {
-        "liability_quotes": clean_and_dedup(liability_quotes),
-        "damages_quotes": clean_and_dedup(damages_quotes)
-    }
-
 def split_and_combine(fn, long_text, quotes="", chunk_size=3000):
     chunks = [long_text[i:i+chunk_size] for i in range(0, len(long_text), chunk_size)]
     results = []
