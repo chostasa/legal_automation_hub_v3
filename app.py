@@ -597,7 +597,13 @@ Ignore all other content.
                             liability_part, damages_part = result.split("**Damages**", 1)
                             if liability_part.strip():
                                 labeled_liability = f"📑 {depo_name}\n{liability_part.strip()}"
-                                st.session_state.quote_outputs["Liability"].append(labeled_liability)
+                                st.session_state.quote_outputs["Liability"].append(
+                                    f"📑 {st.session_state.deposition_names[i-1]}\n{result['liability_quotes']}"
+                                )
+                                st.session_state.quote_outputs["Damages"].append(
+                                    f"📑 {st.session_state.deposition_names[i-1]}\n{result['damages_quotes']}"
+                                )
+
 
                             if damages_part.strip():
                                 labeled_damages = f"📑 {depo_name}\n{damages_part.strip()}"
