@@ -14,7 +14,7 @@ import tempfile
 from docx import Document
 from datetime import datetime
 from users import USERS, hash_password
-
+from streamlit_autorefresh import st_autorefresh
 
 
 import time
@@ -451,7 +451,6 @@ if tool == "📄 Batch Doc Generator":
 
 # === Load Excel Data from Dropbox App Folder (Secure API Method) ===
 if tool == "📊 Litigation Dashboard":
-    from streamlit_autorefresh import st_autorefresh
     st.header("📊 Interactive Litigation Dashboard")
     st_autorefresh(interval=3600000, key="refresh_dashboard")
 
