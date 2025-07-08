@@ -539,7 +539,6 @@ elif tool == "🧾 Mediation Memos":
                 else:
                     st.warning("Please enter both a name and the deposition text.")
 
-
     if st.session_state.depositions:
         st.markdown("✅ **Depositions Loaded:**")
         for i, (depo, name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
@@ -550,15 +549,13 @@ elif tool == "🧾 Mediation Memos":
 
             for i, (depo_text, depo_name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
                 with st.spinner(f"Analyzing {depo_name}..."):
-                    from scripts import run_mediation as rm
-
                     try:
-                        numbered_lines = rm.normalize_deposition_lines(depo_text)
-                        merged_text = rm.merge_multiline_qas(numbered_lines)
-                        text_chunks = [merged_text]
+                        numbered = rm.normalize_deposition_lines(depo_text)
+                        merged = rm.merge_multiline_qas(numbered)
+                        chunks = rm.chunk_text(merged, max_chars=10000)
 
                         result = rm.generate_quotes_in_chunks(
-                            text_chunks,
+                            chunks,
                             depo_label=depo_name,
                             delay_seconds=5,
                             custom_instructions=quote_instructions
@@ -566,14 +563,16 @@ elif tool == "🧾 Mediation Memos":
 
                         st.session_state.quote_outputs["Liability"].append(result["liability_quotes"])
                         st.session_state.quote_outputs["Damages"].append(result["damages_quotes"])
+
                     except Exception as e:
                         st.error(f"❌ Error processing {depo_name}: {e}")
 
-        st.subheader("📂 Extracted Liability Quotes")
-        st.text_area("Copy-ready Liability Quotes", "\n\n".join(st.session_state.quote_outputs["Liability"]), height=300)
+            st.subheader("📂 Extracted Liability Quotes")
+            st.text_area("Copy-ready Liability Quotes", "\n\n".join(st.session_state.quote_outputs["Liability"]), height=300)
 
-        st.subheader("📂 Extracted Damages Quotes")
-        st.text_area("Copy-ready Damages Quotes", "\n\n".join(st.session_state.quote_outputs["Damages"]), height=300)
+            st.subheader("📂 Extracted Damages Quotes")
+            st.text_area("Copy-ready Damages Quotes", "\n\n".join(st.session_state.quote_outputs["Damages"]), height=300)
+
 
 
     # === Memo Form ===
