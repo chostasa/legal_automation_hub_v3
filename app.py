@@ -530,6 +530,8 @@ elif tool == "🧾 Mediation Memos":
 
     if "depositions" not in st.session_state:
         st.session_state.depositions = []
+    if "deposition_names" not in st.session_state:
+        st.session_state.deposition_names = []
 
     if "depositions" not in st.session_state:
         st.session_state.depositions = []
@@ -545,35 +547,38 @@ elif tool == "🧾 Mediation Memos":
     )
 
     st.subheader("📎 Add Deposition Excerpts One at a Time")
-
+    new_depo_name = st.text_input("📛 Deposition Name (e.g., Efimov Deposition)")
     new_depo_text = st.text_area("✍️ Paste New Deposition Text", height=300)
+
     if st.button("➕ Add Deposition"):
-        if new_depo_text.strip():
+        if new_depo_text.strip() and new_depo_name.strip():
             st.session_state.depositions.append(new_depo_text.strip())
-            st.success(f"Deposition #{len(st.session_state.depositions)} added.")
+            st.session_state.deposition_names.append(new_depo_name.strip())
+            st.success(f"✅ '{new_depo_name.strip()}' added as Deposition #{len(st.session_state.depositions)}.")
         else:
-            st.warning("Please paste some text before adding.")
+            st.warning("Please provide both deposition text and a name.")
 
     if st.session_state.depositions:
         st.markdown("✅ **Depositions Loaded:**")
-        for i, depo in enumerate(st.session_state.depositions, 1):
-            st.text_area(f"Deposition {i}", depo, height=150)
+        for i, (depo, name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
+            st.text_area(f"{name} (Deposition {i})", depo, height=150)
+
 
         if st.button("🧠 Extract Quotes from All Depositions"):
             from scripts.run_mediation import safe_generate, generate_with_openai
             st.session_state.quote_outputs = {"Liability": [], "Damages": []}
 
-            for i, depo_text in enumerate(st.session_state.depositions, 1):
-                with st.spinner(f"Analyzing Deposition #{i}..."):
+            for i, (depo_text, depo_name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
+                with st.spinner(f"Analyzing {depo_name}..."):
                     prompt = f"""
 You are a legal analyst reviewing deposition excerpts in a {case_synopsis.strip() or 'civil lawsuit'}.
 
 Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAMAGES**.
 Ignore all other content.
 
-🧾 **Format for each Q&A**:
-0012:24 Q: "What were you doing that day?"
-0012:25 A: "I was monitoring intake procedures."
+🗞 **Format for each Q&A**:
+{depo_name} 0012:24 Q: "What were you doing that day?"
+{depo_name} 0012:25 A: "I was monitoring intake procedures."
 
 ⚠️ **Rules**:
 - Only include categories: **Liability** and **Damages**
@@ -584,7 +589,7 @@ Ignore all other content.
 
 {f"💡 Case Notes: {quote_instructions.strip()}" if quote_instructions.strip() else ""}
 
-📄 Deposition:
+📄 Deposition ({depo_name}):
 {depo_text}
 """
                     try:
