@@ -571,7 +571,7 @@ elif tool == "🧾 Mediation Memos":
         st.subheader("📂 Extracted Damages Quotes")
         st.text_area("Copy-ready Damages Quotes", "\n\n".join(st.session_state.quote_outputs["Damages"]), height=300)
 
-"""
+st.code("""
 try:
     result = safe_generate(rm.generate_with_openai, prompt, model="gpt-3.5-turbo")
     if "**Damages**" in result:
@@ -582,8 +582,7 @@ try:
         st.session_state.quote_outputs["Liability"].append(result.strip())
 except Exception as e:
     st.error(f"Error processing Deposition {i}: {e}")
-"""
-
+""", language="python")
 
 # === Memo Form ===
 with st.form("simple_mediation_form"):
