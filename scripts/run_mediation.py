@@ -857,8 +857,20 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         if memo_data.get(key):
             memo_data[key] = re.sub(r"\s{2,}", " ", memo_data[key].strip())
 
+
+    # === Patch: ensure Word placeholders are mapped ===
+    for i in range(1, 4):
+        memo_data[f"{{{{Plaintiff_{i}_Name}}}}"] = memo_data.get(f"plaintiff{i}", "")
+        memo_data[f"{{{{Plaintiff_{i}_Statement}}}}"] = memo_data.get(f"plaintiff{i}_statement", "")
+
+    for i in range(1, 8):
+        memo_data[f"{{{{Defendant_{i}_Name}}}}"] = memo_data.get(f"defendant{i}", "")
+        memo_data[f"{{{{Defendant_{i}_Statement}}}}"] = memo_data.get(f"defendant{i}_statement", "")
+
     file_path = fill_mediation_template(memo_data, template_path, output_dir)
     return file_path, memo_data
+
+
 
 
 def generate_plaintext_memo(memo_data):
