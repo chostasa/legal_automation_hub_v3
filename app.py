@@ -80,22 +80,28 @@ def parse_and_label_quotes(result: str, depo_name: str):
     sections = {"Liability": "", "Damages": ""}
 
     current_section = None
+    current_pair = []
+
     for line in result.splitlines():
-        if "**Liability**" in line:
+        if "**Liability**" in line or "**Liability:**" in line:
             current_section = "Liability"
             continue
-        elif "**Damages**" in line:
+        elif "**Damages**" in line or "**Damages:**" in line:
             current_section = "Damages"
             continue
 
         if current_section and line.strip():
-            line_match = re.match(r"^(\d{4}:\d{2})\s+(Q:|A:)", line.strip())
-            if line_match:
-                page_line = line_match.group(1)
-                role = line_match.group(2)
-                quote = line.strip()[len(page_line) + len(role):].strip()
-                labeled_line = f"📑 {depo_name} {page_line} {role} {quote}"
-                sections[current_section] += labeled_line + "\n"
+            match = re.match(r"^(\d{4}:\d{2})\s+(Q:|A:)\s+(.*)", line.strip())
+            if match:
+                page_line, role, content = match.groups()
+                formatted_line = f"{page_line} {role} {content}"
+                current_pair.append(formatted_line)
+
+                # If we have both Q and A, bundle them and reset
+                if role == "A:" and len(current_pair) == 2:
+                    full_quote = "\n".join(current_pair)
+                    sections[current_section] += f"📑 {depo_name} {full_quote}\n\n"
+                    current_pair = []
 
     return sections["Liability"].strip(), sections["Damages"].strip()
 
@@ -628,7 +634,7 @@ Ignore all other content.
                         liability_quotes, damages_quotes = parse_and_label_quotes(result, depo_name)
 
                         st.subheader(f"🧾 Parsed Quotes for {depo_name}")
-                        st.text_area("🧷 Liability", liability_quotes or "No Liability Quotes Found", height=150)
+                        st.text_area("🧷 Liability ({depo_name})", liability_quotes or "No Liability Quotes Found", height=150)
                         st.text_area("🧷 Damages", damages_quotes or "No Damages Quotes Found", height=150)
 
 
