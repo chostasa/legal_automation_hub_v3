@@ -634,8 +634,8 @@ Ignore all other content.
                         liability_quotes, damages_quotes = parse_and_label_quotes(result, depo_name)
 
                         st.subheader(f"🧾 Parsed Quotes for {depo_name}")
-                        st.text_area("🧷 Liability ({depo_name})", liability_quotes or "No Liability Quotes Found", height=150)
-                        st.text_area("🧷 Damages", damages_quotes or "No Damages Quotes Found", height=150)
+                        st.text_area(f"🧷 Liability ({depo_name})", liability_quotes or "No Liability Quotes Found", height=150, key=f"liability_{i}_{depo_name}")
+                        st.text_area(f"🧷 Damages ({depo_name})", damages_quotes or "No Damages Quotes Found", height=150, key=f"damages_{i}_{depo_name}")
 
 
                         if liability_quotes:
