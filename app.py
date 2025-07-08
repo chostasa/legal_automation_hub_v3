@@ -601,6 +601,7 @@ elif tool == "🧾 Mediation Memos":
                             st.session_state.quote_outputs["Liability"].append(result.strip())
                     except Exception as e:
                         st.error(f"Error processing Deposition {i}: {e}")
+"""
 
         st.subheader("📂 Extracted Liability Quotes")
         st.text_area("Copy-ready Liability Quotes", "\n\n".join(st.session_state.quote_outputs["Liability"]), height=300)
