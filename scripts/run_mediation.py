@@ -17,11 +17,12 @@ except Exception:
 client = OpenAI(api_key=api_key)
 
 def trim_to_token_limit(text, max_tokens=12000):
+    if not text: return ""
     tokens = text.split()
     if len(tokens) <= max_tokens:
         return text
-    half = max_tokens // 2
-    return " ".join(tokens[:half]) + "\n...\n" + " ".join(tokens[-half:])
+    third = max_tokens // 3
+    return " ".join(tokens[:third]) + "\n...\n" + " ".join(tokens[-2 * third:])
 
 def safe_generate(fn, *args, retries=3, wait_time=10, **kwargs):
     trimmed_args = [trim_to_token_limit(arg, 6000) if isinstance(arg, str) else arg for arg in args]
@@ -34,10 +35,10 @@ def safe_generate(fn, *args, retries=3, wait_time=10, **kwargs):
                 time.sleep(wait_time)
             else:
                 raise e
-    raise Exception("❌ gpt-3.5-turbo rate limit error after multiple attempts.")
+    raise Exception("❌ gpt-4-turbo rate limit error after multiple attempts.")
 
 
-def generate_with_openai(prompt, model="gpt-3.5-turbo"):
+def generate_with_openai(prompt, model="gpt-4-turbo"):
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -469,11 +470,9 @@ def fill_mediation_template(data, template_path, output_path):
         "{{Additional_Harms_Losses}}": data.get("additional_harms", ""),
         "{{Future_Medical_Bills}}": data.get("future_bills", ""),
         "{{Conclusion}}": data.get("conclusion", ""),
-        "{{Plaintiffs}}": data.get("plaintiffs", ""),
-        "{{Defendants}}": data.get("defendants", "")
+        "{{Plaintiffs}}": data.get("Plaintiffs", ""),
+        "{{Defendants}}": data.get("Defendants", "")
     }
-
-
 
     def rebuild_paragraph(paragraph):
         combined_text = "".join(run.text for run in paragraph.runs)
@@ -501,26 +500,15 @@ def fill_mediation_template(data, template_path, output_path):
     plaintiff_name = data.get("plaintiff", "Unknown").replace(" ", "_")
     filename = f"Mediation_Memo_{plaintiff_name}_{datetime.today().strftime('%Y-%m-%d')}.docx"
     output_file_path = os.path.join(output_path, filename)
+    print("📄 Placeholder values used in template:")
+    for k, v in replacements.items():
+        print(f"{k}: {'[FILLED]' if v else '[EMPTY]'}")
     doc.save(output_file_path)
 
     return output_file_path
 
 
 # --- Safe wrapper to handle OpenAI rate limits ---
-
-
-def safe_generate(fn, *args, retries=3, wait_time=10, **kwargs):
-    for attempt in range(retries):
-        try:
-            return fn(*args)
-        except APIStatusError as e:
-            if e.status_code == 429 and "rate_limit_exceeded" in str(e):
-                st.warning(
-                    f"Rate limit hit. Retrying in {wait_time} seconds...")
-                time.sleep(wait_time)
-            else:
-                raise e
-    raise Exception("❌ gpt-3.5-turbo rate limit error after multiple attempts.")
 
 import re
 
@@ -620,50 +608,6 @@ def split_and_combine(fn, long_text, quotes="", chunk_size=3000):
         else:
             results.append(safe_generate(fn, chunk))
     return "\n\n".join(results)
-
-# --- Main generation function ---
-
-def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
-    memo_data = {}
-
-    memo_data["Plaintiffs"] = ", ".join(
-        [data.get(f"plaintiff{i}", "") for i in range(1, 4) if data.get(f"plaintiff{i}", "")]
-    )
-    memo_data["Defendants"] = ", ".join(
-        [data.get(f"defendant{i}", "") for i in range(1, 8) if data.get(f"defendant{i}", "")]
-    )
-
-    memo_data["court"] = data["court"]
-    memo_data["case_number"] = data["case_number"]
-
-    # Determine primary plaintiff
-    plaintiff1 = data.get("plaintiff1") or data.get("plaintiff") or "Plaintiff"
-    memo_data["plaintiff"] = plaintiff1
-    memo_data["plaintiff1"] = plaintiff1
-    memo_data["plaintiff1_statement"] = safe_generate(
-        generate_plaintiff_statement, trim_to_token_limit(data["complaint_narrative"], 4000), plaintiff1
-    )
-
-    # Handle up to 3 plaintiffs
-    for i in range(2, 4):
-        name = data.get(f"plaintiff{i}", "").strip()
-        if name:
-            memo_data[f"plaintiff{i}"] = name
-            memo_data[f"plaintiff{i}_statement"] = safe_generate(
-                generate_plaintiff_statement, data["complaint_narrative"], name)
-
-    # Handle up to 7 defendants dynamically
-    for i in range(1, 8):
-        key = f"defendant{i}"
-        name = data.get(key, "")
-        memo_data[key] = name
-        if name:
-            memo_data[f"{key}_statement"] = safe_generate(
-                generate_defendant_statement, data["complaint_narrative"], name)
-        else:
-            memo_data[f"{key}_statement"] = ""
-
-    # Main body content
     # --- Main generation function ---
 
 def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
@@ -765,8 +709,6 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         ])
     )
     time.sleep(20)
-
-    return memo_data
 
     # === FORMAL NARRATIVE PARTIES SECTION WITH HEADINGS ===
     plaintiff_sections = []
