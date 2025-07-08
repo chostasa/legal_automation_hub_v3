@@ -1,6 +1,25 @@
 import streamlit as st
 st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
+from scripts.run_foia import run_foia
+from scripts.run_demand import run
+from scripts.run_mediation import (
+    generate_with_openai,
+    generate_introduction,
+    generate_plaintiff_statement,
+    generate_defendant_statement,
+    generate_demand_section,
+    generate_facts_liability_section,
+    generate_causation_injuries,
+    generate_additional_harms,
+    generate_future_medical,
+    generate_conclusion_section,
+    generate_quotes_in_chunks,
+    fill_mediation_template,
+)
+from scripts.run_mediation import split_and_combine
+from scripts.run_mediation import generate_quotes_in_chunks
+
 
 import pandas as pd
 import os
@@ -12,8 +31,7 @@ import tempfile
 from docx import Document
 from datetime import datetime
 from users import USERS, hash_password
-from streamlit_autorefresh import st_autorefresh
-import scripts.run_mediation as rm
+
 
 
 import time
@@ -71,7 +89,7 @@ Only return a list of quotes. Do not paraphrase. Only use what is in the input.
 Input:
 {ocr_text}
 """
-    return rm.generate_with_openai(full_prompt)
+    return generate_with_openai(full_prompt)
 
 
 
@@ -97,7 +115,7 @@ if not st.session_state.logged_in:
 
     st.stop()
 else:
-    st.sidebar.markdown(f"**Logged in as:** {st.session_state.username}")
+    st.sidebar.markdown(f"**Logged in as:** `{st.session_state.username}`")
 
 st.markdown("""
 <style>
@@ -273,7 +291,7 @@ if tool == "📄 Batch Doc Generator":
 
     st.markdown("""
     > **How it works:**  
-    > 1. Upload a template with {placeholders}  
+    > 1. Upload a template with `{placeholders}`  
     > 2. Upload Excel with matching column headers  
     > 3. Enter filename format, generate, and download
 
@@ -450,6 +468,7 @@ if tool == "📄 Batch Doc Generator":
 
 # === Load Excel Data from Dropbox App Folder (Secure API Method) ===
 if tool == "📊 Litigation Dashboard":
+    from streamlit_autorefresh import st_autorefresh
     st.header("📊 Interactive Litigation Dashboard")
     st_autorefresh(interval=3600000, key="refresh_dashboard")
 
@@ -509,94 +528,83 @@ if tool == "📊 Litigation Dashboard":
 elif tool == "🧾 Mediation Memos":
     st.header("🧾 Generate Confidential Mediation Memo")
 
-    # Initialize state
-    for key in ["depositions", "deposition_names", "quote_outputs"]:
-        if key not in st.session_state:
-            st.session_state[key] = [] if "outputs" not in key else {"Liability": [], "Damages": []}
+    if "depositions" not in st.session_state:
+        st.session_state.depositions = []
 
-    if "case_synopsis" not in st.session_state:
-        st.session_state.case_synopsis = ""
-    if "quote_instructions" not in st.session_state:
-        st.session_state.quote_instructions = ""
+    if "depositions" not in st.session_state:
+        st.session_state.depositions = []
+    if "quote_outputs" not in st.session_state:
+        st.session_state.quote_outputs = {"Liability": [], "Damages": []}
 
     st.subheader("📘 Case Synopsis & Instructions")
-
-    st.session_state.case_synopsis = st.text_area(
-        "💼 Brief Case Synopsis (optional)",
-        value=st.session_state.case_synopsis,
-        height=100
-    )
-
-    st.session_state.quote_instructions = st.text_area(
+    case_synopsis = st.text_area("💼 Brief Case Synopsis (optional)", height=100)
+    quote_instructions = st.text_area(
         "📝 Instructions for AI (optional)",
-        value=st.session_state.quote_instructions,
         placeholder="E.g., Focus on quotes about emotional distress or negligent supervision...",
         height=100
     )
 
-    st.subheader("🔐 Add Deposition Excerpts One at a Time")
-    with st.expander("➕ Add a Deposition"):
-        with st.form(f"depo_form_{len(st.session_state.depositions)}"):
-            custom_name = st.text_input("📏 Deposition Label (e.g., Efimov Deposition)")
-            depo_text = st.text_area("✍️ Paste Deposition Excerpt", height=300)
-            add_clicked = st.form_submit_button("Add Deposition")
+    st.subheader("📎 Add Deposition Excerpts One at a Time")
 
-            if add_clicked:
-                if custom_name.strip() and depo_text.strip():
-                    st.session_state.depositions.append(depo_text.strip())
-                    st.session_state.deposition_names.append(custom_name.strip())
-                    st.success(f"✅ '{custom_name.strip()}' added as Deposition #{len(st.session_state.depositions)}.")
-                else:
-                    st.warning("Please enter both a name and the deposition text.")
+    new_depo_text = st.text_area("✍️ Paste New Deposition Text", height=300)
+    if st.button("➕ Add Deposition"):
+        if new_depo_text.strip():
+            st.session_state.depositions.append(new_depo_text.strip())
+            st.success(f"Deposition #{len(st.session_state.depositions)} added.")
+        else:
+            st.warning("Please paste some text before adding.")
 
     if st.session_state.depositions:
         st.markdown("✅ **Depositions Loaded:**")
-        for i, (depo, name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
-            st.text_area(f"{name} (Deposition {i})", depo, height=150, key=f"depo_display_{i}")
+        for i, depo in enumerate(st.session_state.depositions, 1):
+            st.text_area(f"Deposition {i}", depo, height=150)
 
-        if st.button("🧐 Extract Quotes from All Depositions"):
+        if st.button("🧠 Extract Quotes from All Depositions"):
+            from scripts.run_mediation import safe_generate, generate_with_openai
             st.session_state.quote_outputs = {"Liability": [], "Damages": []}
 
-            combined_prompt = (
-                f"{st.session_state.case_synopsis}\n\n{st.session_state.quote_instructions}"
-            ).strip()
+            for i, depo_text in enumerate(st.session_state.depositions, 1):
+                with st.spinner(f"Analyzing Deposition #{i}..."):
+                    prompt = f"""
+You are a legal analyst reviewing deposition excerpts in a {case_synopsis.strip() or 'civil lawsuit'}.
 
-            for i, (depo_text, depo_name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
-                with st.spinner(f"🔍 Extracting from {depo_name}..."):
+Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAMAGES**.
+Ignore all other content.
+
+🧾 **Format for each Q&A**:
+0012:24 Q: "What were you doing that day?"
+0012:25 A: "I was monitoring intake procedures."
+
+⚠️ **Rules**:
+- Only include categories: **Liability** and **Damages**
+- Return each quote under the appropriate section.
+- Do not summarize. No headers or explanations.
+- Use exact wording from the transcript. No edits.
+- Show Q and A both, with full quote and line numbers.
+
+{f"💡 Case Notes: {quote_instructions.strip()}" if quote_instructions.strip() else ""}
+
+📄 Deposition:
+{depo_text}
+"""
                     try:
-                        numbered = rm.normalize_deposition_lines(depo_text)
-                        merged = rm.merge_multiline_qas(numbered)
-                        chunks = rm.chunk_text(merged, max_chars=10000)
-
-                        result = rm.generate_quotes_in_chunks(
-                            chunks,
-                            depo_label=depo_name,
-                            delay_seconds=5,
-                            custom_instructions=combined_prompt
-                        )
-
-                        st.session_state.quote_outputs["Liability"].append(result["liability_quotes"])
-                        st.session_state.quote_outputs["Damages"].append(result["damages_quotes"])
-
+                        result = safe_generate(generate_with_openai, prompt, model="gpt-3.5-turbo")
+                        if "**Damages**" in result:
+                            liability_part, damages_part = result.split("**Damages**", 1)
+                            st.session_state.quote_outputs["Liability"].append(liability_part.strip())
+                            st.session_state.quote_outputs["Damages"].append(damages_part.strip())
+                        else:
+                            st.session_state.quote_outputs["Liability"].append(result.strip())
                     except Exception as e:
-                        st.error(f"❌ Error processing {depo_name}: {e}")
+                        st.error(f"Error processing Deposition {i}: {e}")
 
-            st.subheader("📂 Extracted Liability Quotes")
-            st.text_area(
-                "Copy-ready Liability Quotes",
-                "\n\n".join(st.session_state.quote_outputs["Liability"]),
-                height=300
-            )
+        st.subheader("📂 Extracted Liability Quotes")
+        st.text_area("Copy-ready Liability Quotes", "\n\n".join(st.session_state.quote_outputs["Liability"]), height=300)
 
-            st.subheader("📂 Extracted Damages Quotes")
-            st.text_area(
-                "Copy-ready Damages Quotes",
-                "\n\n".join(st.session_state.quote_outputs["Damages"]),
-                height=300
-            )
+        st.subheader("📂 Extracted Damages Quotes")
+        st.text_area("Copy-ready Damages Quotes", "\n\n".join(st.session_state.quote_outputs["Damages"]), height=300)
 
-
-    # === Memo Form ===
+    # === Memo Form (same as before) ===
     with st.form("simple_mediation_form"):
         court = st.text_input("Court")
         case_number = st.text_input("Case Number")
@@ -611,7 +619,7 @@ elif tool == "🧾 Mediation Memos":
             label = f"Defendant {i} Name" + (" (optional)" if i > 1 else "")
             defendants[f"defendant{i}"] = st.text_input(label)
 
-        complaint_narrative = st.text_area("📄 Complaint Narrative", height=200)
+        complaint_narrative = st.text_area("📔 Complaint Narrative", height=200)
         party_info = st.text_area("Party Information from Complaint", height=200)
         settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
         medical_summary = st.text_area("🏥 Medical Summary", height=200)
@@ -643,6 +651,8 @@ elif tool == "🧾 Mediation Memos":
             }
 
             template_path = "templates/mediation_template.docx"
+
+            from scripts.run_mediation import safe_generate, generate_introduction, generate_plaintiff_statement, generate_defendant_statement, generate_demand_section, generate_facts_liability_section, generate_causation_injuries, generate_additional_harms, generate_future_medical, generate_conclusion_section, fill_mediation_template
 
             progress_text = st.empty()
             progress_bar = st.progress(0)
@@ -685,49 +695,54 @@ elif tool == "🧾 Mediation Memos":
                 progress_text.text(text)
 
                 if key == "introduction":
-                    memo_data[key] = safe_generate(rm.generate_introduction, data["complaint_narrative"], data["plaintiff1"])
+                    memo_data[key] = safe_generate(generate_introduction, data["complaint_narrative"], data["plaintiff1"])
                 elif key == "plaintiff_statement":
-                    memo_data["Plaintiff1 Statement"] = safe_generate(rm.generate_plaintiff_statement, data["complaint_narrative"], data["plaintiff1"])
+                    memo_data["Plaintiff1 Statement"] = safe_generate(generate_plaintiff_statement, data["complaint_narrative"], data["plaintiff1"])
                 elif key.startswith("defendant") and key.endswith("_statement"):
                     i = key.replace("defendant", "").replace("_statement", "")
-                    memo_data[f"Defendant{i} Statement"] = safe_generate(rm.generate_defendant_statement, data["complaint_narrative"], data[f"defendant{i}"])
+                    memo_data[f"Defendant{i} Statement"] = safe_generate(generate_defendant_statement, data["complaint_narrative"], data[f"defendant{i}"])
                 elif key == "demand":
-                    memo_data[key] = safe_generate(rm.generate_demand_section, data["settlement_summary"], data["plaintiff1"])
+                    memo_data[key] = safe_generate(generate_demand_section, data["settlement_summary"], data["plaintiff1"])
                 elif key == "facts_liability":
-                    memo_data[key] = safe_generate(rm.generate_facts_liability_section, data["complaint_narrative"], data["deposition_liability"])
+                    memo_data[key] = safe_generate(generate_facts_liability_section, data["complaint_narrative"], data["deposition_liability"])
                 elif key == "causation_injuries":
-                    memo_data[key] = safe_generate(rm.generate_causation_injuries, data["medical_summary"])
+                    memo_data[key] = safe_generate(generate_causation_injuries, data["medical_summary"])
                 elif key == "additional_harms":
-                    memo_data[key] = safe_generate(rm.generate_additional_harms, data["medical_summary"], data["deposition_damages"])
+                    memo_data[key] = safe_generate(generate_additional_harms, data["medical_summary"], data["deposition_damages"])
                 elif key == "future_bills":
-                    memo_data[key] = safe_generate(rm.generate_future_medical, data["medical_summary"], data["deposition_damages"])
+                    memo_data[key] = safe_generate(generate_future_medical, data["medical_summary"], data["deposition_damages"])
                 elif key == "conclusion":
-                    memo_data[key] = safe_generate(rm.generate_conclusion_section, data["settlement_summary"])
+                    memo_data[key] = safe_generate(generate_conclusion_section, data["settlement_summary"])
 
                 progress_bar.progress((idx + 1) / total)
 
-            file_path = rm.fill_mediation_template(data | memo_data, template_path, output_dir)
+            file_path = fill_mediation_template(data | memo_data, template_path, output_dir)
 
             with open(file_path, "rb") as f:
                 st.success("✅ Mediation memo generated!")
-                st.download_button("🗅 Download Mediation Memo", f, file_name=os.path.basename(file_path))
+                st.download_button("🗅️ Download Mediation Memo", f, file_name=os.path.basename(file_path))
+
+            # Fallback plaintext output
+            plaintext_output = generate_plaintext_memo(memo_data)
+            st.download_button("📄 Download Plaintext Version", plaintext_output, file_name="Mediation_Memo_Plaintext.txt")
+            st.text_area("📝 Memo Preview (Plaintext)", plaintext_output, height=700)
+
 
         except Exception as e:
             st.error(f"❌ Error: {e}")
-
 
 if tool == "📖 Instructions & Support":
     st.header("📘 Instructions & Support")
 
     with st.expander("📄 Batch Doc Generator – How to Use", expanded=True):
-        st.markdown(r"""
+        st.markdown("""
 Use this tool to **automatically generate documents in bulk** by merging a Word template with an Excel sheet.
 
 **Step-by-step:**
 1. **Upload a Word Template or Select an Existing Template**
-   - If uploading a new template, use placeholders inside of the document like {{ClientName}}, {{Date}}, etc.
+   - If uploading a new template, use placeholders inside of the document like `{{ClientName}}`, `{{Date}}`, etc.
    - These placeholders should mirror what is at the top of your excel columns
-   - Save your template for reuse -- it will appear in the dropdown.
+   - Save your template for reuse — it’ll appear in the dropdown.
    - If selecting an existing template, choose 'Select a Saved Template' and search for the existing template. 
 
 2. **Upload an Excel File**
@@ -738,11 +753,11 @@ Use this tool to **automatically generate documents in bulk** by merging a Word 
    - View the first row to confirm the placeholder match.
 
 4. **Set Output Filename Format**
-   - Use any column name inside {{ }}.
-   - Example: {{ClientName}}_Notice -> JohnDoe_Notice.docx.
+   - Use any column name inside `{{ }}`.
+   - Example: `{{ClientName}}_Notice` → `JohnDoe_Notice.docx`.
 
 5. **Generate Documents**
-   - Click "Generate Files."
+   - Click “Generate Files.”
    - Download a ZIP file with all Word documents.
         """)
 
@@ -760,7 +775,7 @@ Use this tool to generate **individual FOIA request letters** using form fields 
    - A personalized Word document will be created.
 
 3. **Download**
-   - You will see a preview and a download button for the generated letter.
+   - You’ll see a preview and a download button for the generated letter.
         """)
 
     with st.expander("📂 Demand Letters – How to Use", expanded=False):
@@ -769,7 +784,7 @@ Use this tool to generate **individual demand letters** using a manual entry for
 
 **Step-by-step:**
 1. **Fill Out the Form**
-   - Enter the clients name, defendant, incident date, location, summary, and damages (damages should be a dollar figure. Ex. $100,000 One Hundred Thousand Dollars).
+   - Enter the client’s name, defendant, incident date, location, summary, and damages (damages should be a dollar figure. Ex. $100,000 One Hundred Thousand Dollars).
 
 2. **Click 'Generate Demand Letter'**
    - The app will insert your responses into a Word template.
@@ -791,7 +806,7 @@ Use this tool to generate **confidential mediation memorandums** from structured
    - A final Word document will be created with your inputs formatted and polished.
 
 3. **Download**
-   - You will get a download button to retrieve the complete mediation memorandum.
+   - You'll get a download button to retrieve the complete mediation memorandum.
         """)
 
     with st.expander("🚧 Complaints – Coming Soon", expanded=False):
