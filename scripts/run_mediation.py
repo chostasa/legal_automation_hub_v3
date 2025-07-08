@@ -339,7 +339,11 @@ Draft the Facts / Liability section using only this information:
 """
     if deposition_text:
         prompt += f"""
-You may reference **direct quotes** from the following deposition excerpts if they support liability. Introduce them professionally (e.g., \"As {{plaintiff}} testified, ...\" or \"Deposition excerpts confirm...\"):
+Carefully embed relevant direct quotes from the following deposition excerpts directly into the narrative as formal citations. Use phrasing like:
+- “Plaintiff testified, ‘...’ (Ex. A, Efimov Dep. 43).”
+- “According to deposition testimony, ‘...’ (Ex. A, Efimov Dep. 21).”
+
+Only insert quotes where they support specific facts or legal reasoning.
 
 Deposition excerpts for liability:
 {deposition_text}
@@ -407,9 +411,11 @@ Input:
     if deposition_text:
         prompt += f"""
 
-You may quote directly from the following deposition excerpts to reinforce impact on daily life, work, or emotional well-being:
+Carefully embed relevant direct quotes from the following deposition excerpts directly into the narrative as formal citations. Use phrasing like:
+- “Plaintiff testified, ‘...’ (Ex. A, Efimov Dep. 43).”
+- “According to deposition testimony, ‘...’ (Ex. A, Efimov Dep. 21).”
 
-Deposition excerpts for damages:
+Only insert quotes where they support specific facts or legal reasoning.
 {deposition_text}
 """
 
@@ -748,27 +754,18 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     damages_quotes = quotes_dict["damages_quotes"]
 
     memo_data["facts_liability"] = polish_text_for_legal_memo(
-        embed_quotes_in_section(
-            "\n\n".join([
-                safe_generate(generate_facts_liability_section, chunk, trim_to_token_limit(liability_quotes, 2000))
-                for chunk in chunk_text(data["complaint_narrative"])
-            ]),
-            liability_quotes,
-            heading="Liability Testimony"
+        safe_generate(generate_facts_liability_section, 
+        "\n\n".join(chunk_text(data["complaint_narrative"])), 
+            liability_quotes
         )
     )
+
     time.sleep(20)
 
     memo_data["additional_harms"] = polish_text_for_legal_memo(
-        embed_quotes_in_section(
-            "\n\n".join([
-                safe_generate(generate_additional_harms, chunk, trim_to_token_limit(damages_quotes, 2000))
-                for chunk in chunk_text(trimmed_medical_summary)
-            ]),
-            damages_quotes,
-            heading="Damages Testimony"
-        )
+        safe_generate(generate_additional_harms, trimmed_medical_summary, damages_quotes)
     )
+
     time.sleep(20)
 
     memo_data["future_bills"] = polish_text_for_legal_memo(
@@ -796,8 +793,8 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         name = memo_data.get(f"plaintiff{i}", "")
         statement = memo_data.get(f"plaintiff{i}_statement", "")
         if name:
-            memo_data[f"{{{{Plaintiff_{i}_Name}}}}"] = name
-            memo_data[f"{{{{Plaintiff_{i}_Statement}}}}"] = statement
+            memo_data[f"Plaintiff_{i}_Name"] = name
+            memo_data[f"Plaintiff_{i}_Statement"] = statement
             plaintiff_sections.append(f"Plaintiff {name} Statement:\n{statement}")
 
     # === Fill {{Defendant_1_Name}}, etc. ===
@@ -805,8 +802,8 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         name = memo_data.get(f"defendant{i}", "")
         statement = memo_data.get(f"defendant{i}_statement", "")
         if name:
-            memo_data[f"{{{{Defendant_{i}_Name}}}}"] = name
-            memo_data[f"{{{{Defendant_{i}_Statement}}}}"] = statement
+            memo_data[f"Defendant_{i}_Name"] = name
+            memo_data[f"Defendant_{i}_Statement"] = statement
             defendant_sections.append(f"Defendant {name} Statement:\n{statement}")
 
     # === Generate narrative and full parties section ===
