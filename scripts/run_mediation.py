@@ -191,7 +191,10 @@ Now write the Introduction section of a confidential mediation memorandum for {c
 
 {input_text}
 """
-    return generate_with_openai(prompt)
+    text = generate_with_openai(prompt)
+    text = re.sub(r"\.\s+", ". ", text)
+    return polish_text_for_legal_memo(text)
+
 # === Mediation Memo Section Generators ===
 
 
@@ -212,7 +215,9 @@ Using only the info below, write a brief formal background on the Plaintiff ({cl
 Bio:
 {bio}
 """
-    return generate_with_openai(prompt)
+    text = generate_with_openai(prompt)
+    text = re.sub(r"\.\s+", ". ", text)
+    return polish_text_for_legal_memo(text)
 
 
 DEFENDANT_STATEMENT_EXAMPLE = """
@@ -238,7 +243,9 @@ Example:
 Input:
 {def_text}
 """
-    return generate_with_openai(prompt)
+    text = generate_with_openai(prompt)
+    text = re.sub(r"\.\s+", ". ", text)
+    return polish_text_for_legal_memo(text)
 
 
 DEMAND_EXAMPLE = """
@@ -262,7 +269,9 @@ Example:
 Facts:
 {summary}
 """
-    return generate_with_openai(prompt)
+    text = generate_with_openai(prompt)
+    text = re.sub(r"\.\s+", ". ", text)
+    return polish_text_for_legal_memo(text)
 
 
 
@@ -291,7 +300,9 @@ Example:
 Input:
 {party_details}
 """
-    return generate_with_openai(prompt)
+    text = generate_with_openai(prompt)
+    text = re.sub(r"\.\s+", ". ", text)
+    return polish_text_for_legal_memo(text)
 
 def generate_party_summary(plaintiff_names, defendant_names):
     """
@@ -313,7 +324,9 @@ Defendants: {defendant_list}
 
 Keep it factual, formal, and brief — like the first paragraph of a complaint. Do not summarize allegations or damages here.
 """
-    return generate_with_openai(prompt)
+    text = generate_with_openai(prompt)
+    text = re.sub(r"\.\s+", ". ", text)
+    return polish_text_for_legal_memo(text)
 
 
 def generate_facts_liability_section(facts, deposition_text=None):
@@ -333,7 +346,9 @@ Deposition excerpts for liability:
 """
 
     prompt += f"\n\nExample:\n{FACTS_LIABILITY_EXAMPLE}"
-    return generate_with_openai(prompt)
+    text = generate_with_openai(prompt)
+    text = re.sub(r"\.\s+", ". ", text)
+    return polish_text_for_legal_memo(text)
 
 CAUSATION_EXAMPLE = """
 As a result of this occurrence, Stan will require a decompressive hemilaminectomy and microdiscectomy at L5-S1.
@@ -366,7 +381,9 @@ Example:
 Facts:
 {causation_info}
 """
-    return generate_with_openai(prompt)
+    text = generate_with_openai(prompt)
+    text = re.sub(r"\.\s+", ". ", text)
+    return polish_text_for_legal_memo(text)
 
 
 HARMS_EXAMPLE = """
@@ -397,7 +414,9 @@ Deposition excerpts for damages:
 """
 
     prompt += f"\n\nExample:\n{HARMS_EXAMPLE}"
-    return generate_with_openai(prompt)
+    text = generate_with_openai(prompt)
+    text = re.sub(r"\.\s+", ". ", text)
+    return polish_text_for_legal_memo(text)
 
 
 def generate_future_medical(future_info, deposition_text=None):
@@ -420,7 +439,9 @@ You may quote directly from the following deposition excerpts to reinforce impac
 Deposition excerpts for damages:
 {deposition_text}
 """
-    return generate_with_openai(prompt)
+    text = generate_with_openai(prompt)
+    text = re.sub(r"\.\s+", ". ", text)
+    return polish_text_for_legal_memo(text)
 
 
 CONCLUSION_EXAMPLE = """
@@ -442,7 +463,9 @@ Example:
 Input:
 {notes}
 """
-    return generate_with_openai(prompt)
+    text = generate_with_openai(prompt)
+    text = re.sub(r"\.\s+", ". ", text)
+    return polish_text_for_legal_memo(text)
 
 
 # === Improved Placeholder Replacer ===
@@ -718,13 +741,17 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     memo_data["facts_liability"] = polish_text_for_legal_memo(
         embed_quotes_in_section(
             "\n\n".join([
-                safe_generate(generate_facts_liability_section, chunk, trim_to_token_limit(liability_quotes, 2000))
-                for chunk in chunk_text(data["complaint_narrative"])
-            ]),
-            liability_quotes,
-            heading="Liability Testimony"
-        )
-    )
+                polish_text_for_legal_memo(
+                    embed_quotes_in_section(
+                        "\n\n".join([
+                            safe_generate(generate_facts_liability_section, chunk, trim_to_token_limit(liability_quotes, 2000))
+                            for chunk in chunk_text(data["complaint_narrative"])
+                        ]),
+                        liability_quotes,
+                        heading="Liability Testimony"
+                    )
+                )
+
     time.sleep(20)
 
     memo_data["additional_harms"] = polish_text_for_legal_memo(
@@ -796,7 +823,9 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         safe_generate(generate_conclusion_section, data["settlement_summary"])
     )
 
-    memo_data["Introduction"] = memo_data.pop("introduction", "")
+    intro_clean = memo_data.pop("introduction", "")
+    facts_text = data["complaint_narrative"]
+    memo_data["Introduction"] = polish_text_for_legal_memo(intro_clean.replace(facts_text[:200], ""))
     memo_data["Demand"] = memo_data.pop("demand", "")
     memo_data["Facts_Liability"] = memo_data.pop("facts_liability", "")
     memo_data["Causation_Injuries_Treatment"] = memo_data.pop("causation_injuries", "")
