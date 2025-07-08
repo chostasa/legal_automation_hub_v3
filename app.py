@@ -739,14 +739,14 @@ if tool == "📖 Instructions & Support":
     st.header("📘 Instructions & Support")
 
     with st.expander("📄 Batch Doc Generator – How to Use", expanded=True):
-        st.markdown("""
+        st.markdown(r"""
 Use this tool to **automatically generate documents in bulk** by merging a Word template with an Excel sheet.
 
 **Step-by-step:**
 1. **Upload a Word Template or Select an Existing Template**
    - If uploading a new template, use placeholders inside of the document like `{{ClientName}}`, `{{Date}}`, etc.
    - These placeholders should mirror what is at the top of your excel columns
-   - Save your template for reuse -- it'll appear in the dropdown.
+   - Save your template for reuse -- it will appear in the dropdown.
    - If selecting an existing template, choose 'Select a Saved Template' and search for the existing template. 
 
 2. **Upload an Excel File**
