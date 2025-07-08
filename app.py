@@ -848,3 +848,4 @@ st.markdown("""
 &copy; 2025 Stinar Gould Grieco & Hensley. All rights reserved.
 </div>
 """, unsafe_allow_html=True)
+
