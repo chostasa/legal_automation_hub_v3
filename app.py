@@ -530,9 +530,8 @@ elif tool == "🧾 Mediation Memos":
 
     if "depositions" not in st.session_state:
         st.session_state.depositions = []
-
-    if "depositions" not in st.session_state:
-        st.session_state.depositions = []
+    if "deposition_names" not in st.session_state:
+        st.session_state.deposition_names = []
     if "quote_outputs" not in st.session_state:
         st.session_state.quote_outputs = {"Liability": [], "Damages": []}
 
@@ -551,8 +550,6 @@ elif tool == "🧾 Mediation Memos":
 
     if st.button("➕ Add Deposition"):
         if new_depo_label.strip() and new_depo_text.strip():
-            if "deposition_names" not in st.session_state:
-            st.session_state.deposition_names = []
             st.session_state.depositions.append(new_depo_text.strip())
             st.session_state.deposition_names.append(new_depo_label.strip())
             st.success(f"✅ '{new_depo_label.strip()}' added as Deposition #{len(st.session_state.depositions)}.")
