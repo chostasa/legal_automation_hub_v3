@@ -587,11 +587,11 @@ elif tool == "🧾 Mediation Memos":
             label = f"Defendant {i} Name" + (" (optional)" if i > 1 else "")
             defendants[f"defendant{i}"] = st.text_input(label)
 
-        complaint_narrative = st.text_area("\ud83d\udcd4 Complaint Narrative", height=200)
+        complaint_narrative = st.text_area("📄 Complaint Narrative", height=200)
         party_info = st.text_area("Party Information from Complaint", height=200)
-        settlement_summary = st.text_area("\ud83d\udcbc Settlement Demand Summary", height=200)
-        medical_summary = st.text_area("\ud83c\udfe5 Medical Summary", height=200)
-        explicit_instructions = st.text_area("\ud83d\udcdd Additional Instructions for Memo (optional)", height=100)
+        settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
+        medical_summary = st.text_area("🏥 Medical Summary", height=200)
+        explicit_instructions = st.text_area("📝 Additional Instructions for Memo (optional)", height=100)
 
         deposition_liability = "\n\n".join(st.session_state.quote_outputs["Liability"])
         deposition_damages = "\n\n".join(st.session_state.quote_outputs["Damages"])
@@ -685,11 +685,11 @@ elif tool == "🧾 Mediation Memos":
             file_path = rm.fill_mediation_template(data | memo_data, template_path, output_dir)
 
             with open(file_path, "rb") as f:
-                st.success("\u2705 Mediation memo generated!")
-                st.download_button("\ud83d\uddc5\ufe0f Download Mediation Memo", f, file_name=os.path.basename(file_path))
+                st.success("✅ Mediation memo generated!")
+                st.download_button("🗅 Download Mediation Memo", f, file_name=os.path.basename(file_path))
 
         except Exception as e:
-            st.error(f"\u274c Error: {e}")
+            st.error(f"❌ Error: {e}")
 
 
 if tool == "📖 Instructions & Support":
