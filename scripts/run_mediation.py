@@ -868,7 +868,6 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
 
     return file_path, memo_data
 
-
 def generate_plaintext_memo(memo_data):
     """
     Fallback: Generate a plain text version of the memo from all memo_data.
@@ -906,5 +905,4 @@ def generate_plaintext_memo(memo_data):
             lines.append(f"=== {title.upper()} ===\n{content.strip()}\n")
 
     return "\n".join(lines)
-
 
