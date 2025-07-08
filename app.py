@@ -595,8 +595,14 @@ Ignore all other content.
                         result = safe_generate(generate_with_openai, prompt, model="gpt-3.5-turbo")
                         if "**Damages**" in result:
                             liability_part, damages_part = result.split("**Damages**", 1)
-                            st.session_state.quote_outputs["Liability"].append(liability_part.strip())
-                            st.session_state.quote_outputs["Damages"].append(damages_part.strip())
+                            if liability_part.strip():
+                                labeled_liability = f"📑 {depo_name}\n{liability_part.strip()}"
+                                st.session_state.quote_outputs["Liability"].append(labeled_liability)
+
+                            if damages_part.strip():
+                                labeled_damages = f"📑 {depo_name}\n{damages_part.strip()}"
+                                st.session_state.quote_outputs["Damages"].append(labeled_damages)
+
                         else:
                             st.session_state.quote_outputs["Liability"].append(result.strip())
                     except Exception as e:
