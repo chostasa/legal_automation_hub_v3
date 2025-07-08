@@ -35,10 +35,10 @@ def safe_generate(fn, *args, retries=3, wait_time=10, **kwargs):
                 time.sleep(wait_time)
             else:
                 raise e
-    raise Exception("❌ gpt-4-turbo rate limit error after multiple attempts.")
+    raise Exception("❌ gpt-3.5-turbo rate limit error after multiple attempts.")
 
 
-def generate_with_openai(prompt, model="gpt-4-turbo"):
+def generate_with_openai(prompt, model="gpt-3.5-turbo"):
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -293,6 +293,28 @@ Input:
 """
     return generate_with_openai(prompt)
 
+def generate_party_summary(plaintiff_names, defendant_names):
+    """
+    Generates a one-paragraph narrative describing all plaintiffs and all defendants.
+    """
+    plaintiff_list = ", ".join(plaintiff_names)
+    defendant_list = ", ".join(defendant_names)
+
+    prompt = f"""
+{NO_HALLUCINATION_NOTE}
+{LEGAL_FLUENCY_NOTE}
+
+Write a single narrative paragraph describing all parties to the action.
+Include each Plaintiff’s name, role, and jurisdictional detail. Do the same for all Defendants.
+Use only this list:
+
+Plaintiffs: {plaintiff_list}
+Defendants: {defendant_list}
+
+Keep it factual, formal, and brief — like the first paragraph of a complaint. Do not summarize allegations or damages here.
+"""
+    return generate_with_openai(prompt)
+
 
 def generate_facts_liability_section(facts, deposition_text=None):
     prompt = f"""
@@ -432,10 +454,16 @@ def replace_placeholders(doc, replacements):
         if combined_text.strip():  # Only replace if there's something to write
             # Clear and reset
             for run in paragraph.runs:
-                run.clear()
-            paragraph.clear()
-            paragraph.add_run(combined_text)
+                run.text = ""
 
+            if paragraph.runs:
+                paragraph.runs[0].text = combined_text
+            else:
+                paragraph.add_run(combined_text)
+
+
+            if not paragraph.runs:
+                paragraph.add_run()
 
     def replace_in_cell(cell: _Cell):
         for paragraph in cell.paragraphs:
@@ -475,15 +503,18 @@ def fill_mediation_template(data, template_path, output_path):
     }
 
     def rebuild_paragraph(paragraph):
-        combined_text = "".join(run.text for run in paragraph.runs)
+        original_text = "".join(run.text for run in paragraph.runs)
+        replaced_text = original_text
         for key, val in replacements.items():
-            if key in combined_text:
-                combined_text = combined_text.replace(key, val)
-        if combined_text != paragraph.text:
+            replaced_text = replaced_text.replace(key, val)
+
+        if replaced_text != original_text:
             for run in paragraph.runs:
-                p_elem = run._element
-                p_elem.getparent().remove(p_elem)
-            paragraph.add_run(combined_text)
+                run.text = ""
+            if paragraph.runs:
+                paragraph.runs[0].text = replaced_text
+            else:
+                paragraph.add_run(replaced_text)
 
     def replace_in_cell(cell):
         for paragraph in cell.paragraphs:
@@ -610,6 +641,20 @@ def split_and_combine(fn, long_text, quotes="", chunk_size=3000):
     return "\n\n".join(results)
     # --- Main generation function ---
 
+def polish_text_for_legal_memo(text):
+    prompt = f"""
+You are a senior legal editor. Improve the following legal writing by:
+- Converting to active voice
+- Eliminating redundant or vague phrases
+- Removing repetition of facts already stated
+- Keeping it formal, persuasive, and professionally polished
+- Do not introduce new facts or change case theory
+
+Text:
+{text}
+"""
+    return safe_generate(generate_with_openai, prompt)
+
 def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     import time
     memo_data = {}
@@ -714,23 +759,25 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     plaintiff_sections = []
     defendant_sections = []
 
-    for i in range(1, 4):
-        name = memo_data.get(f"plaintiff{i}", "").strip()
-        statement = memo_data.get(f"plaintiff{i}_statement", "").strip()
-        if name and statement:
-            plaintiff_sections.append(f"Plaintiff {name}:\n{statement}")
-
     for i in range(1, 8):
         name = memo_data.get(f"defendant{i}", "").strip()
         statement = memo_data.get(f"defendant{i}_statement", "").strip()
         if name and statement:
             defendant_sections.append(f"Defendant {name}:\n{statement}")
 
-    memo_data["parties"] = ""
+    # === Generate narrative and full parties section ===
+    plaintiff_names = [memo_data.get(f"plaintiff{i}", "") for i in range(1, 4) if memo_data.get(f"plaintiff{i}", "")]
+    defendant_names = [memo_data.get(f"defendant{i}", "") for i in range(1, 8) if memo_data.get(f"defendant{i}", "")]
+
+    memo_data["parties"] = polish_text_for_legal_memo(
+        safe_generate(generate_party_summary, plaintiff_names, defendant_names)
+    )
+
     if plaintiff_sections:
-        memo_data["parties"] += "PLAINTIFFS:\n" + "\n\n".join(plaintiff_sections) + "\n\n"
+        memo_data["parties"] += "\n\nPLAINTIFFS:\n" + "\n\n".join(plaintiff_sections) + "\n\n"
     if defendant_sections:
         memo_data["parties"] += "DEFENDANTS:\n" + "\n\n".join(defendant_sections)
+
 
     # === Final cleanup and formatting ===
     memo_data["conclusion"] = polish_text_for_legal_memo(
@@ -751,21 +798,6 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
 
     file_path = fill_mediation_template(memo_data, template_path, output_dir)
     return file_path, memo_data
-
-
-def polish_text_for_legal_memo(text):
-    prompt = f"""
-You are a senior legal editor. Improve the following legal writing by:
-- Converting to active voice
-- Eliminating redundant or vague phrases
-- Removing repetition of facts already stated
-- Keeping it formal, persuasive, and professionally polished
-- Do not introduce new facts or change case theory
-
-Text:
-{text}
-"""
-    return safe_generate(generate_with_openai, prompt)
 
 
 def generate_plaintext_memo(memo_data):
