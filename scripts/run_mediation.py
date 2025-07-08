@@ -721,8 +721,13 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         name = data.get(f"plaintiff{i}", "").strip()
         if name:
             memo_data[f"plaintiff{i}"] = name
+            party_input = (
+                trim_to_token_limit(data.get("party_information_from_complaint", ""), 3000)
+                + "\n\n"
+                + trim_to_token_limit(data.get("settlement_summary", ""), 2000)
+            )
             memo_data[f"plaintiff{i}_statement"] = safe_generate(
-                generate_plaintiff_statement, data["complaint_narrative"], name)
+                generate_plaintiff_statement, party_input, name)
             time.sleep(20)
 
     # Handle up to 7 defendants dynamically
@@ -731,8 +736,13 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         name = data.get(key, "")
         memo_data[key] = name
         if name:
+            party_input = (
+                trim_to_token_limit(data.get("party_information_from_complaint", ""), 3000)
+                + "\n\n"
+                + trim_to_token_limit(data.get("settlement_summary", ""), 2000)
+            )
             memo_data[f"{key}_statement"] = safe_generate(
-                generate_defendant_statement, data["complaint_narrative"], name)
+                generate_defendant_statement, party_input, name)
             time.sleep(20)
         else:
             memo_data[f"{key}_statement"] = ""
