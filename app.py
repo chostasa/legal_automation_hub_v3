@@ -758,7 +758,7 @@ Use this tool to **automatically generate documents in bulk** by merging a Word 
 
 4. **Set Output Filename Format**
    - Use any column name inside `{{ }}`.
-   - Example: `{{ClientName}}_Notice` → `JohnDoe_Notice.docx`.
+   - Example: `{{ClientName}}_Notice` -> `JohnDoe_Notice.docx`.
 
 5. **Generate Documents**
    - Click “Generate Files.”
