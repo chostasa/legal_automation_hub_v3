@@ -72,6 +72,35 @@ def safe_generate(func, *args, max_retries=3, delay=5, **kwargs):
         except Exception as e:
             raise RuntimeError(f"Generation failed: {e}")
 
+# === Parse and Label GPT-Extracted Quotes ===
+import re
+
+def parse_and_label_quotes(result: str, depo_name: str):
+    result = result.strip()
+    sections = {"Liability": "", "Damages": ""}
+
+    current_section = None
+    for line in result.splitlines():
+        if "**Liability**" in line:
+            current_section = "Liability"
+            continue
+        elif "**Damages**" in line:
+            current_section = "Damages"
+            continue
+
+        if current_section and line.strip():
+            line_match = re.match(r"^(\d{4}:\d{2})\s+(Q:|A:)", line.strip())
+            if line_match:
+                page_line = line_match.group(1)
+                role = line_match.group(2)
+                quote = line.strip()[len(page_line) + len(role):].strip()
+                labeled_line = f"📑 {depo_name} {page_line} {role} {quote}"
+                sections[current_section] += labeled_line + "\n"
+
+    return sections["Liability"].strip(), sections["Damages"].strip()
+
+
+
 def extract_quotes_from_text(ocr_text, user_instructions=""):
     base_prompt = """
 You are a legal assistant. Given this deposition or record text, extract the most relevant direct quotes (verbatim, in quotes) that support either:
@@ -543,7 +572,7 @@ elif tool == "🧾 Mediation Memos":
         height=100
     )
 
-    st.subheader("📎 Add Deposition Excerpts One at a Time")
+    st.subheader("📌 Add Deposition Excerpts One at a Time")
 
     new_depo_label = st.text_input("📏 Deposition Label (e.g., Efimov Deposition)")
     new_depo_text = st.text_area("✍️ Paste New Deposition Text", height=300)
@@ -556,12 +585,10 @@ elif tool == "🧾 Mediation Memos":
         else:
             st.warning("Please enter both a label and deposition text.")
 
-
     if st.session_state.depositions:
         st.markdown("✅ **Depositions Loaded:**")
         for i, (depo, name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
             st.text_area(f"{name} (Deposition {i})", depo, height=150)
-
 
         if st.button("🧠 Extract Quotes from All Depositions"):
             from scripts.run_mediation import safe_generate, generate_with_openai
@@ -575,7 +602,7 @@ You are a legal analyst reviewing deposition excerpts in a {case_synopsis.strip(
 Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAMAGES**.
 Ignore all other content.
 
-🧾 **Format for each Q&A**:
+📟 **Format for each Q&A**:
 0012:24 Q: "What were you doing that day?"
 0012:25 A: "I was monitoring intake procedures."
 
@@ -593,24 +620,15 @@ Ignore all other content.
 """
                     try:
                         result = safe_generate(generate_with_openai, prompt, model="gpt-3.5-turbo")
-                        if "**Damages**" in result:
-                            liability_part, damages_part = result.split("**Damages**", 1)
-                            if liability_part.strip():
-                                labeled_liability = f"📑 {depo_name}\n{liability_part.strip()}"
-                                st.session_state.quote_outputs["Liability"].append(
-                                    f"📑 {st.session_state.deposition_names[i-1]}\n{result['liability_quotes']}"
-                                )
-                                st.session_state.quote_outputs["Damages"].append(
-                                    f"📑 {st.session_state.deposition_names[i-1]}\n{result['damages_quotes']}"
-                                )
 
+                        liability_quotes, damages_quotes = parse_and_label_quotes(result, depo_name)
 
-                            if damages_part.strip():
-                                labeled_damages = f"📑 {depo_name}\n{damages_part.strip()}"
-                                st.session_state.quote_outputs["Damages"].append(labeled_damages)
+                        if liability_quotes:
+                            st.session_state.quote_outputs["Liability"].append(liability_quotes)
 
-                        else:
-                            st.session_state.quote_outputs["Liability"].append(result.strip())
+                        if damages_quotes:
+                            st.session_state.quote_outputs["Damages"].append(damages_quotes)
+
                     except Exception as e:
                         st.error(f"Error processing Deposition {i}: {e}")
 
