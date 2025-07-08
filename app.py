@@ -524,10 +524,14 @@ elif tool == "🧾 Mediation Memos":
         height=100
     )
 
-    st.subheader("📌 Add Deposition Excerpts One at a Time")
+    # Save to session_state for use during rerun
+    st.session_state.case_synopsis = case_synopsis
+    st.session_state.quote_instructions = quote_instructions
+
+    st.subheader("🔐 Add Deposition Excerpts One at a Time")
     with st.expander("➕ Add a Deposition"):
         with st.form(f"depo_form_{len(st.session_state.depositions)}"):
-            custom_name = st.text_input("💿 Deposition Label (e.g., Efimov Deposition)")
+            custom_name = st.text_input("📏 Deposition Label (e.g., Efimov Deposition)")
             depo_text = st.text_area("✍️ Paste Deposition Excerpt", height=300)
             add_clicked = st.form_submit_button("Add Deposition")
 
@@ -544,8 +548,12 @@ elif tool == "🧾 Mediation Memos":
         for i, (depo, name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
             st.text_area(f"{name} (Deposition {i})", depo, height=150)
 
-        if st.button("🧐 Extract Quotes from All Depositions"):
+        if st.button("🤮 Extract Quotes from All Depositions"):
             st.session_state.quote_outputs = {"Liability": [], "Damages": []}
+
+            case_synopsis_text = st.session_state.get("case_synopsis", "")
+            quote_instruction_text = st.session_state.get("quote_instructions", "")
+            combined_prompt = f"{case_synopsis_text}\n\n{quote_instruction_text}".strip()
 
             for i, (depo_text, depo_name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
                 with st.spinner(f"Analyzing {depo_name}..."):
@@ -558,7 +566,7 @@ elif tool == "🧾 Mediation Memos":
                             chunks,
                             depo_label=depo_name,
                             delay_seconds=5,
-                            custom_instructions=quote_instructions
+                            custom_instructions=combined_prompt
                         )
 
                         st.session_state.quote_outputs["Liability"].append(result["liability_quotes"])
