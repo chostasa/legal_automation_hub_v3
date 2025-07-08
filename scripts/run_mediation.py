@@ -573,9 +573,11 @@ def fill_mediation_template(data, template_path, output_path):
     plaintiff_name = data.get("plaintiff", "Unknown").replace(" ", "_")
     filename = f"Mediation_Memo_{plaintiff_name}_{datetime.today().strftime('%Y-%m-%d')}.docx"
     output_file_path = os.path.join(output_path, filename)
-    print("📄 Placeholder values used in template:")
+    print("=== PLACEHOLDERS SENT TO TEMPLATE ===")
     for k, v in replacements.items():
-        print(f"{k}: {'[FILLED]' if v else '[EMPTY]'}")
+        if '{{' in k:
+            print(f"{k}: {'[FILLED]' if v.strip() else '[EMPTY]'}")
+
     doc.save(output_file_path)
 
     return output_file_path
