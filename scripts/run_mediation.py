@@ -200,19 +200,25 @@ DEMAND_EXAMPLE = """
 STL Trucking has represented to Plaintiff’s counsel that they only have a $1 million policy available for Mr. Efimov’s losses. To date, STL has yet to sign an affidavit verifying coverage. (Ex. F, Affidavit of No Excess Coverage).
 """
 
-
 def generate_demand_section(summary, client_name):
     prompt = f"""
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
+{BAN_PHRASING_NOTE}
+{FORBIDDEN_PHRASES}
+{NO_PASSIVE_LANGUAGE_NOTE}
 
-Use the following example for tone and structure, but do not copy any of the specific facts. Use only the information below.
+Write a mediation demand **paragraph** using the tone and clarity of the example below. 
+This should be professional and persuasive—not a letter. Do not address “Dear Counsel” or sign off. This should simply be a summary. Keep it to two sentences. 
+
+Example:
+{DEMAND_EXAMPLE}
 
 Facts:
 {summary}
-
 """
     return generate_with_openai(prompt)
+
 
 
 FACTS_LIABILITY_EXAMPLE = """
@@ -635,25 +641,28 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         data["medical_summary"]
     )
 
-# === FORMAL NARRATIVE PARTIES SECTION ===
-    parties_blocks = []
+# === FORMAL NARRATIVE PARTIES SECTION WITH HEADINGS ===
+plaintiff_sections = []
+defendant_sections = []
 
-    # Add plaintiff narratives
-    for i in range(1, 4):
-        name = memo_data.get(f"plaintiff{i}", "").strip()
-        statement = memo_data.get(f"plaintiff{i}_statement", "").strip()
-        if name and statement:
-            parties_blocks.append(statement)
+for i in range(1, 4):
+    name = memo_data.get(f"plaintiff{i}", "").strip()
+    statement = memo_data.get(f"plaintiff{i}_statement", "").strip()
+    if name and statement:
+        plaintiff_sections.append(f"Plaintiff {name}:\n{statement}")
 
-    # Add defendant narratives
-    for i in range(1, 8):
-        name = memo_data.get(f"defendant{i}", "").strip()
-        statement = memo_data.get(f"defendant{i}_statement", "").strip()
-        if name and statement:
-            parties_blocks.append(statement)
+for i in range(1, 8):
+    name = memo_data.get(f"defendant{i}", "").strip()
+    statement = memo_data.get(f"defendant{i}_statement", "").strip()
+    if name and statement:
+        defendant_sections.append(f"Defendant {name}:\n{statement}")
 
-    # Merge into one formal narrative section
-    memo_data["parties"] = "\n\n".join(parties_blocks)
+memo_data["parties"] = ""
+if plaintiff_sections:
+    memo_data["parties"] += "PLAINTIFFS:\n" + "\n\n".join(plaintiff_sections) + "\n\n"
+if defendant_sections:
+    memo_data["parties"] += "DEFENDANTS:\n" + "\n\n".join(defendant_sections)
+
 
     memo_data["conclusion"] = safe_generate(generate_conclusion_section, data["settlement_summary"])
 
