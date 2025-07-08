@@ -685,48 +685,6 @@ Ignore all other content.
 
         submitted = st.form_submit_button("Generate Memo")
 
-    if submitted:
-        try:
-            output_dir = "outputs/mediation_memos"
-            os.makedirs(output_dir, exist_ok=True)
-
-            try:
-                output_dir = "outputs/mediation_memos"
-                os.makedirs(output_dir, exist_ok=True)
-
-                data = {
-                    "court": court,
-                    "case_number": case_number,
-                    "complaint_narrative": complaint_narrative,
-                    "party_information": party_info,
-                    "settlement_summary": settlement_summary,
-                    "medical_summary": medical_summary,
-                    "deposition_liability": deposition_liability,
-                    "deposition_damages": deposition_damages,
-                    **plaintiffs,
-                    **defendants,
-                }
-
-                template_path = "templates/mediation_template.docx"
-                file_path, memo_data = rm.generate_memo_from_summary(
-                    data,
-                    template_path,
-                    output_dir,
-                    [deposition_liability, deposition_damages]
-                )
-
-                with open(file_path, "rb") as f:
-                    st.success("✅ Mediation memo generated!")
-                    st.download_button("🗅️ Download Mediation Memo", f, file_name=os.path.basename(file_path))
-
-                # Optional plaintext fallback
-                plaintext_output = rm.generate_plaintext_memo(memo_data)
-                st.download_button("📄 Download Plaintext Version", plaintext_output, file_name="Mediation_Memo_Plaintext.txt")
-                st.text_area("📝 Memo Preview (Plaintext)", plaintext_output, height=700)
-
-            except Exception as e:
-                st.error(f"❌ Error: {e}")
-
 if tool == "📖 Instructions & Support":
     st.header("📘 Instructions & Support")
 
