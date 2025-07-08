@@ -755,15 +755,27 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     )
     time.sleep(20)
 
-    # === FORMAL NARRATIVE PARTIES SECTION WITH HEADINGS ===
+# === FORMAL NARRATIVE PARTIES SECTION WITH HEADINGS ===
     plaintiff_sections = []
     defendant_sections = []
 
+    # === Fill {{Plaintiff_1_Name}}, etc. ===
+    for i in range(1, 4):
+        name = memo_data.get(f"plaintiff{i}", "")
+        statement = memo_data.get(f"plaintiff{i}_statement", "")
+        if name:
+            memo_data[f"{{{{Plaintiff_{i}_Name}}}}"] = name
+            memo_data[f"{{{{Plaintiff_{i}_Statement}}}}"] = statement
+            plaintiff_sections.append(f"Plaintiff {name} Statement:\n{statement}")
+
+    # === Fill {{Defendant_1_Name}}, etc. ===
     for i in range(1, 8):
-        name = memo_data.get(f"defendant{i}", "").strip()
-        statement = memo_data.get(f"defendant{i}_statement", "").strip()
-        if name and statement:
-            defendant_sections.append(f"Defendant {name}:\n{statement}")
+        name = memo_data.get(f"defendant{i}", "")
+        statement = memo_data.get(f"defendant{i}_statement", "")
+        if name:
+            memo_data[f"{{{{Defendant_{i}_Name}}}}"] = name
+            memo_data[f"{{{{Defendant_{i}_Statement}}}}"] = statement
+            defendant_sections.append(f"Defendant {name} Statement:\n{statement}")
 
     # === Generate narrative and full parties section ===
     plaintiff_names = [memo_data.get(f"plaintiff{i}", "") for i in range(1, 4) if memo_data.get(f"plaintiff{i}", "")]
