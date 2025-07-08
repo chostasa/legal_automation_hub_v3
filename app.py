@@ -546,18 +546,25 @@ elif tool == "🧾 Mediation Memos":
 
     st.subheader("📎 Add Deposition Excerpts One at a Time")
 
+    new_depo_label = st.text_input("📏 Deposition Label (e.g., Efimov Deposition)")
     new_depo_text = st.text_area("✍️ Paste New Deposition Text", height=300)
+
     if st.button("➕ Add Deposition"):
-        if new_depo_text.strip():
+        if new_depo_label.strip() and new_depo_text.strip():
+            if "deposition_names" not in st.session_state:
+            st.session_state.deposition_names = []
             st.session_state.depositions.append(new_depo_text.strip())
-            st.success(f"Deposition #{len(st.session_state.depositions)} added.")
+            st.session_state.deposition_names.append(new_depo_label.strip())
+            st.success(f"✅ '{new_depo_label.strip()}' added as Deposition #{len(st.session_state.depositions)}.")
         else:
-            st.warning("Please paste some text before adding.")
+            st.warning("Please enter both a label and deposition text.")
+
 
     if st.session_state.depositions:
         st.markdown("✅ **Depositions Loaded:**")
-        for i, depo in enumerate(st.session_state.depositions, 1):
-            st.text_area(f"Deposition {i}", depo, height=150)
+        for i, (depo, name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
+            st.text_area(f"{name} (Deposition {i})", depo, height=150)
+
 
         if st.button("🧠 Extract Quotes from All Depositions"):
             from scripts.run_mediation import safe_generate, generate_with_openai
