@@ -608,9 +608,15 @@ You are a legal analyst reviewing deposition excerpts in a {case_synopsis.strip(
 Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAMAGES**.
 Ignore all other content.
 
-📟 **Format for each Q&A**:
-0012:24 Q: "What were you doing that day?"
-0012:25 A: "I was monitoring intake procedures."
+⚠️ Format requirements:
+- Each quote must start with a line number in format `0012:24 Q:` and `0012:25 A:` (make it up if not available)
+- No bullet points, no hyphens
+- Do not summarize, paraphrase, or interpret
+- Only show **direct Q&A pairs**
+
+💡 Example format:
+0012:24 Q: "What did you observe?"
+0012:25 A: "There was liquid and debris.
 
 ⚠️ **Rules**:
 - Only include categories: **Liability** and **Damages**
