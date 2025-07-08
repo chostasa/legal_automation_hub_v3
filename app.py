@@ -603,12 +603,6 @@ elif tool == "🧾 Mediation Memos":
                         st.error(f"Error processing Deposition {i}: {e}")
 """
 
-        st.subheader("📂 Extracted Liability Quotes")
-        st.text_area("Copy-ready Liability Quotes", "\n\n".join(st.session_state.quote_outputs["Liability"]), height=300)
-
-        st.subheader("📂 Extracted Damages Quotes")
-        st.text_area("Copy-ready Damages Quotes", "\n\n".join(st.session_state.quote_outputs["Damages"]), height=300)
-
     # === Memo Form (same as before) ===
     with st.form("simple_mediation_form"):
         court = st.text_input("Court")
