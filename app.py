@@ -779,7 +779,7 @@ Use this tool to generate **individual FOIA request letters** using form fields 
    - A personalized Word document will be created.
 
 3. **Download**
-   - You’ll see a preview and a download button for the generated letter.
+   - You will see a preview and a download button for the generated letter.
         """)
 
     with st.expander("📂 Demand Letters – How to Use", expanded=False):
