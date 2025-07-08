@@ -525,6 +525,15 @@ def fill_mediation_template(data, template_path, output_path):
         "{{Defendants}}": data.get("Defendants", "")
     }
 
+    for i in range(1, 4):
+        replacements[f"{{{{Plaintiff_{i}_Name}}}}"] = data.get(f"plaintiff{i}", "")
+        replacements[f"{{{{Plaintiff_{i}_Statement}}}}"] = data.get(f"plaintiff{i}_statement", "")
+
+    for i in range(1, 8):
+        replacements[f"{{{{Defendant_{i}_Name}}}}"] = data.get(f"defendant{i}", "")
+        replacements[f"{{{{Defendant_{i}_Statement}}}}"] = data.get(f"defendant{i}_statement", "")
+
+
     def rebuild_paragraph(paragraph):
         original_text = "".join(run.text for run in paragraph.runs)
         replaced_text = original_text
@@ -722,7 +731,7 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         else:
             memo_data[f"{key}_statement"] = ""
 
-    # Main body content
+ # Main body content
     memo_data["introduction"] = polish_text_for_legal_memo(
         safe_generate(generate_introduction, trim_to_token_limit(data["complaint_narrative"], 4000), plaintiff1)
     )
@@ -741,17 +750,13 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     memo_data["facts_liability"] = polish_text_for_legal_memo(
         embed_quotes_in_section(
             "\n\n".join([
-                polish_text_for_legal_memo(
-                    embed_quotes_in_section(
-                        "\n\n".join([
-                            safe_generate(generate_facts_liability_section, chunk, trim_to_token_limit(liability_quotes, 2000))
-                            for chunk in chunk_text(data["complaint_narrative"])
-                        ]),
-                        liability_quotes,
-                        heading="Liability Testimony"
-                    )
-                )
-
+                safe_generate(generate_facts_liability_section, chunk, trim_to_token_limit(liability_quotes, 2000))
+                for chunk in chunk_text(data["complaint_narrative"])
+            ]),
+            liability_quotes,
+            heading="Liability Testimony"
+        )
+    )
     time.sleep(20)
 
     memo_data["additional_harms"] = polish_text_for_legal_memo(
