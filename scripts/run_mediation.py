@@ -599,7 +599,7 @@ def redact_text(text):
     return text
 
 # --- Main time split function ---
-def generate_quotes_in_chunks(text_chunks, depo_label="Dep.", delay_seconds=10):
+def generate_quotes_in_chunks(text_chunks, depo_label="Dep.", delay_seconds=10, custom_instructions=""):
     """
     Categorize Q&A deposition quotes by Liability and Damages.
     Appends (Ex. A, [Deposition Label] [Page#]) to each Q/A block.
@@ -612,7 +612,9 @@ def generate_quotes_in_chunks(text_chunks, depo_label="Dep.", delay_seconds=10):
 
         for j, sub_chunk in enumerate(sub_chunks):
             prompt = f"""
-You are a litigation analyst. Categorize the following deposition excerpts into **Liability** or **Damages**. 
+You are a litigation analyst reviewing deposition excerpts.
+
+{custom_instructions.strip() if custom_instructions else "Categorize all Q&A pairs into **Liability** or **Damages** only."}
 
 🧾 **Return Format (strict)**:
 Only include bullet points like this:
@@ -632,6 +634,10 @@ Only include bullet points like this:
 
 📄 **Excerpt**:
 {sub_chunk}
+"""
+
+"""
+
 """
             try:
                 result = safe_generate(generate_with_openai, prompt)
