@@ -532,12 +532,16 @@ def fill_mediation_template(data, template_path, output_path):
     }
 
     for i in range(1, 4):
-        replacements[f"{{{{Plaintiff_{i}_Name}}}}"] = data.get(f"plaintiff{i}", "")
-        replacements[f"{{{{Plaintiff_{i}_Statement}}}}"] = data.get(f"plaintiff{i}_statement", "")
+        name = data.get(f"plaintiff{i}", "")
+        statement = data.get(f"plaintiff{i}_statement", "")
+        replacements[f"{{{{Plaintiff_{i}_Name}}}}"] = name
+        replacements[f"{{{{Plaintiff_{i}_Statement}}}}"] = statement
 
     for i in range(1, 8):
-        replacements[f"{{{{Defendant_{i}_Name}}}}"] = data.get(f"defendant{i}", "")
-        replacements[f"{{{{Defendant_{i}_Statement}}}}"] = data.get(f"defendant{i}_statement", "")
+        name = data.get(f"defendant{i}", "")
+        statement = data.get(f"defendant{i}_statement", "")
+        replacements[f"{{{{Defendant_{i}_Name}}}}"] = name
+        replacements[f"{{{{Defendant_{i}_Statement}}}}"] = statement
 
 
     def rebuild_paragraph(paragraph):

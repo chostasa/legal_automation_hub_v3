@@ -738,12 +738,15 @@ Ignore all other content.
             }
 
             for i in range(2, 4):
-                memo_data[f"Plaintiff{i}"] = data.get(f"plaintiff{i}", "")
-                memo_data[f"Plaintiff{i} Statement"] = ""
+                name = data.get(f"plaintiff{i}", "")
+                memo_data[f"Plaintiff_{i}_Name"] = name
+                memo_data[f"Plaintiff_{i}_Statement"] = ""
+
 
             for i in range(1, 8):
                 memo_data[f"Defendant{i}"] = data.get(f"defendant{i}", "")
                 memo_data[f"Defendant{i} Statement"] = ""
+
 
             total = len(steps)
             for idx, (text, key) in enumerate(steps):
