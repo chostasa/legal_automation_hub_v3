@@ -575,6 +575,18 @@ def split_and_combine(fn, long_text, quotes="", chunk_size=3000):
     return "\n\n".join(results)
 
 
+def trim_to_token_limit(text, max_tokens=12000):
+    """
+    Trims input text to ensure it stays within OpenAI model context limits.
+    Keeps the beginning and end of the text, cutting out the middle if necessary.
+    """
+    tokens = text.split()
+    if len(tokens) <= max_tokens:
+        return text
+    half = max_tokens // 2
+    return " ".join(tokens[:half]) + "\n...\n" + " ".join(tokens[-half:])
+
+
 # --- Main generation function ---
 def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     memo_data = {}
@@ -624,21 +636,23 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         liability_quotes             
     )
 
+    trimmed_medical_summary = trim_to_token_limit(data["medical_summary"])
+
     memo_data["additional_harms"] = split_and_combine(
         generate_additional_harms,
-        data["medical_summary"],
+        trimmed_medical_summary,
         damages_quotes
     )
 
     memo_data["future_bills"] = split_and_combine(
         generate_future_medical,
-        data["medical_summary"],
+        trimmed_medical_summary,
         damages_quotes
     )
 
     memo_data["causation_injuries"] = split_and_combine(
         generate_causation_injuries,
-        data["medical_summary"]
+        trimmed_medical_summary
     )
 
     # === FORMAL NARRATIVE PARTIES SECTION WITH HEADINGS ===
