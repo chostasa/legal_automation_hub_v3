@@ -534,14 +534,15 @@ def fill_mediation_template(data, template_path, output_path):
     for i in range(1, 4):
         name = data.get(f"plaintiff{i}", "")
         statement = data.get(f"plaintiff{i}_statement", "")
-        replacements[f"{{{{Plaintiff_{i}_Name}}}}"] = name
-        replacements[f"{{{{Plaintiff_{i}_Statement}}}}"] = statement
+        combined = f"**{name}**\n\n{statement}" if name or statement else ""
+        replacements[f"{{{{Plaintiff_{i}}}}}"] = combined
+
 
     for i in range(1, 8):
         name = data.get(f"defendant{i}", "")
         statement = data.get(f"defendant{i}_statement", "")
-        replacements[f"{{{{Defendant_{i}_Name}}}}"] = name
-        replacements[f"{{{{Defendant_{i}_Statement}}}}"] = statement
+        combined = f"**{name}**\n\n{statement}" if name or statement else ""
+        replacements[f"{{{{defendant_{i}}}}}"] = combined
 
 
     def rebuild_paragraph(paragraph):
@@ -808,24 +809,22 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     plaintiff_sections = []
     defendant_sections = []
 
-    # === Fill {{Plaintiff_1_Name}}, etc. ===
+    # === Fill {{Plaintiff_1}}, {{Plaintiff_2}}, etc. ===
     for i in range(1, 4):
         name = memo_data.get(f"plaintiff{i}", "")
         statement = memo_data.get(f"plaintiff{i}_statement", "")
-        if name:
-            # ✅ Fix: match the expected keys used in fill_mediation_template()
-            memo_data[f"{{{{Plaintiff_{i}_Name}}}}"] = name
-            memo_data[f"{{{{Plaintiff_{i}_Statement}}}}"] = statement
+        combined = f"**{name}**\n\n{statement}" if name or statement else ""
+        memo_data[f"{{{{Plaintiff_{i}}}}}"] = combined
+        if combined:
             plaintiff_sections.append(f"Plaintiff {name} Statement:\n{statement}")
 
-    # === Fill {{Defendant_1_Name}}, etc. ===
+    # === Fill {{Defendant_1}}, {{Defendant_2}}, etc. ===
     for i in range(1, 8):
         name = memo_data.get(f"defendant{i}", "")
         statement = memo_data.get(f"defendant{i}_statement", "")
-        if name:
-            # ✅ Fix: match the expected keys used in fill_mediation_template()
-            memo_data[f"{{{{Defendant_{i}_Name}}}}"] = name
-            memo_data[f"{{{{Defendant_{i}_Statement}}}}"] = statement
+        combined = f"**{name}**\n\n{statement}" if name or statement else ""
+        memo_data[f"{{{{Defendant_{i}}}}}"] = combined
+        if combined:
             defendant_sections.append(f"Defendant {name} Statement:\n{statement}")
 
     # === Generate narrative and full parties section ===
