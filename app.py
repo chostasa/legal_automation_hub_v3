@@ -667,48 +667,26 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
         deposition_liability = "\n\n".join(st.session_state.quote_outputs["Liability"])
         deposition_damages = "\n\n".join(st.session_state.quote_outputs["Damages"])
 
-        submitted = st.form_submit_button("📂 Generate Memo")
-
-    # === Party Statement Preview (only when not submitted) ===
-    if tool == "📿 Mediation Memos" and not submitted:
-        st.subheader("📿 Preview & Edit Party Statements")
-
-        if st.button("✍️ Generate Party Statements Preview"):
-            with st.spinner("Generating party statements..."):
-                if "party_statements" not in st.session_state:
-                    st.session_state.party_statements = {}
-
-                for i in range(1, 4):
-                    name = plaintiffs.get(f"plaintiff{i}", "").strip()
-                    if name:
-                        input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
-                        result = safe_generate(generate_plaintiff_statement, input_text, name)
-                        st.session_state.party_statements[f"plaintiff{i}_statement"] = result
-
-                for i in range(1, 8):
-                    name = defendants.get(f"defendant{i}", "").strip()
-                    if name:
-                        input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
-                        result = safe_generate(generate_defendant_statement, input_text, label=name)
-                        st.session_state.party_statements[f"defendant{i}_statement"] = result
-    
-        st.markdown("🧐 **Review and edit party statements below before generating the full memo.**")
+    if st.button("🔍 Preview Auto-Generated Party Paragraphs"):
+        st.subheader("📝 Auto-Generated Party Statements")
 
         for i in range(1, 4):
             name = plaintiffs.get(f"plaintiff{i}", "").strip()
             if name:
-                default_text = st.session_state.party_statements.get(f"plaintiff{i}_statement", "")
-                st.session_state.party_statements[f"plaintiff{i}_statement"] = st.text_area(
-                    f"🩍 plaintiff {i}: {name}", value=default_text, height=150
-                )
+                input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
+                result = safe_generate(generate_plaintiff_statement, input_text, name)
+                st.markdown(f"**👤 Plaintiff {i}: {name}**")
+                st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_plaintiff{i}")
 
         for i in range(1, 8):
             name = defendants.get(f"defendant{i}", "").strip()
             if name:
-                default_text = st.session_state.party_statements.get(f"defendant{i}_statement", "")
-                st.session_state.party_statements[f"defendant{i}_statement"] = st.text_area(
-                    f"🏢 defendant {i}: {name}", value=default_text, height=150
-                )
+                input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
+                result = safe_generate(generate_defendant_statement, input_text, label=name)
+                st.markdown(f"**🏢 Defendant {i}: {name}**")
+                st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_defendant{i}")
+
+        submitted = st.form_submit_button("📂 Generate Memo")
     
     # === Memo Generation ===
     if submitted:
@@ -777,12 +755,12 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
 
             for i in range(2, 4):
                 name = data.get(f"plaintiff{i}", "")
-                memo_data[f"plaintiff_{i}_Name"] = name
-                memo_data[f"plaintiff_{i}_Statement"] = st.session_state.party_statements.get(f"plaintiff{i}_statement", "")
+                memo_data[f"plaintiff{i}"] = name
+                memo_data[f"plaintiff{i}_statement"] = st.session_state.party_statements.get(f"plaintiff{i}_statement", "")
 
             for i in range(1, 8):
-                memo_data[f"defendant{i}"] = data.get(f"defendant{i}", "")
-                memo_data[f"defendant{i} Statement"] = st.session_state.party_statements.get(f"defendant{i}_statement", "")
+                memo_data[f"defendant{i}"] = name
+                memo_data[f"defendant{i}_statement"] = st.session_state.party_statements.get(f"defendant{i}_statement", "")
 
             total = len(steps)
             for idx, (text, key) in enumerate(steps):
