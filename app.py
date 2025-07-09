@@ -685,7 +685,7 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
                     name = defendants.get(f"defendant{i}", "").strip()
                     if name:
                         input_text = party_info.strip() + "\n\n" + settlement_summary.strip()
-                        result = safe_generate(generate_defendant_statement, input_text, label=name)
+                        result = safe_generate(generate_defendant_statement, input_text, name)
                         st.markdown(f"**🏢 Defendant {i}: {name}**")
                         st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_defendant{i}")
 
