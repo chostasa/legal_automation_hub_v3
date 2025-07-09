@@ -676,7 +676,7 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
                 for i in range(1, 4):
                     name = plaintiffs.get(f"plaintiff{i}", "").strip()
                     if name:
-                        input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
+                        input_text = party_info.strip() + "\n\n" + settlement_summary.strip()
                         result = safe_generate(generate_plaintiff_statement, input_text, name)
                         st.markdown(f"**👤 Plaintiff {i}: {name}**")
                         st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_plaintiff{i}")
@@ -684,7 +684,7 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
                 for i in range(1, 8):
                     name = defendants.get(f"defendant{i}", "").strip()
                     if name:
-                        input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
+                        input_text = party_info.strip() + "\n\n" + settlement_summary.strip()
                         result = safe_generate(generate_defendant_statement, input_text, label=name)
                         st.markdown(f"**🏢 Defendant {i}: {name}**")
                         st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_defendant{i}")
