@@ -359,7 +359,16 @@ Carefully embed relevant direct quotes from the following deposition excerpts di
 - “Plaintiff testified, ‘...’ (Ex. A, Efimov Dep. 43).”
 - “According to deposition testimony, ‘...’ (Ex. A, Efimov Dep. 21).”
 
-Only insert quotes where they support specific facts or legal reasoning.
+You must embed a minimum of **three** quotes directly into the paragraph using this exact format:  
+- “Plaintiff testified, ‘[quote]’ (Ex. A, Efimov Dep. 43).”
+- “According to testimony, ‘[quote]’ (Ex. A, Efimov Dep. 55).”
+
+Do not place quotes at the end. Do not summarize them. Do not use bullet points.  
+If no quotes are present, leave a visible placeholder: [QUOTE NOT EMBEDDED].
+
+
+Quotes must flow naturally within the paragraph as factual support—not as standalone blocks.
+
 
 Deposition excerpts for liability:
 {deposition_text}
@@ -429,9 +438,13 @@ Input:
     if deposition_text:
         prompt += f"""
 
-Carefully embed relevant direct quotes from the following deposition excerpts directly into the narrative as formal citations. Use phrasing like:
-- “Plaintiff testified, ‘...’ (Ex. A, Efimov Dep. 43).”
-- “According to deposition testimony, ‘...’ (Ex. A, Efimov Dep. 21).”
+You must embed a minimum of **three** quotes directly into the paragraph using this exact format:  
+- “Plaintiff testified, ‘[quote]’ (Ex. A, Efimov Dep. 43).”
+- “According to testimony, ‘[quote]’ (Ex. A, Efimov Dep. 55).”
+
+Do not place quotes at the end. Do not summarize them. Do not use bullet points.  
+If no quotes are present, leave a visible placeholder: [QUOTE NOT EMBEDDED].
+
 
 Only insert quotes where they support specific facts or legal reasoning.
 {deposition_text}
@@ -626,6 +639,7 @@ def redact_text(text):
 
 # --- Main time split function ---
 def generate_quotes_in_chunks(text_chunks, delay_seconds=10):
+
     """
     Categorize Q&A deposition quotes by Liability and Damages.
     Ensures line numbers, formatting, and strict legal output.
@@ -695,6 +709,26 @@ Only include bullet points like this:
         "liability_quotes": clean_and_dedup(liability_quotes),
         "damages_quotes": clean_and_dedup(damages_quotes)
     }
+
+def format_quotes_for_embedding(raw_quotes):
+    """
+    Converts raw Q&A quotes like:
+    📑 Becker Scott 0012:24 Q: "..." 
+    0012:25 A: "..."
+
+    Into:
+    Becker Scott testified, “...” (Ex. A, Becker Scott Dep. 0012:25).
+    """
+    pattern = r"📑 ([^\n]+?) (\d{4}:\d{2}) Q: \"(.*?)\"\n(\d{4}:\d{2}) A: \"(.*?)\""
+    matches = re.findall(pattern, raw_quotes, re.DOTALL)
+
+    formatted = []
+    for name, q_line, question, a_line, answer in matches:
+        quote = f'{name} testified, “{answer}” (Ex. A, {name} Dep. {a_line}).'
+        formatted.append(quote)
+
+    return "\n".join(formatted)
+
 
 def split_and_combine(fn, long_text, quotes="", chunk_size=3000):
     chunks = [long_text[i:i+chunk_size] for i in range(0, len(long_text), chunk_size)]
@@ -791,8 +825,9 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
 
     quotes_dict = generate_quotes_in_chunks(text_chunks, delay_seconds=20)
     trimmed_medical_summary = trim_to_token_limit(data.get("medical_summary", ""), 10000)
-    liability_quotes = quotes_dict["liability_quotes"]
-    damages_quotes = quotes_dict["damages_quotes"]
+    liability_quotes = format_quotes_for_embedding(quotes_dict["liability_quotes"])
+    damages_quotes = format_quotes_for_embedding(quotes_dict["damages_quotes"])
+
 
     memo_data["facts_liability"] = polish_text_for_legal_memo(
         safe_generate(generate_facts_liability_section, 
