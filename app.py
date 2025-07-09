@@ -812,12 +812,20 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
 
                     file_path = fill_mediation_template(data | memo_data, template_path, output_dir)
 
-                    with open(file_path, "rb") as f:
-                        st.success("✅ Mediation memo generated!")
-                        st.download_button("📂 Download Mediation Memo", f, file_name=os.path.basename(file_path))
+                    st.session_state.generated_file_path = file_path
+                    st.success("✅ Mediation memo generated! Scroll down to download.")
+
 
                 except Exception as e:
                     st.error(f"❌ Error: {e}")
+
+if "generated_file_path" in st.session_state:
+    with open(st.session_state.generated_file_path, "rb") as f:
+        st.download_button(
+            "📂 Download Mediation Memo",
+            f,
+            file_name=os.path.basename(st.session_state.generated_file_path)
+        )
 
 if tool == "📖 Instructions & Support":
     st.header("📘 Instructions & Support")
