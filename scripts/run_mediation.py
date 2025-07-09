@@ -276,7 +276,7 @@ def generate_demand_section(summary, client_name):
 {FORBIDDEN_PHRASES}
 {NO_PASSIVE_LANGUAGE_NOTE}
 
-Write a mediation demand **paragraph** using the tone and clarity of the example below. 
+Write a third-person, objective summary of the Plaintiff’s settlement position using the tone and clarity of the example below. . Do not use “we urge,” “our clients,” or direct address language.
 This should be professional and persuasive—not a letter. Do not address “Dear Counsel” or sign off. This should simply be a summary. Keep it to two sentences. 
 
 Example:
@@ -366,6 +366,7 @@ Deposition excerpts for liability:
 """
 
     prompt += f"\n\nExample:\n{FACTS_LIABILITY_EXAMPLE}"
+    prompt += "\n\nWhere appropriate, cite source material using placeholder format (e.g., “... (Ex. A, Dep. 43)” or “... (Ex. B, Medical Report)”). Do not fabricate citations—use only what's justified by content."
     text = generate_with_openai(prompt)
     text = re.sub(r"\.\s+", ". ", text)
     return polish_text_for_legal_memo(text)
@@ -420,6 +421,7 @@ def generate_additional_harms(harm_info, deposition_text=None):
 {LEGAL_FLUENCY_NOTE}
 
 Write the “Additional Harms and Losses” section based on the information below.
+Incorporate persuasive framing that reflects the personal, professional, and emotional consequences. Avoid simple restatement of diagnoses—frame the impact on daily function, identity, and future potential.
 
 Input:
 {harm_info}
@@ -436,6 +438,7 @@ Only insert quotes where they support specific facts or legal reasoning.
 """
 
     prompt += f"\n\nExample:\n{HARMS_EXAMPLE}"
+    prompt += "\n\nWhere appropriate, cite source material using placeholder format (e.g., “... (Ex. A, Dep. 43)” or “... (Ex. B, Medical Report)”). Do not fabricate citations—use only what's justified by content."
     text = generate_with_openai(prompt)
     text = re.sub(r"\.\s+", ". ", text)
     return polish_text_for_legal_memo(text)
@@ -447,6 +450,8 @@ def generate_future_medical(future_info, deposition_text=None):
 {LEGAL_FLUENCY_NOTE}
 
 Draft a future medical expenses section using this tone:
+Frame future care as an inevitable medical and financial consequence. Avoid vague terms. Focus on cost, duration, disruption to work/life, and long-term care burdens.
+
 
 {FUTURE_BILLS_EXAMPLE}
 
@@ -477,7 +482,7 @@ def generate_conclusion_section(notes):
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
-Write the closing section of a mediation memo.
+Write the closing section of a mediation memo. Use objective, third-person framing. Avoid phrases like "we demand" or "we urge." Speak from the Plaintiff’s perspective in summary tone (e.g., “Plaintiff submits this memorandum…”).
 
 Example:
 {CONCLUSION_EXAMPLE}
@@ -710,6 +715,7 @@ You are a senior legal editor. Improve the following legal writing by:
 - Removing repetition of facts already stated
 - Keeping it formal, persuasive, and professionally polished
 - Do not introduce new facts or change case theory
+- Focus on eliminating repetition of facts, phrases, or injuries that appear earlier in the document. Streamline where possible to enhance clarity and impact.
 
 Text:
 {text}
@@ -790,10 +796,12 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
 
     memo_data["facts_liability"] = polish_text_for_legal_memo(
         safe_generate(generate_facts_liability_section, 
-        "\n\n".join(chunk_text(data["complaint_narrative"])), 
+            "\n\n".join(chunk_text(data["complaint_narrative"])), 
             liability_quotes
         )
     )
+    memo_data["facts_liability"] = "FACTS AND LIABILITY\n\n" + memo_data["facts_liability"]
+
 
     time.sleep(20)
 
@@ -855,6 +863,16 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     memo_data["conclusion"] = polish_text_for_legal_memo(
         safe_generate(generate_conclusion_section, data["settlement_summary"])
     )
+
+    # === Add Section Headings for Final Output ===
+    memo_data["introduction"] = "INTRODUCTION\n\n" + memo_data["introduction"]
+    memo_data["demand"] = "DEMAND\n\n" + memo_data["demand"]
+    memo_data["facts_liability"] = "FACTS AND LIABILITY\n\n" + memo_data["facts_liability"]
+    memo_data["causation_injuries"] = "CAUSATION, INJURIES, AND TREATMENT\n\n" + memo_data["causation_injuries"]
+    memo_data["additional_harms"] = "ADDITIONAL HARMS AND LOSSES\n\n" + memo_data["additional_harms"]
+    memo_data["future_bills"] = "FUTURE MEDICAL EXPENSES\n\n" + memo_data["future_bills"]
+    memo_data["conclusion"] = "CONCLUSION\n\n" + memo_data["conclusion"]
+
 
     intro_clean = memo_data.pop("introduction", "")
     facts_text = data["complaint_narrative"]
