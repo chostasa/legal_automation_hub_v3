@@ -733,12 +733,11 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
                 + trim_to_token_limit(data.get("settlement_summary", ""), 2000)
             )
             statement = safe_generate(generate_plaintiff_statement, party_input, name)
-            combined = f"**{name}**\n\n{statement.strip()}"
         else:
-            combined = ""
+            statement = ""
 
-        memo_data[f"{{{{Plaintiff_{i}}}}}"] = combined
         memo_data[f"plaintiff{i}"] = name
+        memo_data[f"plaintiff{i}_statement"] = statement
 
     # === Handle Defendants ===
     for i in range(1, 8):
@@ -750,12 +749,11 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
                 + trim_to_token_limit(data.get("settlement_summary", ""), 2000)
             )
             statement = safe_generate(generate_defendant_statement, party_input, name)
-            combined = f"**{name}**\n\n{statement.strip()}"
         else:
-            combined = ""
+            statement = ""
 
-        memo_data[f"{{{{Defendant_{i}}}}}"] = combined
         memo_data[f"defendant{i}"] = name
+        memo_data[f"defendant{i}_statement"] = statement
 
 
  # Main body content
@@ -809,23 +807,19 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     plaintiff_sections = []
     defendant_sections = []
 
-    # === Fill {{Plaintiff_1}}, {{Plaintiff_2}}, etc. ===
+    # === Collect narrative paragraphs for display under "Parties" ===
     for i in range(1, 4):
         name = memo_data.get(f"plaintiff{i}", "")
         statement = memo_data.get(f"plaintiff{i}_statement", "")
-        combined = f"**{name}**\n\n{statement}" if name or statement else ""
-        memo_data[f"{{{{Plaintiff_{i}}}}}"] = combined
-        if combined:
+        if name or statement:
             plaintiff_sections.append(f"Plaintiff {name} Statement:\n{statement}")
 
-    # === Fill {{Defendant_1}}, {{Defendant_2}}, etc. ===
     for i in range(1, 8):
         name = memo_data.get(f"defendant{i}", "")
         statement = memo_data.get(f"defendant{i}_statement", "")
-        combined = f"**{name}**\n\n{statement}" if name or statement else ""
-        memo_data[f"{{{{Defendant_{i}}}}}"] = combined
-        if combined:
+        if name or statement:
             defendant_sections.append(f"Defendant {name} Statement:\n{statement}")
+
 
     # === Generate narrative and full parties section ===
     plaintiff_names = [memo_data.get(f"plaintiff{i}", "") for i in range(1, 4) if memo_data.get(f"plaintiff{i}", "")]
@@ -860,21 +854,8 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
         if memo_data.get(key):
             memo_data[key] = re.sub(r"\s{2,}", " ", memo_data[key].strip())
 
-
-    # === Patch: ensure Word placeholders are mapped ===
-    for i in range(1, 4):
-        memo_data[f"{{{{Plaintiff_{i}_Name}}}}"] = memo_data.get(f"plaintiff{i}", "")
-        memo_data[f"{{{{Plaintiff_{i}_Statement}}}}"] = memo_data.get(f"plaintiff{i}_statement", "")
-
-    for i in range(1, 8):
-        memo_data[f"{{{{Defendant_{i}_Name}}}}"] = memo_data.get(f"defendant{i}", "")
-        memo_data[f"{{{{Defendant_{i}_Statement}}}}"] = memo_data.get(f"defendant{i}_statement", "")
-
     file_path = fill_mediation_template(memo_data, template_path, output_dir)
     return file_path, memo_data
-
-
-
 
 def generate_plaintext_memo(memo_data):
     """
