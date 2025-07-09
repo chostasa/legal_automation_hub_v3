@@ -643,51 +643,52 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
         st.subheader("📂 Extracted Damages Quotes")
         st.text_area("Copy-ready Damages Quotes", "\n\n".join(st.session_state.quote_outputs["Damages"]), height=300)
 
-    # === Memo Form (Full Block: Inputs + Party Statement Preview + Submission) ===
-    with st.form("simple_mediation_form"):
-        court = st.text_input("🏫 Court")
-        case_number = st.text_input("📁 Case Number")
+# === Memo Form (Full Block: Inputs + Party Statement Preview + Submission) ===
+with st.form("simple_mediation_form"):
+    court = st.text_input("🏫 Court")
+    case_number = st.text_input("📁 Case Number")
 
-        plaintiffs = {}
-        for i in range(1, 4):
-            label = f"👤 plaintiff {i} Name" + (" (required)" if i == 1 else " (optional)")
-            plaintiffs[f"plaintiff{i}"] = st.text_input(label)
+    plaintiffs = {}
+    for i in range(1, 4):
+        label = f"👤 plaintiff {i} Name" + (" (required)" if i == 1 else " (optional)")
+        plaintiffs[f"plaintiff{i}"] = st.text_input(label)
 
-        defendants = {}
-        for i in range(1, 8):
-            label = f"🏢 defendant {i} Name" + (" (optional)" if i > 1 else "")
-            defendants[f"defendant{i}"] = st.text_input(label)
+    defendants = {}
+    for i in range(1, 8):
+        label = f"🏢 defendant {i} Name" + (" (optional)" if i > 1 else "")
+        defendants[f"defendant{i}"] = st.text_input(label)
 
-        complaint_narrative = st.text_area("📔 Complaint Narrative", height=200)
-        party_info = st.text_area("👥 Party Information from Complaint", height=200)
-        settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
-        medical_summary = st.text_area("🏥 Medical Summary", height=200)
-        explicit_instructions = st.text_area("📝 Additional Instructions for Memo (optional)", height=100)
+    complaint_narrative = st.text_area("📔 Complaint Narrative", height=200)
+    party_info = st.text_area("👥 Party Information from Complaint", height=200)
+    settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
+    medical_summary = st.text_area("🏥 Medical Summary", height=200)
+    explicit_instructions = st.text_area("📝 Additional Instructions for Memo (optional)", height=100)
 
-        deposition_liability = "\n\n".join(st.session_state.quote_outputs["Liability"])
-        deposition_damages = "\n\n".join(st.session_state.quote_outputs["Damages"])
+    deposition_liability = "\n\n".join(st.session_state.quote_outputs["Liability"])
+    deposition_damages = "\n\n".join(st.session_state.quote_outputs["Damages"])
 
-    if st.button("🔍 Preview Auto-Generated Party Paragraphs"):
-        st.subheader("📝 Auto-Generated Party Statements")
+    action = st.radio("Choose Action", ["🔍 Preview Party Paragraphs", "📂 Generate Memo"])
+    submitted = st.form_submit_button("Submit")
 
-        for i in range(1, 4):
-            name = plaintiffs.get(f"plaintiff{i}", "").strip()
-            if name:
-                input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
-                result = safe_generate(generate_plaintiff_statement, input_text, name)
-                st.markdown(f"**👤 Plaintiff {i}: {name}**")
-                st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_plaintiff{i}")
+if submitted and action == "🔍 Preview Party Paragraphs":
+    st.subheader("📝 Auto-Generated Party Statements")
 
-        for i in range(1, 8):
-            name = defendants.get(f"defendant{i}", "").strip()
-            if name:
-                input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
-                result = safe_generate(generate_defendant_statement, input_text, label=name)
-                st.markdown(f"**🏢 Defendant {i}: {name}**")
-                st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_defendant{i}")
+    for i in range(1, 4):
+        name = plaintiffs.get(f"plaintiff{i}", "").strip()
+        if name:
+            input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
+            result = safe_generate(generate_plaintiff_statement, input_text, name)
+            st.markdown(f"**👤 Plaintiff {i}: {name}**")
+            st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_plaintiff{i}")
 
-        submitted = st.form_submit_button("📂 Generate Memo")
-        if submitted:
+    for i in range(1, 8):
+        name = defendants.get(f"defendant{i}", "").strip()
+        if name:
+            input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
+            result = safe_generate(generate_defendant_statement, input_text, label=name)
+            st.markdown(f"**🏢 Defendant {i}: {name}**")
+            st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_defendant{i}")
+
     
     # === Memo Generation ===
     if submitted:
