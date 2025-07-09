@@ -551,7 +551,7 @@ def fill_mediation_template(data, template_path, output_path):
         name = data.get(f"plaintiff{i}", "")
         statement = data.get(f"plaintiff{i}_statement", "")
         combined = f"**{name}**\n\n{statement}" if name or statement else ""
-        replacements[f"{{{{Plaintiff_{i}}}}}"] = combined
+        replacements[f"{{{{plaintiff_{i}}}}}"] = combined
 
 
     for i in range(1, 8):
