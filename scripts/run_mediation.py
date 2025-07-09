@@ -9,6 +9,14 @@ from openai import OpenAI
 import streamlit as st
 import re
 
+def trim_to_token_limit(text, max_tokens=12000):
+    if not text: return ""
+    tokens = text.split()
+    if len(tokens) <= max_tokens:
+        return text
+    third = max_tokens // 3
+    return " ".join(tokens[:third]) + "\n...\n" + " ".join(tokens[-2 * third:])
+
 try:
     api_key = st.secrets["OPENAI_API_KEY"]
 except Exception:
@@ -24,15 +32,6 @@ All quotes must be direct from deposition or complaint excerpts and cited in the
 Do not summarize previously discussed facts. Every sentence must advance legal theory, factual support, or damages.
 The final product must read as if it were reviewed by a managing partner for mediation submission.
 """
-
-
-def trim_to_token_limit(text, max_tokens=12000):
-    if not text: return ""
-    tokens = text.split()
-    if len(tokens) <= max_tokens:
-        return text
-    third = max_tokens // 3
-    return " ".join(tokens[:third]) + "\n...\n" + " ".join(tokens[-2 * third:])
 
 def safe_generate(fn, *args, retries=3, wait_time=10, **kwargs):
     trimmed_args = [trim_to_token_limit(arg, 6000) if isinstance(arg, str) else arg for arg in args]
