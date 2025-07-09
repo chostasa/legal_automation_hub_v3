@@ -681,6 +681,10 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
                         st.markdown(f"**👤 Plaintiff {i}: {name}**")
                         st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_plaintiff{i}")
 
+                        # ✅ Save to session state
+                        st.session_state.party_statements[f"plaintiff{i}_statement"] = result
+
+
                 for i in range(1, 8):
                     name = defendants.get(f"defendant{i}", "").strip()
                     if name:
@@ -688,6 +692,10 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
                         result = safe_generate(generate_defendant_statement, input_text, name)
                         st.markdown(f"**🏢 Defendant {i}: {name}**")
                         st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_defendant{i}")
+
+                        # ✅ Save to session state
+                        st.session_state.party_statements[f"defendant{i}_statement"] = result
+
 
             elif action == "📂 Generate Memo":
                 try:
