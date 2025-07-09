@@ -748,7 +748,7 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
                 + "\n\n"
                 + trim_to_token_limit(data.get("settlement_summary", ""), 2000)
             )
-            statement = safe_generate(generate_defendant_statement, party_input, name)
+            statement = safe_generate(generate_defendant_statement, def_text=party_input, label=name)
         else:
             statement = ""
 
