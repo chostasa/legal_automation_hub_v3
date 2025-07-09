@@ -601,7 +601,7 @@ if tool == "🧾 Mediation Memos":
         for i, (depo, name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
             st.text_area(f"{name} (Deposition {i})", depo, height=150)
 
-        if st.button("🧐 Extract Quotes from All Depositions"):
+        if st.button("🔎 Extract Quotes from All Depositions"):
             st.session_state.quote_outputs = {"Liability": [], "Damages": []}
             for i, (depo_text, depo_name) in enumerate(zip(st.session_state.depositions, st.session_state.deposition_names), 1):
                 with st.spinner(f"Analyzing Deposition #{i}..."):
@@ -627,8 +627,8 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
                         from scripts.run_mediation import parse_and_label_quotes
                         liability_quotes, damages_quotes = parse_and_label_quotes(result, depo_name)
 
-                        st.text_area(f"🧷 Liability ({depo_name})", liability_quotes or "No Liability Quotes Found", height=150, key=f"liab_{i}")
-                        st.text_area(f"🧷 Damages ({depo_name})", damages_quotes or "No Damages Quotes Found", height=150, key=f"dam_{i}")
+                        st.text_area(f"🥷 Liability ({depo_name})", liability_quotes or "No Liability Quotes Found", height=150, key=f"liab_{i}")
+                        st.text_area(f"🥷 Damages ({depo_name})", damages_quotes or "No Damages Quotes Found", height=150, key=f"dam_{i}")
 
                         if liability_quotes:
                             st.session_state.quote_outputs["Liability"].append(liability_quotes)
@@ -643,55 +643,53 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
         st.subheader("📂 Extracted Damages Quotes")
         st.text_area("Copy-ready Damages Quotes", "\n\n".join(st.session_state.quote_outputs["Damages"]), height=300)
 
-# === Memo Form (Full Block: Inputs + Party Statement Preview + Submission) ===
-with st.form("simple_mediation_form"):
-    court = st.text_input("🏫 Court")
-    case_number = st.text_input("📁 Case Number")
+    # === Memo Form (Full Block: Inputs + Party Statement Preview + Submission) ===
+    with st.form("simple_mediation_form"):
+        court = st.text_input("🏭 Court")
+        case_number = st.text_input("📁 Case Number")
 
-    plaintiffs = {}
-    for i in range(1, 4):
-        label = f"👤 plaintiff {i} Name" + (" (required)" if i == 1 else " (optional)")
-        plaintiffs[f"plaintiff{i}"] = st.text_input(label)
+        plaintiffs = {}
+        for i in range(1, 4):
+            label = f"👤 plaintiff {i} Name" + (" (required)" if i == 1 else " (optional)")
+            plaintiffs[f"plaintiff{i}"] = st.text_input(label)
 
-    defendants = {}
-    for i in range(1, 8):
-        label = f"🏢 defendant {i} Name" + (" (optional)" if i > 1 else "")
-        defendants[f"defendant{i}"] = st.text_input(label)
+        defendants = {}
+        for i in range(1, 8):
+            label = f"🏢 defendant {i} Name" + (" (optional)" if i > 1 else "")
+            defendants[f"defendant{i}"] = st.text_input(label)
 
-    complaint_narrative = st.text_area("📔 Complaint Narrative", height=200)
-    party_info = st.text_area("👥 Party Information from Complaint", height=200)
-    settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
-    medical_summary = st.text_area("🏥 Medical Summary", height=200)
-    explicit_instructions = st.text_area("📝 Additional Instructions for Memo (optional)", height=100)
+        complaint_narrative = st.text_area("📔 Complaint Narrative", height=200)
+        party_info = st.text_area("👥 Party Information from Complaint", height=200)
+        settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
+        medical_summary = st.text_area("🏥 Medical Summary", height=200)
+        explicit_instructions = st.text_area("📝 Additional Instructions for Memo (optional)", height=100)
 
-    deposition_liability = "\n\n".join(st.session_state.quote_outputs["Liability"])
-    deposition_damages = "\n\n".join(st.session_state.quote_outputs["Damages"])
+        deposition_liability = "\n\n".join(st.session_state.quote_outputs["Liability"])
+        deposition_damages = "\n\n".join(st.session_state.quote_outputs["Damages"])
 
-    action = st.radio("Choose Action", ["🔍 Preview Party Paragraphs", "📂 Generate Memo"])
-    submitted = st.form_submit_button("Submit")
+        action = st.radio("Choose Action", ["🔍 Preview Party Paragraphs", "📂 Generate Memo"])
+        submitted = st.form_submit_button("Submit")
 
-if submitted and action == "🔍 Preview Party Paragraphs":
-    st.subheader("📝 Auto-Generated Party Statements")
+if submitted:
+    if action == "🔍 Preview Party Paragraphs":
+        st.subheader("📝 Auto-Generated Party Statements")
+        for i in range(1, 4):
+            name = plaintiffs.get(f"plaintiff{i}", "").strip()
+            if name:
+                input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
+                result = safe_generate(generate_plaintiff_statement, input_text, name)
+                st.markdown(f"**👤 Plaintiff {i}: {name}**")
+                st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_plaintiff{i}")
 
-    for i in range(1, 4):
-        name = plaintiffs.get(f"plaintiff{i}", "").strip()
-        if name:
-            input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
-            result = safe_generate(generate_plaintiff_statement, input_text, name)
-            st.markdown(f"**👤 Plaintiff {i}: {name}**")
-            st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_plaintiff{i}")
+        for i in range(1, 8):
+            name = defendants.get(f"defendant{i}", "").strip()
+            if name:
+                input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
+                result = safe_generate(generate_defendant_statement, input_text, label=name)
+                st.markdown(f"**🏢 Defendant {i}: {name}**")
+                st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_defendant{i}")
 
-    for i in range(1, 8):
-        name = defendants.get(f"defendant{i}", "").strip()
-        if name:
-            input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
-            result = safe_generate(generate_defendant_statement, input_text, label=name)
-            st.markdown(f"**🏢 Defendant {i}: {name}**")
-            st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_defendant{i}")
-
-    
-    # === Memo Generation ===
-    if submitted:
+    elif action == "📂 Generate Memo":
         try:
             output_dir = "outputs/mediation_memos"
             os.makedirs(output_dir, exist_ok=True)
@@ -752,7 +750,7 @@ if submitted and action == "🔍 Preview Party Paragraphs":
             memo_data = {
                 "Court": court,
                 "Case Number": case_number,
-                "plaintiff1": plaintiffs["plaintiff1"],
+                "plaintiff1": plaintiffs.get("plaintiff1", "")
             }
 
             for i in range(2, 4):
@@ -761,22 +759,23 @@ if submitted and action == "🔍 Preview Party Paragraphs":
                 memo_data[f"plaintiff{i}_statement"] = st.session_state.party_statements.get(f"plaintiff{i}_statement", "")
 
             for i in range(1, 8):
-                memo_data[f"defendant{i}"] = name
+                def_name = data.get(f"defendant{i}", "")
+                memo_data[f"defendant{i}"] = def_name
                 memo_data[f"defendant{i}_statement"] = st.session_state.party_statements.get(f"defendant{i}_statement", "")
 
             total = len(steps)
             for idx, (text, key) in enumerate(steps):
                 progress_text.text(text)
-    
+
                 if key == "introduction":
                     memo_data[key] = safe_generate(generate_introduction, data["complaint_narrative"], data["plaintiff1"])
 
                 elif key == "plaintiff_statement":
-                    memo_data["plaintiff1 Statement"] = safe_generate(generate_plaintiff_statement, data["party_info"], data["plaintiff1"])
+                    memo_data["plaintiff1_statement"] = safe_generate(generate_plaintiff_statement, data["party_info"], data["plaintiff1"])
 
                 elif key.startswith("defendant") and key.endswith("_statement"):
                     i = key.replace("defendant", "").replace("_statement", "")
-                    statement_key = f"defendant{i} Statement"
+                    statement_key = f"defendant{i}_statement"
                     memo_data[statement_key] = safe_generate(
                         generate_defendant_statement,
                         data.get("party_info", "") + "\n\n" + data.get("settlement_summary", ""),
@@ -811,7 +810,6 @@ if submitted and action == "🔍 Preview Party Paragraphs":
 
         except Exception as e:
             st.error(f"❌ Error: {e}")
-
 
 if tool == "📖 Instructions & Support":
     st.header("📘 Instructions & Support")
