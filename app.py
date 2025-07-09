@@ -740,6 +740,10 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
                         ("✍️ Generating Introduction...", "introduction"),
                         ("👤 Generating plaintiff Statement...", "plaintiff_statement")
                     ]
+                    for i in range(1, 3):
+                        pltf_name = data.get(f"plaintiff{i}")
+                        if pltf_name:
+                            steps.append((f"🏢 Generating plaintiff {i} Statement...", f"plaintiff{i}_statement"))
 
                     for i in range(1, 8):
                         def_name = data.get(f"defendant{i}")
@@ -758,10 +762,9 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
                     memo_data = {
                         "Court": court,
                         "Case Number": case_number,
-                        "plaintiff1": plaintiffs.get("plaintiff1", "")
                     }
 
-                    for i in range(2, 4):
+                    for i in range(1, 3):
                         name = data.get(f"plaintiff{i}", "")
                         memo_data[f"plaintiff{i}"] = name
                         memo_data[f"plaintiff{i}_statement"] = st.session_state.party_statements.get(f"plaintiff{i}_statement", "")
