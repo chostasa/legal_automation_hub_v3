@@ -16,6 +16,16 @@ except Exception:
 
 client = OpenAI(api_key=api_key)
 
+UNIVERSAL_INSTRUCTION = """
+All content must reflect formal legal writing appropriate for submission in federal court.
+Do not fabricate names, facts, injuries, or legal positions. If unsure, omit rather than guess.
+Use active voice only. Maintain continuity of facts, tone, and case theory across all sections.
+All quotes must be direct from deposition or complaint excerpts and cited in the format (Ex. A, [Name] Dep. [Line]).
+Do not summarize previously discussed facts. Every sentence must advance legal theory, factual support, or damages.
+The final product must read as if it were reviewed by a managing partner for mediation submission.
+"""
+
+
 def trim_to_token_limit(text, max_tokens=12000):
     if not text: return ""
     tokens = text.split()
@@ -154,6 +164,9 @@ All content must sound like it was drafted for final review by a managing partne
 
 Avoid summarizing facts multiple times. Focus instead on drawing conclusions from the established facts.
 """
+LEGAL_FLUENCY_NOTE += "\n\nEnsure the writing sounds like it was reviewed by a managing partner at a top litigation firm. Remove anything overly casual, vague, or emotionally overexplained."
+
+LEGAL_FLUENCY_NOTE += "\n\nEnsure transitions between sections are smooth, with light connective phrasing when appropriate (e.g., 'Following the incident…', 'As detailed above…', 'This context is critical in understanding…')."
 
 BAN_PHRASING_NOTE = """
 Ban any phrasing that introduces speculation or weakens factual strength. Do not use: “may,” “might,” “potential,” “appears to,” “possibly,” or “believes that.” Replace all with direct phrasing: “Jane is,” “The evidence will show,” “The footage depicts...”
@@ -176,6 +189,7 @@ Defendants state they have a $1,000,000.00 eroding policy for this case.  They r
 
 def generate_introduction(input_text, client_name):
     prompt = f"""
+{UNIVERSAL_INSTRUCTION}
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 {BAN_PHRASING_NOTE}
@@ -206,10 +220,16 @@ At the time of collision, Mr. Doe worked as a licensed commercial truck driver. 
 
 def generate_plaintiff_statement(bio, client_name):
     prompt = f"""
+{UNIVERSAL_INSTRUCTION}
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
 You are drafting a fact-based injury summary for the Plaintiff, {client_name}, to be used in a mediation memo.
+
+If this is an individual plaintiff, emphasize background, occupation, and their connection to the events.
+
+Avoid repeating facts that will be discussed in later sections (e.g., incident details, injuries, or damages). Focus instead on who the party is and their role or background in this case.
+
 
 📝 Use the following example only to match tone, structure, and level of detail. Do not reuse or refer to any facts from it.
 
@@ -239,10 +259,15 @@ At the time of the collision, Mr. Rakhimdjanov had been driving commercially for
 
 def generate_defendant_statement(context, defendant_name):
     prompt = f"""
+{UNIVERSAL_INSTRUCTION}
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
 You are drafting a concise factual paragraph describing the Defendant, {defendant_name}, for inclusion in a mediation memorandum.
+
+If this is a corporate defendant, focus on its role, responsibilities, and decision-making hierarchy.
+
+Avoid repeating facts that will be discussed in later sections (e.g., incident details, injuries, or damages). Focus instead on who the party is and their role or background in this case.
 
 📝 Use the following example only to match tone, structure, and legal polish. Do not copy or reuse any specific facts from it.
 
@@ -270,6 +295,7 @@ STL Trucking has represented to Plaintiff’s counsel that they only have a $1 m
 
 def generate_demand_section(summary, client_name):
     prompt = f"""
+{UNIVERSAL_INSTRUCTION}
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 {BAN_PHRASING_NOTE}
@@ -305,6 +331,7 @@ Plaintiff Stan Efimov is a resident of Cook County, Illinois. Defendant STL Truc
 
 def generate_party_section(party_details):
     prompt = f"""
+{UNIVERSAL_INSTRUCTION}
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
@@ -328,6 +355,7 @@ def generate_party_summary(plaintiff_names, defendant_names):
     defendant_list = ", ".join(defendant_names)
 
     prompt = f"""
+{UNIVERSAL_INSTRUCTION}
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
@@ -347,6 +375,7 @@ Keep it factual, formal, and brief — like the first paragraph of a complaint. 
 
 def generate_facts_liability_section(facts, deposition_text=None):
     prompt = f"""
+{UNIVERSAL_INSTRUCTION}
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
@@ -359,9 +388,15 @@ Carefully embed relevant direct quotes from the following deposition excerpts di
 - “Plaintiff testified, ‘...’ (Ex. A, Efimov Dep. 43).”
 - “According to deposition testimony, ‘...’ (Ex. A, Efimov Dep. 21).”
 
-You must embed a minimum of **three** quotes directly into the paragraph using this exact format:  
+Embed up to **three unique quotes** directly into the paragraph using this exact format:
+  
 - “Plaintiff testified, ‘[quote]’ (Ex. A, Efimov Dep. 43).”
 - “According to testimony, ‘[quote]’ (Ex. A, Efimov Dep. 55).”
+
+Avoid repeating quotes used earlier in the memo. Use each quote only once.
+Embed quotes fluidly inside supporting narrative. Paraphrase the lead-in, but quote only the answer exactly. Use this format:
+- According to [Name], he “...” (Ex. A, [Name] Dep. 0012:34).
+Avoid standalone quotes or robotic insertions.
 
 Do not place quotes at the end. Do not summarize them. Do not use bullet points.  
 If no quotes are present, leave a visible placeholder: [QUOTE NOT EMBEDDED].
@@ -400,6 +435,7 @@ At present, Mr. Doe reports that his conditions remain symptomatic and cause ong
 """
 def generate_causation_injuries(causation_info):
     prompt = f"""
+{UNIVERSAL_INSTRUCTION}
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
@@ -426,6 +462,7 @@ Mr. Doe’s ongoing symptoms will require lifelong pain management. Based on his
 
 def generate_additional_harms(harm_info, deposition_text=None):
     prompt = f"""
+{UNIVERSAL_INSTRUCTION}
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
@@ -459,6 +496,7 @@ Only insert quotes where they support specific facts or legal reasoning.
 
 def generate_future_medical(future_info, deposition_text=None):
     prompt = f"""
+{UNIVERSAL_INSTRUCTION}
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
@@ -492,10 +530,12 @@ policy that STL Truckers has for their and their Driver’s punitive actions cau
 
 def generate_conclusion_section(notes):
     prompt = f"""
+{UNIVERSAL_INSTRUCTION}
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
-Write the closing section of a mediation memo. Use objective, third-person framing. Avoid phrases like "we demand" or "we urge." Speak from the Plaintiff’s perspective in summary tone (e.g., “Plaintiff submits this memorandum…”).
+Write the closing section of a mediation memo. Use objective, third-person framing. Avoid phrases like "we demand" or "we urge." Use third-person legal summary tone, as if written for a judge or opposing counsel—not from the Plaintiff’s voice.
+
 
 Example:
 {CONCLUSION_EXAMPLE}
@@ -568,14 +608,14 @@ def fill_mediation_template(data, template_path, output_path):
     for i in range(1, 4):
         name = data.get(f"plaintiff{i}", "")
         statement = data.get(f"plaintiff{i}_statement", "")
-        combined = f"**{name}**\n\n{statement}" if name or statement else ""
+        combined = f"**{name}**\n\n{statement.strip()}" if name.strip() or statement.strip() else ""
         replacements[f"{{{{plaintiff_{i}}}}}"] = combined
 
 
     for i in range(1, 8):
         name = data.get(f"defendant{i}", "")
         statement = data.get(f"defendant{i}_statement", "")
-        combined = f"**{name}**\n\n{statement}" if name or statement else ""
+        combined = f"**{name}**\n\n{statement.strip()}" if name.strip() or statement.strip() else ""
         replacements[f"{{{{defendant_{i}}}}}"] = combined
 
 
@@ -743,6 +783,7 @@ def split_and_combine(fn, long_text, quotes="", chunk_size=3000):
 
 def polish_text_for_legal_memo(text):
     prompt = f"""
+{UNIVERSAL_INSTRUCTION}
 You are a senior legal editor. Improve the following legal writing by:
 - Converting to active voice
 - Eliminating redundant or vague phrases
@@ -750,11 +791,15 @@ You are a senior legal editor. Improve the following legal writing by:
 - Keeping it formal, persuasive, and professionally polished
 - Do not introduce new facts or change case theory
 - Focus on eliminating repetition of facts, phrases, or injuries that appear earlier in the document. Streamline where possible to enhance clarity and impact.
+- Ensure the writing sounds like it was reviewed by a managing partner at a top litigation firm.
 
 Text:
 {text}
 """
     return safe_generate(generate_with_openai, prompt)
+
+def is_multi_plaintiff(data):
+    return sum(1 for i in range(1, 4) if data.get(f"plaintiff{i}", "").strip()) > 1
 
 def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     import time
@@ -774,12 +819,10 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     plaintiff1 = data.get("plaintiff1") or data.get("plaintiff") or "Plaintiff"
     memo_data["plaintiff"] = plaintiff1
     memo_data["plaintiff1"] = plaintiff1
-    memo_data["plaintiff1_statement"] = safe_generate(
-        generate_plaintiff_statement, trim_to_token_limit(data["complaint_narrative"], 4000), plaintiff1
-    )
-    time.sleep(20)
 
     # === Handle Plaintiffs ===
+
+
     for i in range(1, 4):
         name = data.get(f"plaintiff{i}", "").strip()
         if name:
@@ -788,6 +831,10 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
                 + "\n\n"
                 + trim_to_token_limit(data.get("settlement_summary", ""), 2000)
             )
+            if is_multi_plaintiff(data):
+                    party_input += "\n\nWrite this statement as part of a group of plaintiffs. Emphasize the individual’s distinct background and role."
+
+
             statement = safe_generate(generate_plaintiff_statement, party_input, name)
         else:
             statement = ""
@@ -827,20 +874,39 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     liability_quotes = data.get("liability_quotes", "")
     damages_quotes = data.get("damages_quotes", "")
 
+    # Format deposition quotes before embedding
+    unique_liability_quotes = format_quotes_for_embedding(liability_quotes)
+    unique_damages_quotes = format_quotes_for_embedding(damages_quotes)
+
+    # === Deduplicate quotes across sections ===
+    used_quotes = set()
+
+    def get_unique_quotes(quotes, count=3):
+        selected = []
+        for quote in quotes.splitlines():
+            if quote not in used_quotes and quote.strip():
+                selected.append(quote.strip())
+                used_quotes.add(quote.strip())
+            if len(selected) == count:
+                break
+        return "\n".join(selected)
+
+    unique_liability_quotes = get_unique_quotes(unique_liability_quotes)
+    unique_damages_quotes = get_unique_quotes(unique_damages_quotes)
 
     memo_data["facts_liability"] = polish_text_for_legal_memo(
-        safe_generate(generate_facts_liability_section, 
-            "\n\n".join(chunk_text(data["complaint_narrative"])), 
-            liability_quotes
+        safe_generate(
+            generate_facts_liability_section,
+            "\n\n".join(chunk_text(data["complaint_narrative"])),
+            unique_liability_quotes
         )
     )
-    memo_data["facts_liability"] = "FACTS AND LIABILITY\n\n" + memo_data["facts_liability"]
 
 
     time.sleep(20)
 
     memo_data["additional_harms"] = polish_text_for_legal_memo(
-        safe_generate(generate_additional_harms, trimmed_medical_summary, damages_quotes)
+        safe_generate(generate_additional_harms, trimmed_medical_summary, unique_damages_quotes)
     )
 
     time.sleep(20)
@@ -888,9 +954,9 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     )
 
     if plaintiff_sections:
-        memo_data["parties"] += "\n\nPLAINTIFFS:\n" + "\n\n".join(plaintiff_sections) + "\n\n"
+        memo_data["parties"] += "\n\n" + "\n\n".join(plaintiff_sections) + "\n\n"
     if defendant_sections:
-        memo_data["parties"] += "DEFENDANTS:\n" + "\n\n".join(defendant_sections)
+        memo_data["parties"] += "\n\n" + "\n\n".join(defendant_sections)
 
 
     # === Final cleanup and formatting ===
@@ -908,13 +974,24 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     memo_data["conclusion"] = "CONCLUSION\n\n" + memo_data["conclusion"]
 
 
+    from difflib import SequenceMatcher
+
+    def remove_redundant_intro(intro, base_text):
+        intro_sentences = intro.split(". ")
+        base_sentences = base_text.split(". ")
+        filtered = []
+        for s in intro_sentences:
+            is_duplicate = any(SequenceMatcher(None, s.strip(), b.strip()).ratio() > 0.8 for b in base_sentences)
+            if not is_duplicate:
+                filtered.append(s)
+        return ". ".join(filtered)
+
     intro_clean = memo_data.pop("introduction", "")
     facts_text = data["complaint_narrative"]
-    memo_data["Introduction"] = polish_text_for_legal_memo(intro_clean.replace(facts_text[:200], ""))
+    filtered_intro = remove_redundant_intro(intro_clean, facts_text)
+    memo_data["Introduction"] = polish_text_for_legal_memo(filtered_intro)
     memo_data["Demand"] = memo_data.pop("demand", "")
-    memo_data["Facts_Liability"] = memo_data.pop("facts_liability", "")
-    memo_data["Causation_Injuries_Treatment"] = memo_data.pop("causation_injuries", "")
-    memo_data["Additional_Harms_Losses"] = memo_data.pop("additional_harms", "")
+    memo_data["Additional_Harms_Losses"] = polish_text_for_legal_memo(memo_data.pop("additional_harms", ""))
     memo_data["Future_Medical_Bills"] = memo_data.pop("future_bills", "")
     memo_data["Conclusion"] = memo_data.pop("conclusion", "")
 
