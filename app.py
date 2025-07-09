@@ -659,58 +659,6 @@ Ignore all other content.
         st.subheader("📂 Extracted Damages Quotes")
         st.text_area("Copy-ready Damages Quotes", "\n\n".join(st.session_state.quote_outputs["Damages"]), height=300)
 
-# === Preview and Edit Party Statements Before Memo Generation ===
-st.subheader("🧾 Preview & Edit Party Statements")
-
-if st.button("✍️ Generate Party Statements Preview"):
-    with st.spinner("Generating party statements..."):
-        if "party_statements" not in st.session_state:
-            st.session_state.party_statements = {}
-
-        # Generate plaintiff statements
-        for i in range(1, 4):
-            name = st.session_state.get(f"plaintiff{i}", "").strip()
-            if name:
-                input_text = (
-                    trim_to_token_limit(st.session_state.get("party_info", ""), 3000)
-                    + "\n\n"
-                    + trim_to_token_limit(st.session_state.get("settlement_summary", ""), 2000)
-                )
-                result = safe_generate(generate_plaintiff_statement, input_text, name)
-                st.session_state.party_statements[f"plaintiff{i}_statement"] = result
-
-        # Generate defendant statements
-        for i in range(1, 8):
-            name = st.session_state.get(f"defendant{i}", "").strip()
-            if name:
-                input_text = (
-                    trim_to_token_limit(st.session_state.get("party_info", ""), 3000)
-                    + "\n\n"
-                    + trim_to_token_limit(st.session_state.get("settlement_summary", ""), 2000)
-                )
-                result = safe_generate(generate_defendant_statement, input_text, label=name)
-                st.session_state.party_statements[f"defendant{i}_statement"] = result
-
-st.markdown("🧠 **Review and edit party statements below before generating the full memo.**")
-
-# Display editable text areas
-for i in range(1, 4):
-    name = st.session_state.get(f"plaintiff{i}", "").strip()
-    if name:
-        default_text = st.session_state.party_statements.get(f"plaintiff{i}_statement", "")
-        st.session_state.party_statements[f"plaintiff{i}_statement"] = st.text_area(
-            f"🧍 Plaintiff {i}: {name}", value=default_text, height=150
-        )
-
-for i in range(1, 8):
-    name = st.session_state.get(f"defendant{i}", "").strip()
-    if name:
-        default_text = st.session_state.party_statements.get(f"defendant{i}_statement", "")
-        st.session_state.party_statements[f"defendant{i}_statement"] = st.text_area(
-            f"🏢 Defendant {i}: {name}", value=default_text, height=150
-        )
-
-
 # === Memo Form (same as before) ===
 with st.form("simple_mediation_form"):
     court = st.text_input("🏛️ Court")
@@ -736,6 +684,47 @@ with st.form("simple_mediation_form"):
     deposition_damages = "\n\n".join(st.session_state.quote_outputs["Damages"])
 
     submitted = st.form_submit_button("🧾 Generate Memo")
+
+if tool == "🧾 Mediation Memos" and not submitted:
+    st.subheader("🧾 Preview & Edit Party Statements")
+
+    if st.button("✍️ Generate Party Statements Preview"):
+        with st.spinner("Generating party statements..."):
+            if "party_statements" not in st.session_state:
+                st.session_state.party_statements = {}
+
+            for i in range(1, 4):
+                name = plaintiffs.get(f"plaintiff{i}", "").strip()
+                if name:
+                    input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
+                    result = safe_generate(generate_plaintiff_statement, input_text, name)
+                    st.session_state.party_statements[f"plaintiff{i}_statement"] = result
+
+            for i in range(1, 8):
+                name = defendants.get(f"defendant{i}", "").strip()
+                if name:
+                    input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
+                    result = safe_generate(generate_defendant_statement, input_text, label=name)
+                    st.session_state.party_statements[f"defendant{i}_statement"] = result
+
+    st.markdown("🧠 **Review and edit party statements below before generating the full memo.**")
+
+    for i in range(1, 4):
+        name = plaintiffs.get(f"plaintiff{i}", "").strip()
+        if name:
+            default_text = st.session_state.party_statements.get(f"plaintiff{i}_statement", "")
+            st.session_state.party_statements[f"plaintiff{i}_statement"] = st.text_area(
+                f"🧍 Plaintiff {i}: {name}", value=default_text, height=150
+            )
+
+    for i in range(1, 8):
+        name = defendants.get(f"defendant{i}", "").strip()
+        if name:
+            default_text = st.session_state.party_statements.get(f"defendant{i}_statement", "")
+            st.session_state.party_statements[f"defendant{i}_statement"] = st.text_area(
+                f"🏢 Defendant {i}: {name}", value=default_text, height=150
+            )
+
 
 if submitted:
     try:
