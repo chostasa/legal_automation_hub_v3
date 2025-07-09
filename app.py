@@ -643,10 +643,6 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
         st.subheader("📂 Extracted Damages Quotes")
         st.text_area("Copy-ready Damages Quotes", "\n\n".join(st.session_state.quote_outputs["Damages"]), height=300)
 
-    # === Show Memo Form ===
-    from components.memo_form import show_memo_form
-    show_memo_form(st.session_state.quote_outputs)
-
     # === Memo Form (Full Block: Inputs + Party Statement Preview + Submission) ===
     with st.form("simple_mediation_form"):
         court = st.text_input("🏫 Court")
