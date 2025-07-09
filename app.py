@@ -3,6 +3,7 @@ st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
 from scripts.run_foia import run_foia
 from scripts.run_demand import run
+from scripts.run_mediation import polish_text_for_legal_memo
 from scripts.run_mediation import (
     generate_with_openai,
     generate_introduction,
@@ -19,7 +20,6 @@ from scripts.run_mediation import (
     safe_generate,  
     split_and_combine,
     trim_to_token_limit 
-    from scripts.run_mediation import polish_text_for_legal_memo
 )
 
 import pandas as pd
