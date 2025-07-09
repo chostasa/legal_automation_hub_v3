@@ -228,7 +228,7 @@ You are drafting a fact-based injury summary for the Plaintiff, {client_name}, t
 
 If this is an individual plaintiff, emphasize background, occupation, and their connection to the events.
 
-Avoid repeating facts that will be discussed in later sections (e.g., incident details, injuries, or damages). Focus instead on who the party is and their role or background in this case.
+Avoid repeating facts that will be discussed in later sections (e.g., incident details, injuries, or damages). Focus instead on who the party is and how their background, daily life, or aspirations were affected by the events. Use vivid, empathetic language to paint a full picture of their identity before the incident.
 
 
 📝 Use the following example only to match tone, structure, and level of detail. Do not reuse or refer to any facts from it.
@@ -399,7 +399,7 @@ Embed quotes fluidly inside supporting narrative. Paraphrase the lead-in, but qu
 Avoid standalone quotes or robotic insertions.
 
 Do not place quotes at the end. Do not summarize them. Do not use bullet points.  
-If no quotes are present, leave a visible placeholder: [QUOTE NOT EMBEDDED].
+You must embed at least **three** direct quotes from the deposition excerpts below into the body of the section. Each quote must be tied to a specific sentence and support a point of liability. Do not place quotes at the end. Do not use bullet points. Embed quotes naturally inside narrative paragraphs.
 
 
 Quotes must flow naturally within the paragraph as factual support—not as standalone blocks.
@@ -798,6 +798,16 @@ Text:
 """
     return safe_generate(generate_with_openai, prompt)
 
+def polish_transitions(text):
+    prompt = f"""
+You are a legal editor. Smooth all transitions between sentences and paragraphs to improve narrative flow and avoid "template stiffness." Do not remove quotes or facts—only adjust flow and phrasing.
+
+Text:
+{text}
+"""
+    return safe_generate(generate_with_openai, prompt)
+
+
 def is_multi_plaintiff(data):
     return sum(1 for i in range(1, 4) if data.get(f"plaintiff{i}", "").strip()) > 1
 
@@ -860,9 +870,9 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
 
 
  # Main body content
-    memo_data["introduction"] = polish_text_for_legal_memo(
+    memo_data["introduction"] = polish_transitions(polish_text_for_legal_memo(
         safe_generate(generate_introduction, trim_to_token_limit(data["complaint_narrative"], 4000), plaintiff1)
-    )
+    ))
     time.sleep(20)
 
     memo_data["demand"] = polish_text_for_legal_memo(
@@ -875,8 +885,21 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     damages_quotes = data.get("damages_quotes", "")
 
     # Format deposition quotes before embedding
-    unique_liability_quotes = format_quotes_for_embedding(liability_quotes)
-    unique_damages_quotes = format_quotes_for_embedding(damages_quotes)
+    
+    used_quotes = set()  # Move above definition of get_unique_quotes
+
+    def get_unique_quotes(quotes, count=3):
+        selected = []
+        for quote in quotes.splitlines():
+            if quote not in used_quotes and quote.strip():
+                selected.append(quote.strip())
+                used_quotes.add(quote.strip())
+            if len(selected) == count:
+                break
+        return "\n".join(selected)
+
+    unique_liability_quotes = get_unique_quotes(liability_quotes)
+    unique_damages_quotes = get_unique_quotes(damages_quotes)
 
     # === Deduplicate quotes across sections ===
     used_quotes = set()
@@ -894,20 +917,22 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     unique_liability_quotes = get_unique_quotes(unique_liability_quotes)
     unique_damages_quotes = get_unique_quotes(unique_damages_quotes)
 
-    memo_data["facts_liability"] = polish_text_for_legal_memo(
+    memo_data["facts_liability"] = polish_transitions(polish_text_for_legal_memo(
         safe_generate(
             generate_facts_liability_section,
             "\n\n".join(chunk_text(data["complaint_narrative"])),
             unique_liability_quotes
         )
-    )
+    ))
+
 
 
     time.sleep(20)
 
-    memo_data["additional_harms"] = polish_text_for_legal_memo(
+    memo_data["additional_harms"] = polish_transitions(polish_text_for_legal_memo(
         safe_generate(generate_additional_harms, trimmed_medical_summary, unique_damages_quotes)
-    )
+    ))
+
 
     time.sleep(20)
 
@@ -919,12 +944,13 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     )
     time.sleep(20)
 
-    memo_data["causation_injuries"] = polish_text_for_legal_memo(
+    memo_data["causation_injuries"] = polish_transitions(polish_text_for_legal_memo(
         "\n\n".join([
             safe_generate(generate_causation_injuries, chunk)
             for chunk in chunk_text(trimmed_medical_summary)
         ])
-    )
+    ))
+
     time.sleep(20)
 
 # === FORMAL NARRATIVE PARTIES SECTION WITH HEADINGS ===
@@ -949,9 +975,10 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     plaintiff_names = [memo_data.get(f"plaintiff{i}", "") for i in range(1, 4) if memo_data.get(f"plaintiff{i}", "")]
     defendant_names = [memo_data.get(f"defendant{i}", "") for i in range(1, 8) if memo_data.get(f"defendant{i}", "")]
 
-    memo_data["parties"] = polish_text_for_legal_memo(
+    memo_data["parties"] = polish_transitions(polish_text_for_legal_memo(
         safe_generate(generate_party_summary, plaintiff_names, defendant_names)
-    )
+    ))
+
 
     if plaintiff_sections:
         memo_data["parties"] += "\n\n" + "\n\n".join(plaintiff_sections) + "\n\n"
@@ -960,9 +987,10 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
 
 
     # === Final cleanup and formatting ===
-    memo_data["conclusion"] = polish_text_for_legal_memo(
+    memo_data["conclusion"] = polish_transitions(polish_text_for_legal_memo(
         safe_generate(generate_conclusion_section, data["settlement_summary"])
-    )
+    ))
+
 
     # === Add Section Headings for Final Output ===
     memo_data["introduction"] = "INTRODUCTION\n\n" + memo_data["introduction"]

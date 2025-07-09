@@ -778,6 +778,9 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
                         memo_data[f"defendant{i}"] = def_name
                         memo_data[f"defendant{i}_statement"] = st.session_state.party_statements.get(f"defendant{i}_statement", "")
 
+                    # Preprocess facts once
+                    facts_input = trim_to_token_limit("\n\n".join(chunk_text(data["complaint_narrative"])), 3000)
+
                     total = len(steps)
                     for idx, (text, key) in enumerate(steps):
                         progress_text.text(text)
@@ -801,26 +804,21 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
                             memo_data[key] = safe_generate(generate_demand_section, data["settlement_summary"], data["plaintiff1"])
 
                         elif key == "facts_liability":
-                            memo_data[key] = safe_generate(generate_facts_liability_section, data["complaint_narrative"], data["deposition_liability"])
+                            memo_data[key] = polish_text_for_legal_memo(
+                                safe_generate(generate_facts_liability_section, facts_input, unique_liability_quotes)
+                            )
 
                         elif key == "causation_injuries":
                             memo_data[key] = safe_generate(generate_causation_injuries, data["medical_summary"])
-        
+
                         elif key == "additional_harms":
                             memo_data[key] = safe_generate(generate_additional_harms, data["medical_summary"], data["deposition_damages"])
-        
+
                         elif key == "future_bills":
                             memo_data[key] = safe_generate(generate_future_medical, data["medical_summary"], data["deposition_damages"])
 
                         elif key == "conclusion":
                             memo_data[key] = safe_generate(generate_conclusion_section, data["settlement_summary"])
-
-                        progress_bar.progress((idx + 1) / total)
-
-                    file_path = fill_mediation_template(data | memo_data, template_path, output_dir)
-
-                    st.session_state.generated_file_path = file_path
-                    st.success("✅ Mediation memo generated! Scroll down to download.")
 
 
                 except Exception as e:
