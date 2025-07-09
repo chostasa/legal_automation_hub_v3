@@ -209,7 +209,9 @@ def generate_plaintiff_statement(bio, client_name):
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
-You are drafting a formal narrative background for a plaintiff in a legal memo. Use the following example only for style and tone. Do not copy or reuse any facts from the example.
+You are drafting a fact-based injury summary for the Plaintiff, {client_name}, to be used in a mediation memo.
+
+📝 Use the following example only to match tone, structure, and level of detail. Do not reuse or refer to any facts from it.
 
 ---
 
@@ -218,7 +220,7 @@ You are drafting a formal narrative background for a plaintiff in a legal memo. 
 
 ---
 
-🎯 Task: Write a single-paragraph narrative background for the Plaintiff named {client_name}, using only the factual information provided below. Do not invent or assume facts. Start the paragraph with: "{client_name} is..."
+🎯 Task: Write a single narrative paragraph using only the information provided below. Do not speculate, assign liability, or mention settlement. Focus on the injuries, treatment, and employment history of {client_name}. If a date of incident is available, begin with it.
 
 📄 Provided Facts:
 {bio}
@@ -226,6 +228,7 @@ You are drafting a formal narrative background for a plaintiff in a legal memo. 
     text = generate_with_openai(prompt)
     text = re.sub(r"\.\s+", ". ", text)
     return polish_text_for_legal_memo(text)
+
 
 
 DEFENDANT_STATEMENT_EXAMPLE = """
@@ -239,7 +242,9 @@ def generate_defendant_statement(context, defendant_name):
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
-You are drafting a formal narrative background for a defendant in a legal memo. Use the example below only as a reference for tone and structure. Do not reuse or reference any facts from the example.
+You are drafting a concise factual paragraph describing the Defendant, {defendant_name}, for inclusion in a mediation memorandum.
+
+📝 Use the following example only to match tone, structure, and legal polish. Do not copy or reuse any specific facts from it.
 
 ---
 
@@ -248,7 +253,7 @@ You are drafting a formal narrative background for a defendant in a legal memo. 
 
 ---
 
-🎯 Task: Write a single-paragraph narrative background for the Defendant named {defendant_name}, using only the provided factual details. Do not invent or assume any facts. Begin the paragraph with: "{defendant_name} is..."
+🎯 Task: Write a single narrative paragraph using only the information provided below. Do not speculate or assign blame. Focus on the Defendant’s role, operations, and relevant actions or omissions. Begin with: “{defendant_name} is...”
 
 📄 Provided Facts:
 {context}
