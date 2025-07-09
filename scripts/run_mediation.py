@@ -209,10 +209,18 @@ def generate_plaintiff_statement(bio, client_name):
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
-Using only the info below, write a brief formal background on the Plaintiff ({client_name}):
+You are drafting a formal narrative background for a plaintiff in a legal memo. Use the following example only for style and tone. Do not copy or reuse any facts from the example.
+
+---
+
+💡 Example Paragraph (for tone only):
 {PLAINTIFF_STATEMENT_EXAMPLE}
 
-Bio:
+---
+
+🎯 Task: Write a single-paragraph narrative background for the Plaintiff named {client_name}, using only the factual information provided below. Do not invent or assume facts. Start the paragraph with: "{client_name} is..."
+
+📄 Provided Facts:
 {bio}
 """
     text = generate_with_openai(prompt)
@@ -226,26 +234,29 @@ On August 8, 2018, {{Defendant1}}, then 43, was driving a commercial truck for t
 At the time of the collision, Mr. Rakhimdjanov had been driving commercially for less than one day.  This was his first commercial driving job (Ex. D, Rakhimdjanov Dep. 30). Mr. Rakhimdjanov used an interpreter when he gave his deposition on December 16, 2021 and when he signed his employment contracts with STL Truckers. (Ex. D, Rakhimdjanov Dep. 73). However, Mr. Rakhimdjanov did not have an interpreter during his training with STL Truckers. (Ex. D, Rakhimdjanov Dep. 73). It is clear from the documents from STL that he did not even write his own name.
 """
 
-
-def generate_defendant_statement(def_text, label="Defendant"):
+def generate_defendant_statement(context, defendant_name):
     prompt = f"""
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
-Write a detailed “Role” section for {label}.  
-Describe who {label} is, their official role, what they were responsible for, and their relationship to the case.  
-Use only the information below. Do not repeat facts from other sections.  
-Match the professional tone and style of the example.
+You are drafting a formal narrative background for a defendant in a legal memo. Use the example below only as a reference for tone and structure. Do not reuse or reference any facts from the example.
 
-Example:
+---
+
+💡 Example Paragraph (for tone only):
 {DEFENDANT_STATEMENT_EXAMPLE}
 
-Input:
-{def_text}
+---
+
+🎯 Task: Write a single-paragraph narrative background for the Defendant named {defendant_name}, using only the provided factual details. Do not invent or assume any facts. Begin the paragraph with: "{defendant_name} is..."
+
+📄 Provided Facts:
+{context}
 """
     text = generate_with_openai(prompt)
     text = re.sub(r"\.\s+", ". ", text)
     return polish_text_for_legal_memo(text)
+
 
 
 DEMAND_EXAMPLE = """
