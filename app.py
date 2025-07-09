@@ -647,195 +647,194 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
     from components.memo_form import show_memo_form
     show_memo_form(st.session_state.quote_outputs)
 
-# === Memo Form (Full Block: Inputs + Party Statement Preview + Submission) ===
-with st.form("simple_mediation_form"):
-    court = st.text_input("🏫 Court")
-    case_number = st.text_input("📁 Case Number")
+    # === Memo Form (Full Block: Inputs + Party Statement Preview + Submission) ===
+    with st.form("simple_mediation_form"):
+        court = st.text_input("🏫 Court")
+        case_number = st.text_input("📁 Case Number")
 
-    plaintiffs = {}
-    for i in range(1, 4):
-        label = f"👤 plaintiff {i} Name" + (" (required)" if i == 1 else " (optional)")
-        plaintiffs[f"plaintiff{i}"] = st.text_input(label)
+        plaintiffs = {}
+        for i in range(1, 4):
+            label = f"👤 plaintiff {i} Name" + (" (required)" if i == 1 else " (optional)")
+            plaintiffs[f"plaintiff{i}"] = st.text_input(label)
 
-    defendants = {}
-    for i in range(1, 8):
-        label = f"🏢 defendant {i} Name" + (" (optional)" if i > 1 else "")
-        defendants[f"defendant{i}"] = st.text_input(label)
-
-    complaint_narrative = st.text_area("📔 Complaint Narrative", height=200)
-    party_info = st.text_area("👥 Party Information from Complaint", height=200)
-    settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
-    medical_summary = st.text_area("🏥 Medical Summary", height=200)
-    explicit_instructions = st.text_area("📝 Additional Instructions for Memo (optional)", height=100)
-
-    deposition_liability = "\n\n".join(st.session_state.quote_outputs["Liability"])
-    deposition_damages = "\n\n".join(st.session_state.quote_outputs["Damages"])
-
-    submitted = st.form_submit_button("📂 Generate Memo")
-
-# === Party Statement Preview (only when not submitted) ===
-if tool == "📿 Mediation Memos" and not submitted:
-    st.subheader("📿 Preview & Edit Party Statements")
-
-    if st.button("✍️ Generate Party Statements Preview"):
-        with st.spinner("Generating party statements..."):
-            if "party_statements" not in st.session_state:
-                st.session_state.party_statements = {}
-
-            for i in range(1, 4):
-                name = plaintiffs.get(f"plaintiff{i}", "").strip()
-                if name:
-                    input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
-                    result = safe_generate(generate_plaintiff_statement, input_text, name)
-                    st.session_state.party_statements[f"plaintiff{i}_statement"] = result
-
-            for i in range(1, 8):
-                name = defendants.get(f"defendant{i}", "").strip()
-                if name:
-                    input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
-                    result = safe_generate(generate_defendant_statement, input_text, label=name)
-                    st.session_state.party_statements[f"defendant{i}_statement"] = result
-
-    st.markdown("🧐 **Review and edit party statements below before generating the full memo.**")
-
-    for i in range(1, 4):
-        name = plaintiffs.get(f"plaintiff{i}", "").strip()
-        if name:
-            default_text = st.session_state.party_statements.get(f"plaintiff{i}_statement", "")
-            st.session_state.party_statements[f"plaintiff{i}_statement"] = st.text_area(
-                f"🩍 plaintiff {i}: {name}", value=default_text, height=150
-            )
-
-    for i in range(1, 8):
-        name = defendants.get(f"defendant{i}", "").strip()
-        if name:
-            default_text = st.session_state.party_statements.get(f"defendant{i}_statement", "")
-            st.session_state.party_statements[f"defendant{i}_statement"] = st.text_area(
-                f"🏢 defendant {i}: {name}", value=default_text, height=150
-            )
-
-# === Memo Generation ===
-if submitted:
-    try:
-        output_dir = "outputs/mediation_memos"
-        os.makedirs(output_dir, exist_ok=True)
-
-        data = {
-            "court": court,
-            "case_number": case_number,
-            "complaint_narrative": complaint_narrative,
-            "party_info": party_info,
-            "settlement_summary": settlement_summary,
-            "medical_summary": medical_summary,
-            "deposition_liability": deposition_liability,
-            "deposition_damages": deposition_damages,
-            **plaintiffs,
-            **defendants,
-            "extracted_quotes": deposition_liability + "\n\n" + deposition_damages,
-            "all_quotes_pool": deposition_liability + "\n\n" + deposition_damages,
-        }
-
-        template_path = "templates/mediation_template.docx"
-
-        from scripts.run_mediation import (
-            safe_generate,
-            generate_introduction,
-            generate_plaintiff_statement,
-            generate_defendant_statement,
-            generate_demand_section,
-            generate_facts_liability_section,
-            generate_causation_injuries,
-            generate_additional_harms,
-            generate_future_medical,
-            generate_conclusion_section,
-            fill_mediation_template,
-        )
-
-        progress_text = st.empty()
-        progress_bar = st.progress(0)
-
-        steps = [
-            ("✍️ Generating Introduction...", "introduction"),
-            ("👤 Generating plaintiff Statement...", "plaintiff_statement")
-        ]
-
+        defendants = {}
         for i in range(1, 8):
-            def_name = data.get(f"defendant{i}")
-            if def_name:
-                steps.append((f"🏢 Generating defendant {i} Statement...", f"defendant{i}_statement"))
+            label = f"🏢 defendant {i} Name" + (" (optional)" if i > 1 else "")
+            defendants[f"defendant{i}"] = st.text_input(label)
 
-        steps += [
-            ("💰 Generating Demand Section...", "demand"),
-            ("📄 Generating Facts / Liability Section...", "facts_liability"),
-            ("🦴 Generating Causation & Injuries...", "causation_injuries"),
-            ("⚖️ Generating Additional Harms...", "additional_harms"),
-            ("🧾 Generating Future Medical Costs...", "future_bills"),
-            ("✅ Generating Conclusion...", "conclusion")
-        ]
+        complaint_narrative = st.text_area("📔 Complaint Narrative", height=200)
+        party_info = st.text_area("👥 Party Information from Complaint", height=200)
+        settlement_summary = st.text_area("💼 Settlement Demand Summary", height=200)
+        medical_summary = st.text_area("🏥 Medical Summary", height=200)
+        explicit_instructions = st.text_area("📝 Additional Instructions for Memo (optional)", height=100)
 
-        memo_data = {
-            "Court": court,
-            "Case Number": case_number,
-            "plaintiff1": plaintiffs["plaintiff1"],
-        }
+        deposition_liability = "\n\n".join(st.session_state.quote_outputs["Liability"])
+        deposition_damages = "\n\n".join(st.session_state.quote_outputs["Damages"])
 
-        for i in range(2, 4):
-            name = data.get(f"plaintiff{i}", "")
-            memo_data[f"plaintiff_{i}_Name"] = name
-            memo_data[f"plaintiff_{i}_Statement"] = st.session_state.party_statements.get(f"plaintiff{i}_statement", "")
+        submitted = st.form_submit_button("📂 Generate Memo")
 
-        for i in range(1, 8):
-            memo_data[f"defendant{i}"] = data.get(f"defendant{i}", "")
-            memo_data[f"defendant{i} Statement"] = st.session_state.party_statements.get(f"defendant{i}_statement", "")
+    # === Party Statement Preview (only when not submitted) ===
+    if tool == "📿 Mediation Memos" and not submitted:
+        st.subheader("📿 Preview & Edit Party Statements")
 
-        total = len(steps)
-        for idx, (text, key) in enumerate(steps):
-            progress_text.text(text)
+        if st.button("✍️ Generate Party Statements Preview"):
+            with st.spinner("Generating party statements..."):
+                if "party_statements" not in st.session_state:
+                    st.session_state.party_statements = {}
 
-            if key == "introduction":
-                memo_data[key] = safe_generate(generate_introduction, data["complaint_narrative"], data["plaintiff1"])
+                for i in range(1, 4):
+                    name = plaintiffs.get(f"plaintiff{i}", "").strip()
+                    if name:
+                        input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
+                        result = safe_generate(generate_plaintiff_statement, input_text, name)
+                        st.session_state.party_statements[f"plaintiff{i}_statement"] = result
 
-            elif key == "plaintiff_statement":
-                memo_data["plaintiff1 Statement"] = safe_generate(generate_plaintiff_statement, data["party_info"], data["plaintiff1"])
+                for i in range(1, 8):
+                    name = defendants.get(f"defendant{i}", "").strip()
+                    if name:
+                        input_text = trim_to_token_limit(party_info, 3000) + "\n\n" + trim_to_token_limit(settlement_summary, 2000)
+                        result = safe_generate(generate_defendant_statement, input_text, label=name)
+                        st.session_state.party_statements[f"defendant{i}_statement"] = result
+    
+        st.markdown("🧐 **Review and edit party statements below before generating the full memo.**")
 
-            elif key.startswith("defendant") and key.endswith("_statement"):
-                i = key.replace("defendant", "").replace("_statement", "")
-                statement_key = f"defendant{i} Statement"
-                memo_data[statement_key] = safe_generate(
-                    generate_defendant_statement,
-                    data.get("party_info", "") + "\n\n" + data.get("settlement_summary", ""),
-                    data.get(f"defendant{i}", "")
+        for i in range(1, 4):
+            name = plaintiffs.get(f"plaintiff{i}", "").strip()
+            if name:
+                default_text = st.session_state.party_statements.get(f"plaintiff{i}_statement", "")
+                st.session_state.party_statements[f"plaintiff{i}_statement"] = st.text_area(
+                    f"🩍 plaintiff {i}: {name}", value=default_text, height=150
                 )
 
-            elif key == "demand":
-                memo_data[key] = safe_generate(generate_demand_section, data["settlement_summary"], data["plaintiff1"])
+        for i in range(1, 8):
+            name = defendants.get(f"defendant{i}", "").strip()
+            if name:
+                default_text = st.session_state.party_statements.get(f"defendant{i}_statement", "")
+                st.session_state.party_statements[f"defendant{i}_statement"] = st.text_area(
+                    f"🏢 defendant {i}: {name}", value=default_text, height=150
+                )
+    
+    # === Memo Generation ===
+    if submitted:
+        try:
+            output_dir = "outputs/mediation_memos"
+            os.makedirs(output_dir, exist_ok=True)
 
-            elif key == "facts_liability":
-                memo_data[key] = safe_generate(generate_facts_liability_section, data["complaint_narrative"], data["deposition_liability"])
+            data = {
+                "court": court,
+                "case_number": case_number,
+                "complaint_narrative": complaint_narrative,
+                "party_info": party_info,
+                "settlement_summary": settlement_summary,
+                "medical_summary": medical_summary,
+                "deposition_liability": deposition_liability,
+                "deposition_damages": deposition_damages,
+                **plaintiffs,
+                **defendants,
+                "extracted_quotes": deposition_liability + "\n\n" + deposition_damages,
+                "all_quotes_pool": deposition_liability + "\n\n" + deposition_damages,
+            }
 
-            elif key == "causation_injuries":
-                memo_data[key] = safe_generate(generate_causation_injuries, data["medical_summary"])
+            template_path = "templates/mediation_template.docx"
 
-            elif key == "additional_harms":
-                memo_data[key] = safe_generate(generate_additional_harms, data["medical_summary"], data["deposition_damages"])
+            from scripts.run_mediation import (
+                safe_generate,
+                generate_introduction,
+                generate_plaintiff_statement,
+                generate_defendant_statement,
+                generate_demand_section,
+                generate_facts_liability_section,
+                generate_causation_injuries,
+                generate_additional_harms,
+                generate_future_medical,
+                generate_conclusion_section,
+                fill_mediation_template,
+            )
 
-            elif key == "future_bills":
-                memo_data[key] = safe_generate(generate_future_medical, data["medical_summary"], data["deposition_damages"])
+            progress_text = st.empty()
+            progress_bar = st.progress(0)
 
-            elif key == "conclusion":
-                memo_data[key] = safe_generate(generate_conclusion_section, data["settlement_summary"])
+            steps = [
+                ("✍️ Generating Introduction...", "introduction"),
+                ("👤 Generating plaintiff Statement...", "plaintiff_statement")
+            ]
 
-            progress_bar.progress((idx + 1) / total)
+            for i in range(1, 8):
+                def_name = data.get(f"defendant{i}")
+                if def_name:
+                    steps.append((f"🏢 Generating defendant {i} Statement...", f"defendant{i}_statement"))
 
-        file_path = fill_mediation_template(data | memo_data, template_path, output_dir)
+            steps += [
+                ("💰 Generating Demand Section...", "demand"),
+                ("📄 Generating Facts / Liability Section...", "facts_liability"),
+                ("🦴 Generating Causation & Injuries...", "causation_injuries"),
+                ("⚖️ Generating Additional Harms...", "additional_harms"),
+                ("🧾 Generating Future Medical Costs...", "future_bills"),
+                ("✅ Generating Conclusion...", "conclusion")
+            ]
 
-        with open(file_path, "rb") as f:
-            st.success("✅ Mediation memo generated!")
-            st.download_button("📂 Download Mediation Memo", f, file_name=os.path.basename(file_path))
+            memo_data = {
+                "Court": court,
+                "Case Number": case_number,
+                "plaintiff1": plaintiffs["plaintiff1"],
+            }
 
-    except Exception as e:
-        st.error(f"❌ Error: {e}")
+            for i in range(2, 4):
+                name = data.get(f"plaintiff{i}", "")
+                memo_data[f"plaintiff_{i}_Name"] = name
+                memo_data[f"plaintiff_{i}_Statement"] = st.session_state.party_statements.get(f"plaintiff{i}_statement", "")
 
+            for i in range(1, 8):
+                memo_data[f"defendant{i}"] = data.get(f"defendant{i}", "")
+                memo_data[f"defendant{i} Statement"] = st.session_state.party_statements.get(f"defendant{i}_statement", "")
+
+            total = len(steps)
+            for idx, (text, key) in enumerate(steps):
+                progress_text.text(text)
+    
+                if key == "introduction":
+                    memo_data[key] = safe_generate(generate_introduction, data["complaint_narrative"], data["plaintiff1"])
+
+                elif key == "plaintiff_statement":
+                    memo_data["plaintiff1 Statement"] = safe_generate(generate_plaintiff_statement, data["party_info"], data["plaintiff1"])
+
+                elif key.startswith("defendant") and key.endswith("_statement"):
+                    i = key.replace("defendant", "").replace("_statement", "")
+                    statement_key = f"defendant{i} Statement"
+                    memo_data[statement_key] = safe_generate(
+                        generate_defendant_statement,
+                        data.get("party_info", "") + "\n\n" + data.get("settlement_summary", ""),
+                        data.get(f"defendant{i}", "")
+                    )
+
+                elif key == "demand":
+                    memo_data[key] = safe_generate(generate_demand_section, data["settlement_summary"], data["plaintiff1"])
+
+                elif key == "facts_liability":
+                    memo_data[key] = safe_generate(generate_facts_liability_section, data["complaint_narrative"], data["deposition_liability"])
+
+                elif key == "causation_injuries":
+                    memo_data[key] = safe_generate(generate_causation_injuries, data["medical_summary"])
+
+                elif key == "additional_harms":
+                    memo_data[key] = safe_generate(generate_additional_harms, data["medical_summary"], data["deposition_damages"])
+
+                elif key == "future_bills":
+                    memo_data[key] = safe_generate(generate_future_medical, data["medical_summary"], data["deposition_damages"])
+
+                elif key == "conclusion":
+                    memo_data[key] = safe_generate(generate_conclusion_section, data["settlement_summary"])
+
+                progress_bar.progress((idx + 1) / total)
+
+            file_path = fill_mediation_template(data | memo_data, template_path, output_dir)
+
+            with open(file_path, "rb") as f:
+                st.success("✅ Mediation memo generated!")
+                st.download_button("📂 Download Mediation Memo", f, file_name=os.path.basename(file_path))
+
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
 
 
 if tool == "📖 Instructions & Support":
