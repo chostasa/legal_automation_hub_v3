@@ -717,6 +717,10 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
                         "all_quotes_pool": deposition_liability + "\n\n" + deposition_damages,
                     }
 
+                    # ✅ Explicitly include formatted quotes for inline memo embedding
+                    data["liability_quotes"] = deposition_liability
+                    data["damages_quotes"] = deposition_damages
+
                     template_path = "templates/mediation_template.docx"
 
                     from scripts.run_mediation import (

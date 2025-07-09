@@ -823,10 +823,9 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     )
     time.sleep(20)
 
-    quotes_dict = generate_quotes_in_chunks(text_chunks, delay_seconds=20)
     trimmed_medical_summary = trim_to_token_limit(data.get("medical_summary", ""), 10000)
-    liability_quotes = format_quotes_for_embedding(quotes_dict["liability_quotes"])
-    damages_quotes = format_quotes_for_embedding(quotes_dict["damages_quotes"])
+    liability_quotes = data.get("liability_quotes", "")
+    damages_quotes = data.get("damages_quotes", "")
 
 
     memo_data["facts_liability"] = polish_text_for_legal_memo(
