@@ -687,6 +687,7 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
                 st.text_area("Auto-Generated Paragraph", result, height=150, key=f"preview_defendant{i}")
 
         submitted = st.form_submit_button("📂 Generate Memo")
+        if submitted:
     
     # === Memo Generation ===
     if submitted:
