@@ -722,36 +722,40 @@ def generate_memo_from_summary(data, template_path, output_dir, text_chunks):
     )
     time.sleep(20)
 
-    # Handle up to 3 plaintiffs
-    for i in range(2, 4):
+    # === Handle Plaintiffs ===
+    for i in range(1, 4):
         name = data.get(f"plaintiff{i}", "").strip()
         if name:
-            memo_data[f"plaintiff{i}"] = name
             party_input = (
                 trim_to_token_limit(data.get("party_information_from_complaint", ""), 3000)
                 + "\n\n"
                 + trim_to_token_limit(data.get("settlement_summary", ""), 2000)
             )
-            memo_data[f"plaintiff{i}_statement"] = safe_generate(
-                generate_plaintiff_statement, party_input, name)
-            time.sleep(20)
+            statement = safe_generate(generate_plaintiff_statement, party_input, name)
+            combined = f"**{name}**\n\n{statement.strip()}"
+        else:
+            combined = ""
 
-    # Handle up to 7 defendants dynamically
+        memo_data[f"{{{{Plaintiff_{i}}}}}"] = combined
+        memo_data[f"plaintiff{i}"] = name
+
+    # === Handle Defendants ===
     for i in range(1, 8):
-        key = f"defendant{i}"
-        name = data.get(key, "")
-        memo_data[key] = name
+        name = data.get(f"defendant{i}", "").strip()
         if name:
             party_input = (
                 trim_to_token_limit(data.get("party_information_from_complaint", ""), 3000)
                 + "\n\n"
                 + trim_to_token_limit(data.get("settlement_summary", ""), 2000)
             )
-            memo_data[f"{key}_statement"] = safe_generate(
-                generate_defendant_statement, party_input, name)
-            time.sleep(20)
+            statement = safe_generate(generate_defendant_statement, party_input, name)
+            combined = f"**{name}**\n\n{statement.strip()}"
         else:
-            memo_data[f"{key}_statement"] = ""
+            combined = ""
+
+        memo_data[f"{{{{Defendant_{i}}}}}"] = combined
+        memo_data[f"defendant{i}"] = name
+
 
  # Main body content
     memo_data["introduction"] = polish_text_for_legal_memo(
