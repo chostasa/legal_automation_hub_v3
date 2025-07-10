@@ -24,6 +24,18 @@ from scripts.run_mediation import (
     chunk_text                    
 )
 
+used_quotes = set()
+
+def get_unique_quotes(quotes, count=3):
+    selected = []
+    for quote in quotes.splitlines():
+        quote = quote.strip()
+        if quote and quote not in used_quotes:
+            selected.append(quote)
+            used_quotes.add(quote)
+        if len(selected) == count:
+            break
+    return "\n".join(selected)
 
 import pandas as pd
 import os
@@ -670,6 +682,9 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
 
         deposition_liability = "\n\n".join(st.session_state.quote_outputs["Liability"])
         deposition_damages = "\n\n".join(st.session_state.quote_outputs["Damages"])
+
+        unique_liability_quotes = get_unique_quotes(deposition_liability)
+        unique_damages_quotes = get_unique_quotes(deposition_damages)
 
         action = st.radio("Choose Action", ["🔍 Preview Party Paragraphs", "📂 Generate Memo"])
         submitted = st.form_submit_button("Submit")
