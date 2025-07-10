@@ -802,7 +802,9 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
 
                     total = len(steps)
                     for idx, (text, key) in enumerate(steps):
-                        progress_text.text(text)
+                        progress = (idx + 1) / total
+                        progress_text.text(f"{text} ({int(progress * 100)}%)")
+                        progress_bar.progress(progress)
 
                         if key == "introduction":
                             memo_data[key] = safe_generate(generate_introduction, data["complaint_narrative"], data["plaintiff1"])
@@ -839,9 +841,14 @@ Extract only **relevant Q&A quote pairs** that support **either LIABILITY or DAM
                         elif key == "conclusion":
                             memo_data[key] = safe_generate(generate_conclusion_section, data["settlement_summary"])
 
+                # ✅ Save the final document
+                output_path = fill_mediation_template(memo_data, template_path, output_dir)
+                st.session_state.generated_file_path = output_path
+                st.success("✅ Mediation memo generated successfully!")
 
-                except Exception as e:
-                    st.error(f"❌ Error: {e}")
+        except Exception as e:
+            st.error(f"❌ Error: {e}")
+
 
 if "generated_file_path" in st.session_state:
     with open(st.session_state.generated_file_path, "rb") as f:
