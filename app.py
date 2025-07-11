@@ -525,7 +525,12 @@ if tool == "📊 Litigation Dashboard":
 
     try:
         # Authenticate with Dropbox using your secret token
-        dbx = dropbox.Dropbox(st.secrets["dropbox_token"])
+        dbx = dropbox.Dropbox(
+            oauth2_refresh_token=st.secrets["dropbox_refresh_token"],
+            app_key=st.secrets["dropbox_app_key"],
+            app_secret=st.secrets["dropbox_app_secret"]
+        )
+
         file_path = "/Master Dashboard.xlsx"
         metadata, res = dbx.files_download(file_path)
         df = pd.read_excel(BytesIO(res.content), sheet_name="Master Dashboard")
