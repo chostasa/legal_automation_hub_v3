@@ -411,7 +411,6 @@ if tool == "📄 Batch Doc Generator":
         st.markdown("**📄 Preview Filename for First Row:**")
         st.code(preview_filename)
 
-        left, right = "{{", "}}"
         with tempfile.TemporaryDirectory() as temp_dir:
             word_dir = os.path.join(temp_dir, "Word Documents", doc_type)
             os.makedirs(word_dir, exist_ok=True)
@@ -445,23 +444,17 @@ if tool == "📄 Batch Doc Generator":
                         arcname = os.path.relpath(full_path, temp_dir)
                         zip_out.write(full_path, arcname=arcname)
 
-
             st.success("✅ Word documents generated!")
+            import uuid
+            unique_key = str(uuid.uuid4())
             st.download_button(
                 label="📦 Download All (Word Only – PDF not supported on Streamlit Cloud)",
                 data=zip_buffer.getvalue(),
                 file_name="word_documents.zip",
                 mime="application/zip",
-                import uuid
-                unique_key = str(uuid.uuid4())
+                key=f"download_zip_{unique_key}"
+            )
 
-                st.download_button(
-                    label="📦 Download All (Word Only – PDF not supported on Streamlit Cloud)",
-                    data=zip_buffer.getvalue(),
-                    file_name="word_documents.zip",
-                    mime="application/zip",
-                    key=f"download_zip_{unique_key}"
-                )
 
     if template_mode == "Upload New Template":
         uploaded_templates = st.file_uploader("Upload One or More .docx Templates", type="docx", accept_multiple_files=True)
