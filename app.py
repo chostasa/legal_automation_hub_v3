@@ -354,103 +354,83 @@ if tool == "📄 Batch Doc Generator":
     st.subheader("📟 Template Manager")
     template_mode = st.radio("Choose an action:", ["Upload New Template", "Select a Saved Template", "Template Options"])
 
-from docx.oxml import parse_xml
+    def process_and_preview(template_path, df, output_name_format):
+        # === Clean up data ===
+        df = df.copy()
 
-def replace_text_in_shapes(doc, replacements):
-    """
-    Replaces {{placeholders}} inside text boxes (shapes) in a Word doc.
-    """
-    for shape in doc.inline_shapes:
-        xml = shape._inline.xml
-        for key, val in replacements.items():
-            placeholder = f"{{{{{key}}}}}"
-            if placeholder in xml:
-                xml = xml.replace(placeholder, str(val))
-        shape._inline = parse_xml(xml)
+        # Format DOBs if present
+        if "DOB" in df.columns:
+            df["DOB"] = pd.to_datetime(df["DOB"], errors="coerce").dt.strftime("%m/%d/%Y")
+
+        # Replace NaN in all columns with blank strings
+        df = df.fillna("")
+
+        st.subheader("🔍 Preview First Row of Excel Data")
+        st.dataframe(df.head(1))
+
+        st.markdown("**Columns in Excel:**")
+        st.code(", ".join(df.columns))
+
+        preview_filename = output_name_format
+        for key, val in df.iloc[0].items():
+            preview_filename = preview_filename.replace(f"{{{{{key}}}}}", str(val))
+        st.markdown("**📄 Preview Filename for First Row:**")
+        st.code(preview_filename)
+
+        left, right = "{{", "}}"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            word_dir = os.path.join(temp_dir, "Word Documents")
+            os.makedirs(word_dir)
+
+            for idx, row in df.iterrows():
+                row = row.fillna("").to_dict()
+
+                for k, v in row.items():
+                    if isinstance(v, (pd.Timestamp, datetime)):
+                        row[k] = v.strftime("%m/%d/%Y")
+
+                doc = Document(template_path)
+
+                for para in doc.paragraphs:
+                    for key, val in row.items():
+                        placeholder = f"{left}{key}{right}"
+                        if placeholder in para.text:
+                            inline = para.runs
+                            for i in range(len(inline)):
+                                inline[i].text = inline[i].text.replace(placeholder, str(val))
 
 
-def process_and_preview(template_path, df, output_name_format):
-    # === Clean up data ===
-    df = df.copy()
+                for table in doc.tables:
+                    for cell in table._cells:
+                        for para in cell.paragraphs:
+                            for run in para.runs:
+                                for key, val in row.items():
+                                    placeholder = f"{left}{key}{right}"
+                                    if placeholder in run.text:
+                                        run.text = run.text.replace(placeholder, str(val))
 
-    # Format DOBs if present
-    if "DOB" in df.columns:
-        df["DOB"] = pd.to_datetime(df["DOB"], errors="coerce").dt.strftime("%m/%d/%Y")
-
-    # Replace NaN in all columns with blank strings
-    df = df.fillna("")
-
-    st.subheader("🔍 Preview First Row of Excel Data")
-    st.dataframe(df.head(1))
-
-    st.markdown("**Columns in Excel:**")
-    st.code(", ".join(df.columns))
-
-    preview_filename = output_name_format
-    for key, val in df.iloc[0].items():
-        preview_filename = preview_filename.replace(f"{{{{{key}}}}}", str(val))
-    st.markdown("**📄 Preview Filename for First Row:**")
-    st.code(preview_filename)
-
-    left, right = "{{", "}}"
-    with tempfile.TemporaryDirectory() as temp_dir:
-        word_dir = os.path.join(temp_dir, "Word Documents")
-        os.makedirs(word_dir)
-
-        for idx, row in df.iterrows():
-            row = row.fillna("").to_dict()
-
-            for k, v in row.items():
-                if isinstance(v, (pd.Timestamp, datetime)):
-                    row[k] = v.strftime("%m/%d/%Y")
-
-            doc = Document(template_path)
-
-            for para in doc.paragraphs:
+                name_for_file = output_name_format
                 for key, val in row.items():
-                    placeholder = f"{left}{key}{right}"
-                    if placeholder in para.text:
-                        inline = para.runs
-                        for i in range(len(inline)):
-                            inline[i].text = inline[i].text.replace(placeholder, str(val))
+                    name_for_file = name_for_file.replace(f"{left}{key}{right}", str(val))
+                filename = name_for_file + ".docx"
 
-            # Replace in table cells
-            for table in doc.tables:
-                for cell in table._cells:
-                    for para in cell.paragraphs:
-                        full_text = para.text
-                        for key, val in row.items():
-                            placeholder = f"{left}{key}{right}"
-                            full_text = full_text.replace(placeholder, str(val))
-                        if para.text != full_text:
-                            para.clear()
-                            para.add_run(full_text)
+                doc_path = os.path.join(word_dir, filename)
+                doc.save(doc_path)
 
-            # 🔁 Replace in text boxes (shapes)
-            replace_text_in_shapes(doc, row)
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w") as zip_out:
+                for file in os.listdir(word_dir):
+                    full_path = os.path.join(word_dir, file)
+                    arcname = os.path.join("Word Documents", file)
+                    zip_out.write(full_path, arcname=arcname)
 
-            name_for_file = output_name_format
-            for key, val in row.items():
-                name_for_file = name_for_file.replace(f"{left}{key}{right}", str(val))
-            filename = name_for_file + ".docx"
-
-            doc_path = os.path.join(word_dir, filename)
-            doc.save(doc_path)
-
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, "w") as zip_out:
-            for file in os.listdir(word_dir):
-                full_path = os.path.join(word_dir, file)
-                arcname = os.path.join("Word Documents", file)
-                zip_out.write(full_path, arcname=arcname)
-
-        st.success("✅ Word documents generated!")
-        st.download_button(
-            label="📦 Download All (Word Only – PDF not supported on Streamlit Cloud)",
-            data=zip_buffer.getvalue(),
-            file_name="word_documents.zip",
-            mime="application/zip"
-        )
+            st.success("✅ Word documents generated!")
+            st.download_button(
+                label="📦 Download All (Word Only – PDF not supported on Streamlit Cloud)",
+                data=zip_buffer.getvalue(),
+                file_name="word_documents.zip",
+                mime="application/zip"
+            )
 
     if template_mode == "Upload New Template":
         uploaded_template = st.file_uploader("Upload a .docx Template", type="docx")
@@ -997,3 +977,5 @@ st.markdown("""
 &copy; 2025 Stinar Gould Grieco & Hensley. All rights reserved.
 </div>
 """, unsafe_allow_html=True)
+
+
