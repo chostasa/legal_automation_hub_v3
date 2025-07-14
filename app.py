@@ -48,7 +48,28 @@ from docx import Document
 from datetime import datetime
 from users import USERS, hash_password
 
+from lxml import etree
+import zipfile
 
+def replace_text_in_docx_textboxes(docx_path, replacements, save_path):
+    with zipfile.ZipFile(docx_path, 'r') as zin:
+        temp_zip = zipfile.ZipFile(save_path, 'w')
+        for item in zin.infolist():
+            buffer = zin.read(item.filename)
+            if item.filename == 'word/document.xml':
+                xml = etree.fromstring(buffer)
+                ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+
+                for node in xml.xpath('//w:txbxContent//w:t', namespaces=ns):
+                    text = node.text
+                    if text:
+                        for key, val in replacements.items():
+                            text = text.replace(f'{{{{{key}}}}}', str(val))
+                        node.text = text
+
+                buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
+            temp_zip.writestr(item, buffer)
+        temp_zip.close()
 
 import time
 import openai
@@ -342,7 +363,7 @@ if tool == "📄 Batch Doc Generator":
 
     st.markdown("""
     > **How it works:**  
-    > 1. Upload a template with {placeholders}  
+    > 1. Upload one or more templates with {{placeholders}}  
     > 2. Upload Excel with matching column headers  
     > 3. Enter filename format, generate, and download
 
@@ -351,23 +372,36 @@ if tool == "📄 Batch Doc Generator":
     🔐 No coding required
     """)
 
-    st.subheader("📟 Template Manager")
+    st.subheader("💿 Template Manager")
     template_mode = st.radio("Choose an action:", ["Upload New Template", "Select a Saved Template", "Template Options"])
 
-    def process_and_preview(template_path, df, output_name_format):
-        # === Clean up data ===
-        df = df.copy()
+    def replace_text_in_docx_textboxes(docx_path, replacements, save_path):
+        from lxml import etree
+        with zipfile.ZipFile(docx_path, 'r') as zin:
+            temp_zip = zipfile.ZipFile(save_path, 'w')
+            for item in zin.infolist():
+                buffer = zin.read(item.filename)
+                if item.filename == 'word/document.xml':
+                    xml = etree.fromstring(buffer)
+                    ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+                    for node in xml.xpath('//w:txbxContent//w:t', namespaces=ns):
+                        text = node.text
+                        if text:
+                            for key, val in replacements.items():
+                                text = text.replace(f'{{{{{key}}}}}', str(val))
+                            node.text = text
+                    buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
+                temp_zip.writestr(item, buffer)
+            temp_zip.close()
 
-        # Format DOBs if present
+    def process_and_preview(template_paths, df, output_name_format):
+        df = df.copy()
         if "DOB" in df.columns:
             df["DOB"] = pd.to_datetime(df["DOB"], errors="coerce").dt.strftime("%m/%d/%Y")
-
-        # Replace NaN in all columns with blank strings
         df = df.fillna("")
 
         st.subheader("🔍 Preview First Row of Excel Data")
         st.dataframe(df.head(1))
-
         st.markdown("**Columns in Excel:**")
         st.code(", ".join(df.columns))
 
@@ -382,40 +416,26 @@ if tool == "📄 Batch Doc Generator":
             word_dir = os.path.join(temp_dir, "Word Documents")
             os.makedirs(word_dir)
 
-            for idx, row in df.iterrows():
-                row = row.fillna("").to_dict()
+            for template_path in template_paths:
+                for idx, row in df.iterrows():
+                    row = row.fillna("").to_dict()
+                    for k, v in row.items():
+                        if isinstance(v, (pd.Timestamp, datetime)):
+                            row[k] = v.strftime("%m/%d/%Y")
 
-                for k, v in row.items():
-                    if isinstance(v, (pd.Timestamp, datetime)):
-                        row[k] = v.strftime("%m/%d/%Y")
-
-                doc = Document(template_path)
-
-                for para in doc.paragraphs:
+                    name_for_file = output_name_format
                     for key, val in row.items():
-                        placeholder = f"{left}{key}{right}"
-                        if placeholder in para.text:
-                            inline = para.runs
-                            for i in range(len(inline)):
-                                inline[i].text = inline[i].text.replace(placeholder, str(val))
+                        name_for_file = name_for_file.replace(f"{{{{{key}}}}}", str(val))
 
+                    template_basename = os.path.splitext(os.path.basename(template_path))[0]
+                    filename = f"{name_for_file}_{template_basename}.docx"
+                    output_path = os.path.join(word_dir, filename)
 
-                for table in doc.tables:
-                    for cell in table._cells:
-                        for para in cell.paragraphs:
-                            for run in para.runs:
-                                for key, val in row.items():
-                                    placeholder = f"{left}{key}{right}"
-                                    if placeholder in run.text:
-                                        run.text = run.text.replace(placeholder, str(val))
+                    temp_template_path = os.path.join(temp_dir, f"temp_{idx}_{template_basename}.docx")
+                    with open(template_path, "rb") as src, open(temp_template_path, "wb") as dst:
+                        dst.write(src.read())
 
-                name_for_file = output_name_format
-                for key, val in row.items():
-                    name_for_file = name_for_file.replace(f"{left}{key}{right}", str(val))
-                filename = name_for_file + ".docx"
-
-                doc_path = os.path.join(word_dir, filename)
-                doc.save(doc_path)
+                    replace_text_in_docx_textboxes(temp_template_path, row, output_path)
 
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, "w") as zip_out:
@@ -433,7 +453,7 @@ if tool == "📄 Batch Doc Generator":
             )
 
     if template_mode == "Upload New Template":
-        uploaded_template = st.file_uploader("Upload a .docx Template", type="docx")
+        uploaded_templates = st.file_uploader("Upload One or More .docx Templates", type="docx", accept_multiple_files=True)
         campaign_name = st.selectbox("🏷️ Select Campaign for This Template", CAMPAIGN_OPTIONS)
         doc_type = st.text_input("📄 Enter Document Type (e.g., HIPAA, Notice, Demand)")
         excel_file = st.file_uploader("Upload Excel Data (.xlsx)", type="xlsx", key="excel_upload_new")
@@ -441,6 +461,7 @@ if tool == "📄 Batch Doc Generator":
 
         if uploaded_template and campaign_name and doc_type:
             if st.button("Save and Generate"):
+                for uploaded_template in uploaded_templates:
                 campaign_safe = campaign_name.replace(" ", "").replace("/", "-")
                 doc_type_safe = doc_type.replace(" ", "")
                 base_name = f"TEMPLATE_{doc_type_safe}_{campaign_safe}"
