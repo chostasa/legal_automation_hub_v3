@@ -53,6 +53,16 @@ import zipfile
 import re
 
 def replace_text_in_docx_all(docx_path, replacements, save_path):
+    from lxml import etree
+    import re
+    import zipfile
+
+    def smart_replace(text, replacements):
+        for key, val in replacements.items():
+            # Replace with optional whitespace inside {{ }}
+            text = re.sub(rf"\{{\{{\s*{re.escape(key)}\s*\}}\}}", str(val), text)
+        return text
+
     with zipfile.ZipFile(docx_path, 'r') as zin:
         with zipfile.ZipFile(save_path, 'w') as zout:
             for item in zin.infolist():
@@ -61,25 +71,9 @@ def replace_text_in_docx_all(docx_path, replacements, save_path):
                     xml = etree.fromstring(buffer)
                     ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 
-                    # Get all <w:t> elements
-                    text_elements = xml.xpath('//w:t', namespaces=ns)
-
-                    # Join all text values into a single string and track node positions
-                    full_text = ''
-                    node_positions = []
-                    for i, node in enumerate(text_elements):
-                        node_text = node.text or ''
-                        node_positions.append((i, len(full_text), len(full_text) + len(node_text)))
-                        full_text += node_text
-
-                    # Replace placeholders in the full text
-                    for key, val in replacements.items():
-                        full_text = full_text.replace(f'{{{{{key}}}}}', str(val))
-
-                    # Rewrite the modified text back into original nodes
-                    for i, (node_index, start, end) in enumerate(node_positions):
-                        text_chunk = full_text[start:end]
-                        text_elements[node_index].text = text_chunk
+                    for node in xml.xpath('//w:t', namespaces=ns):
+                        text = node.text or ''
+                        node.text = smart_replace(text, replacements)
 
                     buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
                 zout.writestr(item, buffer)
