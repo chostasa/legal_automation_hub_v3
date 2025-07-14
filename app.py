@@ -394,9 +394,11 @@ if tool == "📄 Batch Doc Generator":
                 for para in doc.paragraphs:
                     for key, val in row.items():
                         placeholder = f"{left}{key}{right}"
-                        for run in para.runs:
-                            if placeholder in run.text:
-                                run.text = run.text.replace(placeholder, str(val))
+                        if placeholder in para.text:
+                            inline = para.runs
+                            for i in range(len(inline)):
+                                inline[i].text = inline[i].text.replace(placeholder, str(val))
+
 
                 for table in doc.tables:
                     for cell in table._cells:
