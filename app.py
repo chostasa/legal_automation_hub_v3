@@ -50,44 +50,27 @@ from users import USERS, hash_password
 
 from lxml import etree
 import zipfile
-import re
 
 def replace_text_in_docx_all(docx_path, replacements, save_path):
-    from lxml import etree
-    import zipfile
-
     with zipfile.ZipFile(docx_path, 'r') as zin:
-        with zipfile.ZipFile(save_path, 'w') as zout:
-            for item in zin.infolist():
-                data = zin.read(item.filename)
+        temp_zip = zipfile.ZipFile(save_path, 'w')
+        for item in zin.infolist():
+            buffer = zin.read(item.filename)
+            if item.filename == 'word/document.xml':
+                xml = etree.fromstring(buffer)
+                ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 
-                if item.filename == 'word/document.xml':
-                    xml = etree.fromstring(data)
-                    ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+                # Replace in ALL text nodes, not just textboxes
+                for node in xml.xpath('//w:t', namespaces=ns):
+                    text = node.text
+                    if text:
+                        for key, val in replacements.items():
+                            text = text.replace(f'{{{{{key}}}}}', str(val))
+                        node.text = text
 
-                    # Get all <w:t> nodes
-                    text_nodes = xml.xpath('//w:t', namespaces=ns)
-                    full_text = ''.join([node.text or '' for node in text_nodes])
-
-                    # Replace placeholders
-                    for key, val in replacements.items():
-                        full_text = full_text.replace(f'{{{{{key}}}}}', str(val))
-
-                    # Redistribute updated text back across original nodes
-                    offset = 0
-                    for node in text_nodes:
-                        if node.text is None:
-                            continue
-                        original_length = len(node.text)
-                        node.text = full_text[offset:offset + original_length]
-                        offset += original_length
-
-                    data = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
-
-                zout.writestr(item, data)
-
-
-
+                buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
+            temp_zip.writestr(item, buffer)
+        temp_zip.close()
 
 import time
 import openai
@@ -396,35 +379,21 @@ if tool == "📄 Batch Doc Generator":
     def replace_text_in_docx_all(docx_path, replacements, save_path):
         from lxml import etree
         with zipfile.ZipFile(docx_path, 'r') as zin:
-            with zipfile.ZipFile(save_path, 'w') as zout:
-                for item in zin.infolist():
-                    buffer = zin.read(item.filename)
-                    if item.filename == 'word/document.xml':
-                        xml = etree.fromstring(buffer)
-                        ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
-
-                        # Collect all <w:t> elements
-                        text_elements = xml.xpath('//w:t', namespaces=ns)
-
-                        # Join all text into one string
-                        full_text = ''
-                        node_map = []
-                        for i, node in enumerate(text_elements):
-                            val = node.text or ''
-                            node_map.append((i, len(full_text), len(full_text) + len(val)))
-                            full_text += val
-
-                        # Replace in the full string
-                        for key, val in replacements.items():
-                            full_text = full_text.replace(f'{{{{{key}}}}}', str(val))
-
-                        # Redistribute replaced text back into nodes
-                        for i, (node_idx, start, end) in enumerate(node_map):
-                            chunk = full_text[start:end]
-                            text_elements[node_idx].text = chunk
-
-                        buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
-                    zout.writestr(item, buffer)
+            temp_zip = zipfile.ZipFile(save_path, 'w')
+            for item in zin.infolist():
+                buffer = zin.read(item.filename)
+                if item.filename == 'word/document.xml':
+                    xml = etree.fromstring(buffer)
+                    ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+                    for node in xml.xpath('//w:t', namespaces=ns):
+                        text = node.text
+                        if text:
+                            for key, val in replacements.items():
+                                text = text.replace(f'{{{{{key}}}}}', str(val))
+                            node.text = text
+                    buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
+                temp_zip.writestr(item, buffer)
+            temp_zip.close()
 
     def process_and_zip_docs(template_paths, df, output_name_format):
         df = df.fillna("")
