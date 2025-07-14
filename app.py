@@ -53,38 +53,37 @@ import zipfile
 import re
 
 def replace_text_in_docx_all(docx_path, replacements, save_path):
-    import zipfile
     from lxml import etree
+    import zipfile
 
     with zipfile.ZipFile(docx_path, 'r') as zin:
         with zipfile.ZipFile(save_path, 'w') as zout:
             for item in zin.infolist():
-                buffer = zin.read(item.filename)
+                data = zin.read(item.filename)
 
                 if item.filename == 'word/document.xml':
-                    xml = etree.fromstring(buffer)
+                    xml = etree.fromstring(data)
                     ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+
+                    # Get all <w:t> elements in order
                     text_nodes = xml.xpath('//w:t', namespaces=ns)
+                    full_text = ''.join([node.text or '' for node in text_nodes])
 
-                    # Step 1: Build full text and track node positions
-                    full_text = ''
-                    node_map = []
-                    for i, node in enumerate(text_nodes):
-                        text = node.text or ''
-                        node_map.append((i, len(full_text), len(full_text) + len(text)))
-                        full_text += text
-
-                    # Step 2: Apply replacements in full string
+                    # Replace all placeholders in the full string
                     for key, val in replacements.items():
                         full_text = full_text.replace(f'{{{{{key}}}}}', str(val))
 
-                    # Step 3: Write replaced chunks back into original nodes
-                    for i, (node_idx, start, end) in enumerate(node_map):
-                        text_nodes[node_idx].text = full_text[start:end]
+                    # Now redistribute full_text back into the <w:t> nodes
+                    offset = 0
+                    for node in text_nodes:
+                        original_len = len(node.text or '')
+                        node.text = full_text[offset:offset+original_len]
+                        offset += original_len
 
-                    buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
+                    data = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
 
-                zout.writestr(item, buffer)
+                zout.writestr(item, data)
+
 
 
 import time
