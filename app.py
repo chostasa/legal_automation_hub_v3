@@ -448,12 +448,15 @@ if tool == "📄 Batch Doc Generator":
             if st.button("Save and Generate"):
                 saved_paths = []
                 for uploaded_template in uploaded_templates:
-                    base_name = f"TEMPLATE_{doc_type.replace(' ', '')}_{campaign_name.replace(' ', '').replace('/', '-')}"
-                    version = 1
-                    while os.path.exists(os.path.join(TEMPLATE_FOLDER, f"{base_name}_v{version}.docx")):
-                        version += 1
-                    filename = f"{base_name}_v{version}.docx"
+                    original_name = uploaded_template.name
+                    filename = original_name.replace("/", "-").replace("\\", "-")  # sanitize filename if needed
                     save_path = os.path.join(TEMPLATE_FOLDER, filename)
+
+                    if os.path.exists(save_path):
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        filename = f"{os.path.splitext(original_name)[0]}_{timestamp}.docx"
+                        save_path = os.path.join(TEMPLATE_FOLDER, filename)
+
                     with open(save_path, "wb") as f:
                         f.write(uploaded_template.read())
                     saved_paths.append(save_path)
