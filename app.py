@@ -65,7 +65,7 @@ def replace_text_in_docx_all(docx_path, replacements, save_path):
                     text = node.text
                     if text:
                         for key, val in replacements.items():
-                            text = text.replace(f'{{{{{key}}}}}', str(val))
+                            text = text.replace(f'xxx{key}xxx', str(val))
                         node.text = text
 
                 buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
