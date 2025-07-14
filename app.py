@@ -372,7 +372,7 @@ if tool == "📄 Batch Doc Generator":
     🔐 No coding required
     """)
 
-    st.subheader("💿 Template Manager")
+    st.subheader("📏 Template Manager")
     template_mode = st.radio("Choose an action:", ["Upload New Template", "Select a Saved Template", "Template Options"])
 
     def replace_text_in_docx_textboxes(docx_path, replacements, save_path):
@@ -411,7 +411,6 @@ if tool == "📄 Batch Doc Generator":
         st.markdown("**📄 Preview Filename for First Row:**")
         st.code(preview_filename)
 
-        left, right = "{{", "}}"
         with tempfile.TemporaryDirectory() as temp_dir:
             word_dir = os.path.join(temp_dir, "Word Documents")
             os.makedirs(word_dir)
@@ -452,26 +451,33 @@ if tool == "📄 Batch Doc Generator":
                 mime="application/zip"
             )
 
-    if uploaded_templates and campaign_name and doc_type:
-        if st.button("Save and Generate"):
-            for uploaded_template in uploaded_templates:
-                campaign_safe = campaign_name.replace(" ", "").replace("/", "-")
-                doc_type_safe = doc_type.replace(" ", "")
-                base_name = f"TEMPLATE_{doc_type_safe}_{campaign_safe}"
-                version = 1
-                while os.path.exists(os.path.join(TEMPLATE_FOLDER, f"{base_name}_v{version}.docx")):
-                    version += 1
-                final_filename = f"{base_name}_v{version}.docx"
-                save_path = os.path.join(TEMPLATE_FOLDER, final_filename)
+    if template_mode == "Upload New Template":
+        uploaded_templates = st.file_uploader("Upload One or More .docx Templates", type="docx", accept_multiple_files=True)
+        campaign_name = st.selectbox("🏷️ Select Campaign for This Template", CAMPAIGN_OPTIONS)
+        doc_type = st.text_input("📄 Enter Document Type (e.g., HIPAA, Notice, Demand)")
+        excel_file = st.file_uploader("Upload Excel Data (.xlsx)", type="xlsx", key="excel_upload_new")
+        output_name_format = st.text_input("Enter filename format (e.g., HIPAA Notice ({{Client Name}}))")
 
-                with open(save_path, "wb") as f:
-                    f.write(uploaded_template.read())
+        if uploaded_templates and campaign_name and doc_type:
+            if st.button("Save and Generate"):
+                for uploaded_template in uploaded_templates:
+                    campaign_safe = campaign_name.replace(" ", "").replace("/", "-")
+                    doc_type_safe = doc_type.replace(" ", "")
+                    base_name = f"TEMPLATE_{doc_type_safe}_{campaign_safe}"
+                    version = 1
+                    while os.path.exists(os.path.join(TEMPLATE_FOLDER, f"{base_name}_v{version}.docx")):
+                        version += 1
+                    final_filename = f"{base_name}_v{version}.docx"
+                    save_path = os.path.join(TEMPLATE_FOLDER, final_filename)
 
-                st.success(f"✅ Saved as {final_filename}")
+                    with open(save_path, "wb") as f:
+                        f.write(uploaded_template.read())
 
-                if excel_file and output_name_format:
-                    df = pd.read_excel(excel_file)
-                    process_and_preview([save_path], df, output_name_format)
+                    st.success(f"✅ Saved as {final_filename}")
+
+                    if excel_file and output_name_format:
+                        df = pd.read_excel(excel_file)
+                        process_and_preview([save_path], df, output_name_format)
 
     elif template_mode == "Select a Saved Template":
         st.subheader("📂 Select a Saved Template")
@@ -496,7 +502,7 @@ if tool == "📄 Batch Doc Generator":
         if st.button("Generate Documents"):
             if excel_file and output_name_format:
                 df = pd.read_excel(excel_file)
-                process_and_preview(template_path, df, output_name_format)
+                process_and_preview([template_path], df, output_name_format)
 
     elif template_mode == "Template Options":
         st.subheader("⚙️ Template Options")
@@ -530,7 +536,6 @@ if tool == "📄 Batch Doc Generator":
                 os.remove(template_path)
                 st.success(f"✅ Deleted '{template_choice}'")
                 st.rerun()
-
         else:
             st.warning("⚠️ No templates found matching your search.")
 
