@@ -51,7 +51,7 @@ from users import USERS, hash_password
 from lxml import etree
 import zipfile
 
-def replace_text_in_docx_textboxes(docx_path, replacements, save_path):
+def replace_text_in_docx_all(docx_path, replacements, save_path):
     with zipfile.ZipFile(docx_path, 'r') as zin:
         temp_zip = zipfile.ZipFile(save_path, 'w')
         for item in zin.infolist():
@@ -60,7 +60,8 @@ def replace_text_in_docx_textboxes(docx_path, replacements, save_path):
                 xml = etree.fromstring(buffer)
                 ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 
-                for node in xml.xpath('//w:txbxContent//w:t', namespaces=ns):
+                # Replace in ALL text nodes, not just textboxes
+                for node in xml.xpath('//w:t', namespaces=ns):
                     text = node.text
                     if text:
                         for key, val in replacements.items():
