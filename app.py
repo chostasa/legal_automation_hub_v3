@@ -354,6 +354,21 @@ if tool == "📄 Batch Doc Generator":
     st.subheader("📟 Template Manager")
     template_mode = st.radio("Choose an action:", ["Upload New Template", "Select a Saved Template", "Template Options"])
 
+from docx.oxml import parse_xml
+
+def replace_text_in_shapes(doc, replacements):
+    """
+    Replaces {{placeholders}} inside text boxes (shapes) in a Word doc.
+    """
+    for shape in doc.inline_shapes:
+        xml = shape._inline.xml
+        for key, val in replacements.items():
+            placeholder = f"{{{{{key}}}}}"
+            if placeholder in xml:
+                xml = xml.replace(placeholder, str(val))
+        shape._inline = parse_xml(xml)
+
+
     def process_and_preview(template_path, df, output_name_format):
         # === Clean up data ===
         df = df.copy()
@@ -400,14 +415,20 @@ if tool == "📄 Batch Doc Generator":
                                 inline[i].text = inline[i].text.replace(placeholder, str(val))
 
 
+                # Replace in table cells
                 for table in doc.tables:
                     for cell in table._cells:
                         for para in cell.paragraphs:
-                            for run in para.runs:
-                                for key, val in row.items():
-                                    placeholder = f"{left}{key}{right}"
-                                    if placeholder in run.text:
-                                        run.text = run.text.replace(placeholder, str(val))
+                            full_text = para.text
+                            for key, val in row.items():
+                                placeholder = f"{left}{key}{right}"
+                                full_text = full_text.replace(placeholder, str(val))
+                            if para.text != full_text:
+                                para.clear()
+                                para.add_run(full_text)
+
+                # 🔁 Replace in text boxes (shapes)
+                replace_text_in_shapes(doc, row)
 
                 name_for_file = output_name_format
                 for key, val in row.items():
