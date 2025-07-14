@@ -467,7 +467,7 @@ if tool == "📄 Batch Doc Generator":
                     st.download_button(
                         label="📆 Download All Documents (ZIP)",
                         data=zip_bytes,
-                        file_name=f"{folder_name}_documents.zip",
+                        file_name="generated_documents.zip", 
                         mime="application/zip"
                     )
 
