@@ -53,27 +53,39 @@ import zipfile
 import re
 
 def replace_text_in_docx_all(docx_path, replacements, save_path):
-    from lxml import etree
     import zipfile
+    from lxml import etree
 
     with zipfile.ZipFile(docx_path, 'r') as zin:
         with zipfile.ZipFile(save_path, 'w') as zout:
             for item in zin.infolist():
                 buffer = zin.read(item.filename)
+
                 if item.filename == 'word/document.xml':
                     xml = etree.fromstring(buffer)
                     ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+                    text_nodes = xml.xpath('//w:t', namespaces=ns)
 
-                    for node in xml.xpath('//w:t', namespaces=ns):
-                        if node.text:
-                            for key, val in replacements.items():
-                                # This ONLY replaces placeholders fully inside one <w:t>
-                                placeholder = f'{{{{{key}}}}}'
-                                if placeholder in node.text:
-                                    node.text = node.text.replace(placeholder, str(val))
+                    # Step 1: Build full text and track node positions
+                    full_text = ''
+                    node_map = []
+                    for i, node in enumerate(text_nodes):
+                        text = node.text or ''
+                        node_map.append((i, len(full_text), len(full_text) + len(text)))
+                        full_text += text
+
+                    # Step 2: Apply replacements in full string
+                    for key, val in replacements.items():
+                        full_text = full_text.replace(f'{{{{{key}}}}}', str(val))
+
+                    # Step 3: Write replaced chunks back into original nodes
+                    for i, (node_idx, start, end) in enumerate(node_map):
+                        text_nodes[node_idx].text = full_text[start:end]
 
                     buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
+
                 zout.writestr(item, buffer)
+
 
 import time
 import openai
