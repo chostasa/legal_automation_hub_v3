@@ -452,9 +452,16 @@ if tool == "📄 Batch Doc Generator":
                 data=zip_buffer.getvalue(),
                 file_name="word_documents.zip",
                 mime="application/zip",
-                key=f"download_zip_{hash(output_name_format)}"
-            )
+                import uuid
+                unique_key = str(uuid.uuid4())
 
+                st.download_button(
+                    label="📦 Download All (Word Only – PDF not supported on Streamlit Cloud)",
+                    data=zip_buffer.getvalue(),
+                    file_name="word_documents.zip",
+                    mime="application/zip",
+                    key=f"download_zip_{unique_key}"
+                )
 
     if template_mode == "Upload New Template":
         uploaded_templates = st.file_uploader("Upload One or More .docx Templates", type="docx", accept_multiple_files=True)
