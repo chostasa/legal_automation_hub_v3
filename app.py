@@ -376,7 +376,7 @@ if tool == "📄 Batch Doc Generator":
     st.subheader("🔏 Template Manager")
     template_mode = st.radio("Choose an action:", ["Upload New Template", "Select Saved Templates", "Template Options"])
 
-    def replace_text_in_docx_all(docx_path, replacements, save_path):
+    def replace_text_in_docx_textboxes(docx_path, replacements, save_path):
         from lxml import etree
         with zipfile.ZipFile(docx_path, 'r') as zin:
             temp_zip = zipfile.ZipFile(save_path, 'w')
@@ -385,7 +385,7 @@ if tool == "📄 Batch Doc Generator":
                 if item.filename == 'word/document.xml':
                     xml = etree.fromstring(buffer)
                     ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
-                    for node in xml.xpath('//w:t', namespaces=ns):
+                    for node in xml.xpath('//w:txbxContent//w:t', namespaces=ns):
                         text = node.text
                         if text:
                             for key, val in replacements.items():
@@ -405,14 +405,14 @@ if tool == "📄 Batch Doc Generator":
             os.makedirs(word_dir, exist_ok=True)
 
             for idx, row in df.iterrows():
-                row_dict = {str(k): str(v) for k, v in row.to_dict().items()}
+                row_dict = row.to_dict()
                 for k, v in row_dict.items():
                     if isinstance(v, (pd.Timestamp, datetime)):
                         row_dict[k] = v.strftime("%m/%d/%Y")
 
                 folder_name = output_name_format
                 for key, val in row_dict.items():
-                    folder_name = folder_name.replace(f'{{{{{key}}}}}', str(val))
+                    folder_name = folder_name.replace(f"{{{{{key}}}}}", str(val))
                 folder_name = folder_name.strip().replace(" ", "_")
                 folder_path = os.path.join(word_dir, folder_name)
                 os.makedirs(folder_path, exist_ok=True)
@@ -426,7 +426,7 @@ if tool == "📄 Batch Doc Generator":
                     with open(template_path, "rb") as f_in, open(temp_template_path, "wb") as f_out:
                         f_out.write(f_in.read())
 
-                    replace_text_in_docx_all(temp_template_path, row_dict, output_path)
+                    replace_text_in_docx_textboxes(temp_template_path, row_dict, output_path)
 
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_out:
