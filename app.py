@@ -65,7 +65,7 @@ def replace_text_in_docx_all(docx_path, replacements, save_path):
                     text = node.text
                     if text:
                         for key, val in replacements.items():
-                            text = text.replace(f'xxx{key}xxx', str(val))
+                            text = text.replace(f'{{{{{key}}}}}', str(val))
                         node.text = text
 
                 buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
@@ -389,7 +389,7 @@ if tool == "📄 Batch Doc Generator":
                         text = node.text
                         if text:
                             for key, val in replacements.items():
-                                text = text.replace(f'xxx{key}xxx', str(val))
+                                text = text.replace(f'{{{{{key}}}}}', str(val))
                             node.text = text
                     buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
                 temp_zip.writestr(item, buffer)
@@ -412,7 +412,7 @@ if tool == "📄 Batch Doc Generator":
 
                 folder_name = output_name_format
                 for key, val in row_dict.items():
-                    folder_name = folder_name.replace(f'xxx{key}xxx', str(val))
+                    folder_name = folder_name.replace(f'{{{{{key}}}}}', str(val))
                 folder_name = folder_name.strip().replace(" ", "_")
                 folder_path = os.path.join(word_dir, folder_name)
                 os.makedirs(folder_path, exist_ok=True)
