@@ -446,8 +446,8 @@ if tool == "📄 Batch Doc Generator":
             if st.button("Save and Generate"):
                 saved_paths = []
                 for uploaded_template in uploaded_templates:
-                    base_name = f"TEMPLATE_{doc_type.replace(' ', '')}_{campaign_name.replace(' ', '').replace('/', '-')}
-"
+                    base_name = f"TEMPLATE_{doc_type.replace(' ', '')}_{campaign_name.replace(' ', '').replace('/', '-')}"
+
                     version = 1
                     while os.path.exists(os.path.join(TEMPLATE_FOLDER, f"{base_name}_v{version}.docx")):
                         version += 1
