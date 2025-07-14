@@ -65,24 +65,27 @@ def replace_text_in_docx_all(docx_path, replacements, save_path):
                     xml = etree.fromstring(data)
                     ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 
-                    # Get all <w:t> elements in order
+                    # Get all <w:t> nodes
                     text_nodes = xml.xpath('//w:t', namespaces=ns)
                     full_text = ''.join([node.text or '' for node in text_nodes])
 
-                    # Replace all placeholders in the full string
+                    # Replace placeholders
                     for key, val in replacements.items():
                         full_text = full_text.replace(f'{{{{{key}}}}}', str(val))
 
-                    # Now redistribute full_text back into the <w:t> nodes
+                    # Redistribute updated text back across original nodes
                     offset = 0
                     for node in text_nodes:
-                        original_len = len(node.text or '')
-                        node.text = full_text[offset:offset+original_len]
-                        offset += original_len
+                        if node.text is None:
+                            continue
+                        original_length = len(node.text)
+                        node.text = full_text[offset:offset + original_length]
+                        offset += original_length
 
                     data = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
 
                 zout.writestr(item, data)
+
 
 
 
