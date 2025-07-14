@@ -53,15 +53,9 @@ import zipfile
 import re
 
 def replace_text_in_docx_all(docx_path, replacements, save_path):
-    from lxml import etree
     import re
+    from lxml import etree
     import zipfile
-
-    def smart_replace(text, replacements):
-        for key, val in replacements.items():
-            # Replace with optional whitespace inside {{ }}
-            text = re.sub(rf"\{{\{{\s*{re.escape(key)}\s*\}}\}}", str(val), text)
-        return text
 
     with zipfile.ZipFile(docx_path, 'r') as zin:
         with zipfile.ZipFile(save_path, 'w') as zout:
@@ -71,9 +65,21 @@ def replace_text_in_docx_all(docx_path, replacements, save_path):
                     xml = etree.fromstring(buffer)
                     ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 
-                    for node in xml.xpath('//w:t', namespaces=ns):
-                        text = node.text or ''
-                        node.text = smart_replace(text, replacements)
+                    # Collect all <w:t> elements in order
+                    all_nodes = xml.xpath('//w:t', namespaces=ns)
+                    text_chunks = [t.text or '' for t in all_nodes]
+                    combined_text = ''.join(text_chunks)
+
+                    # Replace placeholders in the combined text
+                    for key, val in replacements.items():
+                        combined_text = re.sub(rf'\{{\{{\s*{re.escape(key)}\s*\}}\}}', str(val), combined_text)
+
+                    # Redistribute the modified text across original <w:t> elements
+                    idx = 0
+                    for node in all_nodes:
+                        length = len(node.text or '')
+                        node.text = combined_text[idx:idx+length]
+                        idx += length
 
                     buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
                 zout.writestr(item, buffer)
