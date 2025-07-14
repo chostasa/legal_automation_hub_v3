@@ -394,7 +394,7 @@ if tool == "📄 Batch Doc Generator":
                 temp_zip.writestr(item, buffer)
             temp_zip.close()
 
-    def process_and_preview(template_paths, df, output_name_format):
+    def process_and_preview(template_paths, df, output_name_format, doc_type="Documents"):
         df = df.copy()
         if "DOB" in df.columns:
             df["DOB"] = pd.to_datetime(df["DOB"], errors="coerce").dt.strftime("%m/%d/%Y")
@@ -411,9 +411,10 @@ if tool == "📄 Batch Doc Generator":
         st.markdown("**📄 Preview Filename for First Row:**")
         st.code(preview_filename)
 
+        left, right = "{{", "}}"
         with tempfile.TemporaryDirectory() as temp_dir:
-            word_dir = os.path.join(temp_dir, "Word Documents")
-            os.makedirs(word_dir)
+            word_dir = os.path.join(temp_dir, "Word Documents", doc_type)
+            os.makedirs(word_dir, exist_ok=True)
 
             for template_path in template_paths:
                 for idx, row in df.iterrows():
@@ -438,18 +439,22 @@ if tool == "📄 Batch Doc Generator":
 
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, "w") as zip_out:
-                for file in os.listdir(word_dir):
-                    full_path = os.path.join(word_dir, file)
-                    arcname = os.path.join("Word Documents", file)
-                    zip_out.write(full_path, arcname=arcname)
+                for folder_path, _, files in os.walk(os.path.join(temp_dir, "Word Documents")):
+                    for file in files:
+                        full_path = os.path.join(folder_path, file)
+                        arcname = os.path.relpath(full_path, temp_dir)
+                        zip_out.write(full_path, arcname=arcname)
+
 
             st.success("✅ Word documents generated!")
             st.download_button(
                 label="📦 Download All (Word Only – PDF not supported on Streamlit Cloud)",
                 data=zip_buffer.getvalue(),
                 file_name="word_documents.zip",
-                mime="application/zip"
+                mime="application/zip",
+                key=f"download_zip_{hash(output_name_format)}"
             )
+
 
     if template_mode == "Upload New Template":
         uploaded_templates = st.file_uploader("Upload One or More .docx Templates", type="docx", accept_multiple_files=True)
@@ -477,7 +482,7 @@ if tool == "📄 Batch Doc Generator":
 
                     if excel_file and output_name_format:
                         df = pd.read_excel(excel_file)
-                        process_and_preview([save_path], df, output_name_format)
+                        process_and_preview([save_path], df, output_name_format, doc_type)
 
     elif template_mode == "Select a Saved Template":
         st.subheader("📂 Select a Saved Template")
