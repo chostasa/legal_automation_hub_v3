@@ -452,16 +452,9 @@ if tool == "📄 Batch Doc Generator":
                 mime="application/zip"
             )
 
-    if template_mode == "Upload New Template":
-        uploaded_templates = st.file_uploader("Upload One or More .docx Templates", type="docx", accept_multiple_files=True)
-        campaign_name = st.selectbox("🏷️ Select Campaign for This Template", CAMPAIGN_OPTIONS)
-        doc_type = st.text_input("📄 Enter Document Type (e.g., HIPAA, Notice, Demand)")
-        excel_file = st.file_uploader("Upload Excel Data (.xlsx)", type="xlsx", key="excel_upload_new")
-        output_name_format = st.text_input("Enter filename format (e.g., HIPAA Notice ({{Client Name}}))")
-
-        if uploaded_template and campaign_name and doc_type:
-            if st.button("Save and Generate"):
-                for uploaded_template in uploaded_templates:
+    if uploaded_templates and campaign_name and doc_type:
+        if st.button("Save and Generate"):
+            for uploaded_template in uploaded_templates:
                 campaign_safe = campaign_name.replace(" ", "").replace("/", "-")
                 doc_type_safe = doc_type.replace(" ", "")
                 base_name = f"TEMPLATE_{doc_type_safe}_{campaign_safe}"
@@ -475,9 +468,10 @@ if tool == "📄 Batch Doc Generator":
                     f.write(uploaded_template.read())
 
                 st.success(f"✅ Saved as {final_filename}")
+
                 if excel_file and output_name_format:
                     df = pd.read_excel(excel_file)
-                    process_and_preview(save_path, df, output_name_format)
+                    process_and_preview([save_path], df, output_name_format)
 
     elif template_mode == "Select a Saved Template":
         st.subheader("📂 Select a Saved Template")
