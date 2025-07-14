@@ -166,7 +166,7 @@ if not st.session_state.logged_in:
 
     st.stop()
 else:
-    st.sidebar.markdown(f"**Logged in as:** `{st.session_state.username}`")
+    st.sidebar.markdown(f"**Logged in as:** {st.session_state.username}")
 
 st.markdown("""
 <style>
@@ -342,7 +342,7 @@ if tool == "📄 Batch Doc Generator":
 
     st.markdown("""
     > **How it works:**  
-    > 1. Upload a template with `{placeholders}`  
+    > 1. Upload a template with {placeholders}  
     > 2. Upload Excel with matching column headers  
     > 3. Enter filename format, generate, and download
 
@@ -369,89 +369,88 @@ def replace_text_in_shapes(doc, replacements):
         shape._inline = parse_xml(xml)
 
 
-    def process_and_preview(template_path, df, output_name_format):
-        # === Clean up data ===
-        df = df.copy()
+def process_and_preview(template_path, df, output_name_format):
+    # === Clean up data ===
+    df = df.copy()
 
-        # Format DOBs if present
-        if "DOB" in df.columns:
-            df["DOB"] = pd.to_datetime(df["DOB"], errors="coerce").dt.strftime("%m/%d/%Y")
+    # Format DOBs if present
+    if "DOB" in df.columns:
+        df["DOB"] = pd.to_datetime(df["DOB"], errors="coerce").dt.strftime("%m/%d/%Y")
 
-        # Replace NaN in all columns with blank strings
-        df = df.fillna("")
+    # Replace NaN in all columns with blank strings
+    df = df.fillna("")
 
-        st.subheader("🔍 Preview First Row of Excel Data")
-        st.dataframe(df.head(1))
+    st.subheader("🔍 Preview First Row of Excel Data")
+    st.dataframe(df.head(1))
 
-        st.markdown("**Columns in Excel:**")
-        st.code(", ".join(df.columns))
+    st.markdown("**Columns in Excel:**")
+    st.code(", ".join(df.columns))
 
-        preview_filename = output_name_format
-        for key, val in df.iloc[0].items():
-            preview_filename = preview_filename.replace(f"{{{{{key}}}}}", str(val))
-        st.markdown("**📄 Preview Filename for First Row:**")
-        st.code(preview_filename)
+    preview_filename = output_name_format
+    for key, val in df.iloc[0].items():
+        preview_filename = preview_filename.replace(f"{{{{{key}}}}}", str(val))
+    st.markdown("**📄 Preview Filename for First Row:**")
+    st.code(preview_filename)
 
-        left, right = "{{", "}}"
-        with tempfile.TemporaryDirectory() as temp_dir:
-            word_dir = os.path.join(temp_dir, "Word Documents")
-            os.makedirs(word_dir)
+    left, right = "{{", "}}"
+    with tempfile.TemporaryDirectory() as temp_dir:
+        word_dir = os.path.join(temp_dir, "Word Documents")
+        os.makedirs(word_dir)
 
-            for idx, row in df.iterrows():
-                row = row.fillna("").to_dict()
+        for idx, row in df.iterrows():
+            row = row.fillna("").to_dict()
 
-                for k, v in row.items():
-                    if isinstance(v, (pd.Timestamp, datetime)):
-                        row[k] = v.strftime("%m/%d/%Y")
+            for k, v in row.items():
+                if isinstance(v, (pd.Timestamp, datetime)):
+                    row[k] = v.strftime("%m/%d/%Y")
 
-                doc = Document(template_path)
+            doc = Document(template_path)
 
-                for para in doc.paragraphs:
-                    for key, val in row.items():
-                        placeholder = f"{left}{key}{right}"
-                        if placeholder in para.text:
-                            inline = para.runs
-                            for i in range(len(inline)):
-                                inline[i].text = inline[i].text.replace(placeholder, str(val))
-
-
-                # Replace in table cells
-                for table in doc.tables:
-                    for cell in table._cells:
-                        for para in cell.paragraphs:
-                            full_text = para.text
-                            for key, val in row.items():
-                                placeholder = f"{left}{key}{right}"
-                                full_text = full_text.replace(placeholder, str(val))
-                            if para.text != full_text:
-                                para.clear()
-                                para.add_run(full_text)
-
-                # 🔁 Replace in text boxes (shapes)
-                replace_text_in_shapes(doc, row)
-
-                name_for_file = output_name_format
+            for para in doc.paragraphs:
                 for key, val in row.items():
-                    name_for_file = name_for_file.replace(f"{left}{key}{right}", str(val))
-                filename = name_for_file + ".docx"
+                    placeholder = f"{left}{key}{right}"
+                    if placeholder in para.text:
+                        inline = para.runs
+                        for i in range(len(inline)):
+                            inline[i].text = inline[i].text.replace(placeholder, str(val))
 
-                doc_path = os.path.join(word_dir, filename)
-                doc.save(doc_path)
+            # Replace in table cells
+            for table in doc.tables:
+                for cell in table._cells:
+                    for para in cell.paragraphs:
+                        full_text = para.text
+                        for key, val in row.items():
+                            placeholder = f"{left}{key}{right}"
+                            full_text = full_text.replace(placeholder, str(val))
+                        if para.text != full_text:
+                            para.clear()
+                            para.add_run(full_text)
 
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, "w") as zip_out:
-                for file in os.listdir(word_dir):
-                    full_path = os.path.join(word_dir, file)
-                    arcname = os.path.join("Word Documents", file)
-                    zip_out.write(full_path, arcname=arcname)
+            # 🔁 Replace in text boxes (shapes)
+            replace_text_in_shapes(doc, row)
 
-            st.success("✅ Word documents generated!")
-            st.download_button(
-                label="📦 Download All (Word Only – PDF not supported on Streamlit Cloud)",
-                data=zip_buffer.getvalue(),
-                file_name="word_documents.zip",
-                mime="application/zip"
-            )
+            name_for_file = output_name_format
+            for key, val in row.items():
+                name_for_file = name_for_file.replace(f"{left}{key}{right}", str(val))
+            filename = name_for_file + ".docx"
+
+            doc_path = os.path.join(word_dir, filename)
+            doc.save(doc_path)
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zip_out:
+            for file in os.listdir(word_dir):
+                full_path = os.path.join(word_dir, file)
+                arcname = os.path.join("Word Documents", file)
+                zip_out.write(full_path, arcname=arcname)
+
+        st.success("✅ Word documents generated!")
+        st.download_button(
+            label="📦 Download All (Word Only – PDF not supported on Streamlit Cloud)",
+            data=zip_buffer.getvalue(),
+            file_name="word_documents.zip",
+            mime="application/zip"
+        )
 
     if template_mode == "Upload New Template":
         uploaded_template = st.file_uploader("Upload a .docx Template", type="docx")
@@ -894,7 +893,7 @@ Use this tool to **automatically generate documents in bulk** by merging a Word 
 
 **Step-by-step:**
 1. **Upload a Word Template or Select an Existing Template**
-   - If uploading a new template, use placeholders inside of the document like `{{ClientName}}`, `{{Date}}`, etc.
+   - If uploading a new template, use placeholders inside of the document like {{ClientName}}, {{Date}}, etc.
    - These placeholders should mirror what is at the top of your excel columns
    - Save your template for reuse — it’ll appear in the dropdown.
    - If selecting an existing template, choose 'Select a Saved Template' and search for the existing template. 
@@ -907,8 +906,8 @@ Use this tool to **automatically generate documents in bulk** by merging a Word 
    - View the first row to confirm the placeholder match.
 
 4. **Set Output Filename Format**
-   - Use any column name inside `{{ }}`.
-   - Example: `{{ClientName}}_Notice` → `JohnDoe_Notice.docx`.
+   - Use any column name inside {{ }}.
+   - Example: {{ClientName}}_Notice → JohnDoe_Notice.docx.
 
 5. **Generate Documents**
    - Click “Generate Files.”
