@@ -405,7 +405,7 @@ if tool == "📄 Batch Doc Generator":
             os.makedirs(word_dir, exist_ok=True)
 
             for idx, row in df.iterrows():
-                row_dict = {k.replace("_", " ").title(): v for k, v in row.to_dict().items()}
+                row_dict = {str(k): str(v) for k, v in row.to_dict().items()}
                 for k, v in row_dict.items():
                     if isinstance(v, (pd.Timestamp, datetime)):
                         row_dict[k] = v.strftime("%m/%d/%Y")
