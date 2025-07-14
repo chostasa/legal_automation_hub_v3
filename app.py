@@ -417,11 +417,11 @@ if tool == "📄 Batch Doc Generator":
                 os.makedirs(folder_path, exist_ok=True)
 
                 for template_path in template_paths:
-                    template_base = os.path.splitext(os.path.basename(template_path))[0]
-                    final_filename = f"{template_base}.docx"
+                    template_filename = os.path.basename(template_path)
+                    final_filename = template_filename.replace(".docx", "") + ".docx"
                     output_path = os.path.join(folder_path, final_filename)
 
-                    temp_template_path = os.path.join(temp_dir, f"temp_{template_base}.docx")
+                    temp_template_path = os.path.join(temp_dir, f"temp_{idx}_{template_filename}")
                     with open(template_path, "rb") as f_in, open(temp_template_path, "wb") as f_out:
                         f_out.write(f_in.read())
 
@@ -467,7 +467,7 @@ if tool == "📄 Batch Doc Generator":
                     st.download_button(
                         label="📆 Download All Documents (ZIP)",
                         data=zip_bytes,
-                        file_name="generated_documents.zip",
+                        file_name=f"{folder_name}_documents.zip",
                         mime="application/zip"
                     )
 
