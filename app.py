@@ -373,7 +373,7 @@ if tool == "📄 Batch Doc Generator":
     """)
 
     st.subheader("📏 Template Manager")
-    template_mode = st.radio("Choose an action:", ["Upload New Template", "Select a Saved Template", "Template Options"])
+    template_mode = st.radio("Choose an action:", ["Upload New Template", "Select Saved Templates", "Template Options"])
 
     def replace_text_in_docx_textboxes(docx_path, replacements, save_path):
         from lxml import etree
@@ -394,127 +394,115 @@ if tool == "📄 Batch Doc Generator":
                 temp_zip.writestr(item, buffer)
             temp_zip.close()
 
-    def process_and_preview(template_paths, df, output_name_format, doc_type="Documents"):
-        df = df.copy()
+    def process_and_zip_docs(template_paths, df, output_name_format):
+        df = df.fillna("")
         if "DOB" in df.columns:
             df["DOB"] = pd.to_datetime(df["DOB"], errors="coerce").dt.strftime("%m/%d/%Y")
-        df = df.fillna("")
-
-        st.subheader("🔍 Preview First Row of Excel Data")
-        st.dataframe(df.head(1))
-        st.markdown("**Columns in Excel:**")
-        st.code(", ".join(df.columns))
-
-        preview_filename = output_name_format
-        for key, val in df.iloc[0].items():
-            preview_filename = preview_filename.replace(f"{{{{{key}}}}}", str(val))
-        st.markdown("**📄 Preview Filename for First Row:**")
-        st.code(preview_filename)
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            word_dir = os.path.join(temp_dir, "Word Documents", doc_type)
+            word_dir = os.path.join(temp_dir, "word_docs")
             os.makedirs(word_dir, exist_ok=True)
 
             for template_path in template_paths:
+                template_base = os.path.splitext(os.path.basename(template_path))[0]
                 for idx, row in df.iterrows():
-                    row = row.fillna("").to_dict()
-                    for k, v in row.items():
+                    row_dict = row.to_dict()
+                    for k, v in row_dict.items():
                         if isinstance(v, (pd.Timestamp, datetime)):
-                            row[k] = v.strftime("%m/%d/%Y")
+                            row_dict[k] = v.strftime("%m/%d/%Y")
 
-                    name_for_file = output_name_format
-                    for key, val in row.items():
-                        name_for_file = name_for_file.replace(f"{{{{{key}}}}}", str(val))
+                    file_name = output_name_format
+                    for key, val in row_dict.items():
+                        file_name = file_name.replace(f"{{{{{key}}}}}", str(val))
+                    file_name = file_name.strip().replace(" ", "_")
 
-                    template_basename = os.path.splitext(os.path.basename(template_path))[0]
-                    filename = f"{name_for_file}_{template_basename}.docx"
-                    output_path = os.path.join(word_dir, filename)
+                    final_filename = f"{file_name}_{template_base}.docx"
+                    output_path = os.path.join(word_dir, final_filename)
 
-                    temp_template_path = os.path.join(temp_dir, f"temp_{idx}_{template_basename}.docx")
-                    with open(template_path, "rb") as src, open(temp_template_path, "wb") as dst:
-                        dst.write(src.read())
+                    temp_template_path = os.path.join(temp_dir, f"temp_{idx}.docx")
+                    with open(template_path, "rb") as f_in, open(temp_template_path, "wb") as f_out:
+                        f_out.write(f_in.read())
 
-                    replace_text_in_docx_textboxes(temp_template_path, row, output_path)
+                    replace_text_in_docx_textboxes(temp_template_path, row_dict, output_path)
 
             zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, "w") as zip_out:
-                for folder_path, _, files in os.walk(os.path.join(temp_dir, "Word Documents")):
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_out:
+                for root, _, files in os.walk(word_dir):
                     for file in files:
-                        full_path = os.path.join(folder_path, file)
-                        arcname = os.path.relpath(full_path, temp_dir)
-                        zip_out.write(full_path, arcname=arcname)
+                        full_path = os.path.join(root, file)
+                        arcname = os.path.relpath(full_path, word_dir)
+                        zip_out.write(full_path, arcname)
 
-            st.success("✅ Word documents generated!")
-            import uuid
-            unique_key = str(uuid.uuid4())
-            st.download_button(
-                label="📦 Download All (Word Only – PDF not supported on Streamlit Cloud)",
-                data=zip_buffer.getvalue(),
-                file_name="word_documents.zip",
-                mime="application/zip",
-                key=f"download_zip_{unique_key}"
-            )
-
+        return zip_buffer.getvalue()
 
     if template_mode == "Upload New Template":
         uploaded_templates = st.file_uploader("Upload One or More .docx Templates", type="docx", accept_multiple_files=True)
-        campaign_name = st.selectbox("🏷️ Select Campaign for This Template", CAMPAIGN_OPTIONS)
-        doc_type = st.text_input("📄 Enter Document Type (e.g., HIPAA, Notice, Demand)")
+        campaign_name = st.selectbox("🏷️ Select Campaign", CAMPAIGN_OPTIONS)
+        doc_type = st.text_input("📄 Document Type (e.g., HIPAA, Notice, Demand)")
         excel_file = st.file_uploader("Upload Excel Data (.xlsx)", type="xlsx", key="excel_upload_new")
-        output_name_format = st.text_input("Enter filename format (e.g., HIPAA Notice ({{Client Name}}))")
+        output_name_format = st.text_input("Enter filename format (e.g., {{Client Name}}_HIPAA)")
 
         if uploaded_templates and campaign_name and doc_type:
             if st.button("Save and Generate"):
+                saved_paths = []
                 for uploaded_template in uploaded_templates:
-                    campaign_safe = campaign_name.replace(" ", "").replace("/", "-")
-                    doc_type_safe = doc_type.replace(" ", "")
-                    base_name = f"TEMPLATE_{doc_type_safe}_{campaign_safe}"
+                    base_name = f"TEMPLATE_{doc_type.replace(' ', '')}_{campaign_name.replace(' ', '').replace('/', '-')}
+"
                     version = 1
                     while os.path.exists(os.path.join(TEMPLATE_FOLDER, f"{base_name}_v{version}.docx")):
                         version += 1
-                    final_filename = f"{base_name}_v{version}.docx"
-                    save_path = os.path.join(TEMPLATE_FOLDER, final_filename)
-
+                    filename = f"{base_name}_v{version}.docx"
+                    save_path = os.path.join(TEMPLATE_FOLDER, filename)
                     with open(save_path, "wb") as f:
                         f.write(uploaded_template.read())
+                    saved_paths.append(save_path)
+                    st.success(f"✅ Saved: {filename}")
 
-                    st.success(f"✅ Saved as {final_filename}")
+                if excel_file and output_name_format:
+                    df = pd.read_excel(excel_file)
+                    zip_bytes = process_and_zip_docs(saved_paths, df, output_name_format)
+                    st.success("✅ Documents generated!")
 
-                    if excel_file and output_name_format:
-                        df = pd.read_excel(excel_file)
-                        process_and_preview([save_path], df, output_name_format, doc_type)
+                    st.download_button(
+                        label="📦 Download All Documents (ZIP)",
+                        data=zip_bytes,
+                        file_name="generated_documents.zip",
+                        mime="application/zip"
+                    )
 
-    elif template_mode == "Select a Saved Template":
-        st.subheader("📂 Select a Saved Template")
-        excluded_templates = {"foia_template.docx", "demand_template.docx"}
+    elif template_mode == "Select Saved Templates":
+        st.subheader("📂 Select Saved Templates")
         available_templates = [
             f for f in os.listdir(TEMPLATE_FOLDER)
-            if f.endswith(".docx") and f not in excluded_templates
+            if f.endswith(".docx") and "foia" not in f.lower() and "demand" not in f.lower()
         ]
 
-        search_query = st.text_input("🔍 Search templates by keyword or campaign").lower()
-        filtered_templates = [f for f in available_templates if search_query in f.lower()]
+        search = st.text_input("🔍 Search Templates").lower()
+        filtered_templates = [t for t in available_templates if search in t.lower()]
 
-        if not filtered_templates:
-            st.warning("⚠️ No matching templates found.")
-            st.stop()
-
-        template_choice = st.selectbox("Choose Template", filtered_templates)
-        template_path = os.path.join(TEMPLATE_FOLDER, template_choice)
+        selected_templates = st.multiselect("Choose Template(s)", filtered_templates)
         excel_file = st.file_uploader("Upload Excel Data (.xlsx)", type="xlsx", key="excel_upload_saved")
-        output_name_format = st.text_input("Enter filename format (e.g., HIPAA Notice ({{Client Name}}))")
+        output_name_format = st.text_input("Enter filename format (e.g., {{Client Name}}_HIPAA)")
 
         if st.button("Generate Documents"):
-            if excel_file and output_name_format:
+            if selected_templates and excel_file and output_name_format:
+                template_paths = [os.path.join(TEMPLATE_FOLDER, t) for t in selected_templates]
                 df = pd.read_excel(excel_file)
-                process_and_preview([template_path], df, output_name_format)
+                zip_bytes = process_and_zip_docs(template_paths, df, output_name_format)
+                st.success("✅ Documents generated!")
+
+                st.download_button(
+                    label="📦 Download All Documents (ZIP)",
+                    data=zip_bytes,
+                    file_name="generated_documents.zip",
+                    mime="application/zip"
+                )
 
     elif template_mode == "Template Options":
         st.subheader("⚙️ Template Options")
-        excluded_templates = {"foia_template.docx", "demand_template.docx"}
         available_templates = [
             f for f in os.listdir(TEMPLATE_FOLDER)
-            if f.endswith(".docx") and f not in excluded_templates
+            if f.endswith(".docx") and "foia" not in f.lower() and "demand" not in f.lower()
         ]
 
         search_query = st.text_input("🔍 Search for template to manage").lower()
