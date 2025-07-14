@@ -372,7 +372,7 @@ if tool == "📄 Batch Doc Generator":
     🔐 No coding required
     """)
 
-    st.subheader("📏 Template Manager")
+    st.subheader("🔏 Template Manager")
     template_mode = st.radio("Choose an action:", ["Upload New Template", "Select Saved Templates", "Template Options"])
 
     def replace_text_in_docx_textboxes(docx_path, replacements, save_path):
@@ -403,23 +403,25 @@ if tool == "📄 Batch Doc Generator":
             word_dir = os.path.join(temp_dir, "word_docs")
             os.makedirs(word_dir, exist_ok=True)
 
-            for template_path in template_paths:
-                template_base = os.path.splitext(os.path.basename(template_path))[0]
-                for idx, row in df.iterrows():
-                    row_dict = row.to_dict()
-                    for k, v in row_dict.items():
-                        if isinstance(v, (pd.Timestamp, datetime)):
-                            row_dict[k] = v.strftime("%m/%d/%Y")
+            for idx, row in df.iterrows():
+                row_dict = row.to_dict()
+                for k, v in row_dict.items():
+                    if isinstance(v, (pd.Timestamp, datetime)):
+                        row_dict[k] = v.strftime("%m/%d/%Y")
 
-                    file_name = output_name_format
-                    for key, val in row_dict.items():
-                        file_name = file_name.replace(f"{{{{{key}}}}}", str(val))
-                    file_name = file_name.strip().replace(" ", "_")
+                folder_name = output_name_format
+                for key, val in row_dict.items():
+                    folder_name = folder_name.replace(f"{{{{{key}}}}}", str(val))
+                folder_name = folder_name.strip().replace(" ", "_")
+                folder_path = os.path.join(word_dir, folder_name)
+                os.makedirs(folder_path, exist_ok=True)
 
-                    final_filename = f"{file_name}_{template_base}.docx"
-                    output_path = os.path.join(word_dir, final_filename)
+                for template_path in template_paths:
+                    template_base = os.path.splitext(os.path.basename(template_path))[0]
+                    final_filename = f"{template_base}.docx"
+                    output_path = os.path.join(folder_path, final_filename)
 
-                    temp_template_path = os.path.join(temp_dir, f"temp_{idx}.docx")
+                    temp_template_path = os.path.join(temp_dir, f"temp_{template_base}.docx")
                     with open(template_path, "rb") as f_in, open(temp_template_path, "wb") as f_out:
                         f_out.write(f_in.read())
 
@@ -447,7 +449,6 @@ if tool == "📄 Batch Doc Generator":
                 saved_paths = []
                 for uploaded_template in uploaded_templates:
                     base_name = f"TEMPLATE_{doc_type.replace(' ', '')}_{campaign_name.replace(' ', '').replace('/', '-')}"
-
                     version = 1
                     while os.path.exists(os.path.join(TEMPLATE_FOLDER, f"{base_name}_v{version}.docx")):
                         version += 1
@@ -464,7 +465,7 @@ if tool == "📄 Batch Doc Generator":
                     st.success("✅ Documents generated!")
 
                     st.download_button(
-                        label="📦 Download All Documents (ZIP)",
+                        label="📆 Download All Documents (ZIP)",
                         data=zip_bytes,
                         file_name="generated_documents.zip",
                         mime="application/zip"
@@ -492,7 +493,7 @@ if tool == "📄 Batch Doc Generator":
                 st.success("✅ Documents generated!")
 
                 st.download_button(
-                    label="📦 Download All Documents (ZIP)",
+                    label="📆 Download All Documents (ZIP)",
                     data=zip_bytes,
                     file_name="generated_documents.zip",
                     mime="application/zip"
@@ -529,8 +530,16 @@ if tool == "📄 Batch Doc Generator":
                 os.remove(template_path)
                 st.success(f"✅ Deleted '{template_choice}'")
                 st.rerun()
-        else:
+
+        if available_templates and st.button("🚩 Delete ALL Templates (Cannot Be Undone)"):
+            for t in available_templates:
+                os.remove(os.path.join(TEMPLATE_FOLDER, t))
+            st.success("✅ All templates deleted.")
+            st.rerun()
+
+        elif not filtered_templates:
             st.warning("⚠️ No templates found matching your search.")
+
 
 # === Load Excel Data from Dropbox App Folder (Secure API Method) ===
 if tool == "📊 Litigation Dashboard":
