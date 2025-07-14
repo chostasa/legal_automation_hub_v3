@@ -53,7 +53,6 @@ import zipfile
 import re
 
 def replace_text_in_docx_all(docx_path, replacements, save_path):
-    import re
     from lxml import etree
     import zipfile
 
@@ -65,21 +64,13 @@ def replace_text_in_docx_all(docx_path, replacements, save_path):
                     xml = etree.fromstring(buffer)
                     ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 
-                    # Collect all <w:t> elements in order
-                    all_nodes = xml.xpath('//w:t', namespaces=ns)
-                    text_chunks = [t.text or '' for t in all_nodes]
-                    combined_text = ''.join(text_chunks)
-
-                    # Replace placeholders in the combined text
-                    for key, val in replacements.items():
-                        combined_text = re.sub(rf'\{{\{{\s*{re.escape(key)}\s*\}}\}}', str(val), combined_text)
-
-                    # Redistribute the modified text across original <w:t> elements
-                    idx = 0
-                    for node in all_nodes:
-                        length = len(node.text or '')
-                        node.text = combined_text[idx:idx+length]
-                        idx += length
+                    for node in xml.xpath('//w:t', namespaces=ns):
+                        if node.text:
+                            for key, val in replacements.items():
+                                # This ONLY replaces placeholders fully inside one <w:t>
+                                placeholder = f'{{{{{key}}}}}'
+                                if placeholder in node.text:
+                                    node.text = node.text.replace(placeholder, str(val))
 
                     buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
                 zout.writestr(item, buffer)
