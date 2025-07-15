@@ -551,12 +551,13 @@ if tool == "📊 Litigation Dashboard":
     st.header("📊 Interactive Litigation Dashboard")
     st_autorefresh(interval=3600000, key="refresh_dashboard")
 
+    import os
     try:
-        # Authenticate with Dropbox using your secret token
+        # Authenticate with Dropbox using environment variables
         dbx = dropbox.Dropbox(
-            oauth2_refresh_token=st.secrets["dropbox_refresh_token"],
-            app_key=st.secrets["dropbox_app_key"],
-            app_secret=st.secrets["dropbox_app_secret"]
+            oauth2_refresh_token=os.environ["DROPBOX_REFRESH_TOKEN"],
+            app_key=os.environ["DROPBOX_APP_KEY"],
+            app_secret=os.environ["DROPBOX_APP_SECRET"]
         )
 
         file_path = "/Master Dashboard.xlsx"
