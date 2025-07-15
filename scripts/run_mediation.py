@@ -17,10 +17,9 @@ def trim_to_token_limit(text, max_tokens=12000):
     third = max_tokens // 3
     return " ".join(tokens[:third]) + "\n...\n" + " ".join(tokens[-2 * third:])
 
-try:
-    api_key = st.secrets["OPENAI_API_KEY"]
-except Exception:
-    api_key = os.getenv("OPENAI_API_KEY", "")  # fallback for local dev
+import os
+
+api_key = os.environ["OPENAI_API_KEY"]  # Azure App Service env var
 
 client = OpenAI(api_key=api_key)
 
