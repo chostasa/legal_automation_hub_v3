@@ -1002,4 +1002,4 @@ st.markdown("""
 <div style="text-align: center; font-size: 0.85rem; color: gray;">
 &copy; 2025 Stinar Gould Grieco & Hensley. All rights reserved.
 </div>
-""", unsafe_allow_html=True)
+""", unsafe_allow_html=True) 
