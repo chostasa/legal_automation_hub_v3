@@ -1,6 +1,14 @@
 import streamlit as st
 st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
+import os
+user_email = os.environ.get("X-MS-CLIENT-PRINCIPAL-NAME", "Unknown")
+st.sidebar.success(f"🔐 Signed in as: {user_email}")
+if not user_email.endswith("@yourcompany.com"):
+    st.error("🚫 Access denied: You must sign in with a valid @yourcompany.com email.")
+    st.stop()
+
+
 from scripts.run_foia import run_foia
 from scripts.run_demand import run
 from scripts.run_mediation import polish_text_for_legal_memo
@@ -46,7 +54,6 @@ import io
 import tempfile
 from docx import Document
 from datetime import datetime
-from users import USERS, hash_password
 
 from lxml import etree
 import zipfile
@@ -163,32 +170,6 @@ Input:
 {ocr_text}
 """
     return generate_with_openai(full_prompt)
-
-
-
-# === Username + Password Login ===
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-if not st.session_state.logged_in:
-    st.title("Login")
-
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-
-    if st.button("Login"):
-        hashed_input = hash_password(password)
-        if username in USERS and USERS[username] == hashed_input:
-            st.session_state.logged_in = True
-            st.session_state.username = username
-            st.success(f"Welcome, {username}!")
-            # ✅ No need for st.experimental_rerun()
-        else:
-            st.error("Invalid username or password")
-
-    st.stop()
-else:
-    st.sidebar.markdown(f"**Logged in as:** {st.session_state.username}")
 
 st.markdown("""
 <style>
