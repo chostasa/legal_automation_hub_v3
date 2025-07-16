@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
 from scripts.run_foia import run_foia
