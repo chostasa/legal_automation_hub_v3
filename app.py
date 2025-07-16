@@ -1,29 +1,6 @@
 import streamlit as st
 st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
-import json
-import base64
-
-encoded_claims = os.environ.get("X-MS-CLIENT-PRINCIPAL", "")
-user_email = "Unknown"
-
-try:
-    decoded = base64.b64decode(encoded_claims).decode("utf-8")
-    claims = json.loads(decoded)
-    for claim in claims.get("claims", []):
-        if claim.get("typ") == "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress":
-            user_email = claim.get("val")
-            break
-except Exception as e:
-    pass  # Keep user_email = "Unknown"
-
-st.sidebar.success(f"🔐 Signed in as: {user_email}")
-if not user_email.endswith("@sgghlaw.com"):
-    st.error("🚫 Access denied: You must sign in with a valid @sgghlaw.com email.")
-    st.stop()
-
-
-
 from scripts.run_foia import run_foia
 from scripts.run_demand import run
 from scripts.run_mediation import polish_text_for_legal_memo
