@@ -1025,7 +1025,7 @@ if tool == "📧 Welcome Email Sender":
     with st.sidebar:
         st.markdown("### 🔎 Filter Clients")
 
-        class_code_options = sorted(intake_df["Class Code"].dropna().unique())
+        class_code_options = sorted(intake_df["Class Code Title"].dropna().unique())
         status_options = sorted(intake_df["Status"].dropna().unique()) if "Status" in intake_df.columns else []
 
         selected_class_codes = st.multiselect("Class Code", class_code_options, default=class_code_options)
@@ -1041,12 +1041,12 @@ if tool == "📧 Welcome Email Sender":
     search_term = st.text_input("🔍 Search client name or email").strip().lower()
     if search_term:
         filtered_df = filtered_df[
-            filtered_df["Client Name"].str.lower().str.contains(search_term) |
-            filtered_df["Email"].str.lower().str.contains(search_term)
+            filtered_df["Case Details First Party Name (Full - Last, First)"].str.lower().str.contains(search_term) |
+            filtered_df["Case Details First Party Details Default Email Account Address"].str.lower().str.contains(search_term)
         ]
 
     # Select clients
-    client_options = filtered_df["Client Name"].tolist()
+    client_options = filtered_df["Case Details First Party Name (Full - Last, First)"].tolist()
     selected_clients = st.multiselect("Select Clients to Email", client_options)
 
     # Initialize session state
@@ -1060,12 +1060,12 @@ if tool == "📧 Welcome Email Sender":
         st.session_state.email_previews = []
         st.session_state.email_status = {}
 
-        for i, (_, row) in enumerate(filtered_df[filtered_df["Client Name"].isin(selected_clients)].iterrows()):
+        for i, (_, row) in enumerate(filtered_df[filtered_df["Case Details First Party Name (Full - Last, First)"].isin(selected_clients)].iterrows()):
             client_data = {
-                "ClientName": row["Client Name"],
-                "ReferringAttorney": row["Referring Attorney"],
-                "CaseID": row["Case ID"],
-                "Email": row["Email"]
+                "ClientName": row["Case Details First Party Name (Full - Last, First)"],
+                "ReferringAttorney": row.get("Referring Attorney", "N/A"),
+                "CaseID": row.get("Case ID", "N/A"),
+                "Email": row["Case Details First Party Details Default Email Account Address"]
             }
 
             try:
