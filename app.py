@@ -997,6 +997,22 @@ if tool == "📧 Welcome Email Sender":
     st.header("📧 Welcome Email Sender")
 
     # Load your full DataFrame (already in use for dashboard)
+    import os
+    import dropbox
+    from io import BytesIO
+
+    # Authenticate with Dropbox using environment variables
+    dbx = dropbox.Dropbox(
+        oauth2_refresh_token=os.environ["DROPBOX_REFRESH_TOKEN"],
+        app_key=os.environ["DROPBOX_APP_KEY"],
+        app_secret=os.environ["DROPBOX_APP_SECRET"]
+    )
+
+    # Download the latest Excel file
+    file_path = "/Master Dashboard.xlsx"
+    metadata, res = dbx.files_download(file_path)
+
+    # Load the Master Dashboard sheet into DataFrame
     df = pd.read_excel(BytesIO(res.content), sheet_name="Master Dashboard")
 
     # Filter to show only clients with 'Intake Completed'
