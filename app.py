@@ -1166,7 +1166,7 @@ if st.session_state.email_previews and st.button("📧 Send All Edited Emails"):
                 updated = log_df
 
             updated.to_csv(log_path, index=False)
-            st.info("📘 Email log saved.")
+            st.info("📘 Email log saved.") 
 
 # Footer
 st.markdown("""
