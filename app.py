@@ -2,7 +2,9 @@ import streamlit as st
 import os
 st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
-from email_automation.config import TEMPLATE_CONFIG, CLASS_CODES
+TEMPLATE_CONFIG = json.loads(os.environ.get("TEMPLATE_CONFIG", "{}"))
+CLASS_CODES = json.loads(os.environ.get("CLASS_CODES", "{}"))
+
 from email_automation.scripts.email_utilities import merge_template
 from email_automation.scripts.send_email import send_email
 from email_automation.scripts.update_neos import update_class_code
