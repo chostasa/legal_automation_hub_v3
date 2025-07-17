@@ -2,14 +2,15 @@
 
 import requests
 from datetime import datetime
-import streamlit as st
 
 GRAPH_URL = "https://graph.microsoft.com/v1.0"
 
 def get_access_token():
-    tenant_id = st.secrets["graph_tenant_id"]
-    client_id = st.secrets["graph_client_id"]
-    client_secret = st.secrets["graph_client_secret"]
+    tenant_id = os.environ.get("GRAPH_TENANT_ID")
+    client_id = os.environ.get("GRAPH_CLIENT_ID")
+    client_secret = os.environ.get("GRAPH_CLIENT_SECRET")
+    from_email = os.environ.get("GRAPH_SENDER_EMAIL")
+
 
     url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
@@ -26,7 +27,7 @@ def get_access_token():
 
 def send_email(to, subject, body, cc=[]):
     token = get_access_token()
-    from_email = st.secrets["graph_sender_email"]
+    from_email = os.environ.get("GRAPH_SENDER_EMAIL")
 
     message = {
         "message": {

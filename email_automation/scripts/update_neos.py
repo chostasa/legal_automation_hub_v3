@@ -3,7 +3,8 @@
 import os
 import requests
 from datetime import datetime
-from email_automation.config import CLASS_CODES
+import json
+CLASS_CODES = json.loads(os.environ.get("CLASS_CODES", "{}"))
 
 def update_class_code(case_id, new_class_code_title, welcome_email_field_key=None):
     base_url = os.environ.get("NEOS_BASE_URL", "https://app.neosconnect.com/api/v1")
