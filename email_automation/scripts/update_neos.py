@@ -3,6 +3,7 @@
 import os
 import requests
 from datetime import datetime
+
 import json
 CLASS_CODES = json.loads(os.environ.get("CLASS_CODES", "{}"))
 
