@@ -2,6 +2,22 @@ import streamlit as st
 import os
 st.set_page_config(page_title="Legal Automation Hub", layout="wide")
 
+from email_automation.config import TEMPLATE_CONFIG, CLASS_CODES
+from email_automation.scripts.email_utilities import merge_template
+from email_automation.scripts.send_email import send_email
+from email_automation.scripts.update_neos import update_class_code
+
+import os
+
+NEOS_COMPANY_ID = os.environ.get("NEOS_COMPANY_ID")
+NEOS_API_KEY = os.environ.get("NEOS_API_KEY")
+NEOS_INTEGRATION_ID = os.environ.get("NEOS_INTEGRATION_ID")
+
+import pandas as pd
+import datetime
+import os
+
+
 from scripts.run_foia import run_foia
 from scripts.run_demand import run
 from scripts.run_mediation import polish_text_for_legal_memo
@@ -972,9 +988,187 @@ This tool will allow you to auto-generate subpoena forms for institutions, agenc
                 f.write(issue + "\n---\n")
             st.success("✅ Issue submitted. Thank you!")
 
+st.header("📧 Welcome Email Sender")
+
+# Load your full DataFrame (already in use for dashboard)
+df = pd.read_excel(BytesIO(res.content), sheet_name="Master Dashboard")
+
+# Filter to show only clients with 'Intake Completed'
+intake_df = df[df["Class Code Title"] == "Intake Completed"].copy()
+
+# Dropdown to select template
+template_key = st.selectbox("Select Email Template", list(TEMPLATE_CONFIG.keys()))
+
+# === Sidebar Filters for Email Tool ===
+with st.sidebar:
+    st.markdown("### 🔎 Filter Clients")
+
+    class_code_options = sorted(intake_df["Class Code"].dropna().unique())
+    status_options = sorted(intake_df["Status"].dropna().unique()) if "Status" in intake_df.columns else []
+
+    selected_class_codes = st.multiselect("Class Code", class_code_options, default=class_code_options)
+    selected_statuses = st.multiselect("Status", status_options, default=status_options) if status_options else []
+
+# Apply filters
+filtered_df = intake_df[
+    intake_df["Class Code"].isin(selected_class_codes) &
+    (intake_df["Status"].isin(selected_statuses) if status_options else True)
+]
+
+# Text-based search filter
+search_term = st.text_input("🔍 Search client name or email").strip().lower()
+if search_term:
+    filtered_df = filtered_df[
+        filtered_df["Client Name"].str.lower().str.contains(search_term) |
+        filtered_df["Email"].str.lower().str.contains(search_term)
+    ]
+
+# Select clients
+client_options = filtered_df["Client Name"].tolist()
+selected_clients = st.multiselect("Select Clients to Email", client_options)
+
+# Initialize session state
+if "email_previews" not in st.session_state:
+    st.session_state.email_previews = []
+if "email_status" not in st.session_state:
+    st.session_state.email_status = {}
+
+# === Preview Emails ===
+if st.button("🔍 Preview Emails"):
+    st.session_state.email_previews = []
+    st.session_state.email_status = {}
+
+    for i, (_, row) in enumerate(filtered_df[filtered_df["Client Name"].isin(selected_clients)].iterrows()):
+        client_data = {
+            "ClientName": row["Client Name"],
+            "ReferringAttorney": row["Referring Attorney"],
+            "CaseID": row["Case ID"],
+            "Email": row["Email"]
+        }
+
+        try:
+            subject, body, cc = merge_template(template_key, client_data)
+
+            subject_key = f"subject_{i}"
+            body_key = f"body_{i}"
+            status_key = f"status_{i}"
+
+            st.markdown(f"**{client_data['ClientName']}** — _{client_data['Email']}_")
+            st.text_input("✏️ Subject", subject, key=subject_key)
+            st.text_area("📄 Body", body, height=300, key=body_key)
+            st.markdown(f"**Status**: {st.session_state.email_status.get(status_key, '⏳ Ready to send')}")
+
+            if st.button(f"📧 Send Email to {client_data['ClientName']}", key=f"send_{i}"):
+                try:
+                    with st.spinner("Sending..."):
+                        send_email(
+                            to=client_data["Email"],
+                            subject=st.session_state[subject_key],
+                            body=st.session_state[body_key],
+                            cc=cc
+                        )
+
+                        update_class_code(
+                            case_id=client_data["CaseID"],
+                            new_class_code_title="Questionnaire Sent",
+                            welcome_email_field_key="CustomField_WelcomeEmailSent"
+                        )
+
+                        st.session_state.email_status[status_key] = "✅ Sent successfully"
+
+                        log_entry = {
+                            "Timestamp": datetime.datetime.now().isoformat(),
+                            "Client Name": client_data["ClientName"],
+                            "Email": client_data["Email"],
+                            "Subject": st.session_state[subject_key],
+                            "Body": st.session_state[body_key],
+                            "Template": template_key,
+                            "CC List": ", ".join(cc),
+                            "Case ID": client_data["CaseID"],
+                            "Class Code Before": "Intake Completed",
+                            "Class Code After": "Questionnaire Sent"
+                        }
+
+                        if "log_results" not in st.session_state:
+                            st.session_state.log_results = []
+                        st.session_state.log_results.append(log_entry)
+
+                except Exception as e:
+                    st.session_state.email_status[status_key] = f"❌ Error: {e}"
+
+            st.markdown("---")
+
+            st.session_state.email_previews.append({
+                "client_data": client_data,
+                "subject_key": subject_key,
+                "body_key": body_key,
+                "cc": cc,
+                "status_key": status_key
+            })
+
+        except Exception as e:
+            st.error(f"❌ Error generating preview for {client_data['ClientName']}: {e}")
+
+# === Send All Button ===
+if st.session_state.email_previews and st.button("📧 Send All Edited Emails"):
+    with st.spinner("Sending all emails..."):
+        results = []
+        for preview in st.session_state.email_previews:
+            status = st.session_state.email_status.get(preview["status_key"], "")
+            if "✅" in status:
+                continue  # Skip already sent
+
+            client_data = preview["client_data"]
+            subject = st.session_state[preview["subject_key"]]
+            body = st.session_state[preview["body_key"]]
+            cc = preview["cc"]
+            status_key = preview["status_key"]
+
+            try:
+                send_email(to=client_data["Email"], subject=subject, body=body, cc=cc)
+
+                update_class_code(
+                    case_id=client_data["CaseID"],
+                    new_class_code_title="Questionnaire Sent",
+                    welcome_email_field_key="CustomField_WelcomeEmailSent"
+                )
+
+                log_entry = {
+                    "Timestamp": datetime.datetime.now().isoformat(),
+                    "Client Name": client_data["ClientName"],
+                    "Email": client_data["Email"],
+                    "Subject": subject,
+                    "Body": body,
+                    "Template": template_key,
+                    "CC List": ", ".join(cc),
+                    "Case ID": client_data["CaseID"],
+                    "Class Code Before": "Intake Completed",
+                    "Class Code After": "Questionnaire Sent"
+                }
+
+                results.append(log_entry)
+                st.session_state.email_status[status_key] = "✅ Sent successfully"
+
+            except Exception as e:
+                st.session_state.email_status[status_key] = f"❌ Error: {e}"
+
+        if results:
+            log_df = pd.DataFrame(results)
+            log_path = "email_automation/data/sent_email_log.csv"
+            if os.path.exists(log_path):
+                existing = pd.read_csv(log_path)
+                updated = pd.concat([existing, log_df], ignore_index=True)
+            else:
+                updated = log_df
+
+            updated.to_csv(log_path, index=False)
+            st.info("📘 Email log saved.")
+
+# Footer
 st.markdown("""
 <hr style="margin-top: 2rem;">
 <div style="text-align: center; font-size: 0.85rem; color: gray;">
 &copy; 2025 Stinar Gould Grieco & Hensley. All rights reserved.
 </div>
-""", unsafe_allow_html=True) 
+""", unsafe_allow_html=True)
+
