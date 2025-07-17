@@ -2,7 +2,10 @@
 
 import os
 from jinja2 import Template
-from email_automation.config import TEMPLATE_CONFIG
+import json
+
+TEMPLATE_CONFIG = json.loads(os.environ.get("TEMPLATE_CONFIG", "{}"))
+
 
 def load_template(template_key):
     config = TEMPLATE_CONFIG[template_key]
