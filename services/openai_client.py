@@ -66,3 +66,20 @@ class OpenAIClient:
         except Exception as e:
             logger.error(redact_log(f"❌ Unexpected OpenAI failure: {e}"))
             raise RuntimeError("OpenAI generation failed unexpectedly.")
+
+# ✅ TOP-LEVEL FUNCTION for backward compatibility
+openai_client_instance = OpenAIClient()
+
+@openai_retry
+def safe_generate(
+    prompt: str,
+    model: str = None,
+    system_msg: str = DEFAULT_SYSTEM_MSG,
+    temperature: float = 0.4
+) -> str:
+    return openai_client_instance.safe_generate(
+        prompt=prompt,
+        model=model,
+        system_msg=system_msg,
+        temperature=temperature
+    )
