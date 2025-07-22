@@ -1,6 +1,7 @@
 # Core App + UI
 streamlit==1.46.1
 streamlit-autorefresh
+plotly
 
 # OpenAI + Retry Safety
 openai>=1.0.0
