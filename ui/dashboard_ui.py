@@ -57,27 +57,36 @@ def run_ui():
         referral_counts.columns = ["Referring Attorney", "Count"]
         st.plotly_chart(px.bar(referral_counts, x="Referring Attorney", y="Count", text="Count"), use_container_width=True)
 
-    # === ➕ Optional Filters ===
-    st.subheader("➕ Add Optional Filters")
+    # === ➕ Optional Columns (Visible + Filtered) ===
+    st.subheader("➕ Add Optional Columns")
 
     optional_display_cols = []
-    with st.expander("Add Filters from Additional Columns"):
+    optional_filtered_cols = []
+
+    with st.expander("Show/Filter Additional Columns"):
         candidate_cols = [
             col for col in df.columns
             if col not in [CAMPAIGN_COL, STATUS_COL, REFERRAL_COL]
-            and 1 < df[col].nunique() < 50
+            and col not in [
+                "Date Opened",
+                "Case Details First Party Name (Full - Last, First)",
+                "Case Details First Party Details Default Phone Number",
+                "Case Details First Party Details Default Email Account Address"
+            ]
         ]
+        selected_display_cols = st.multiselect("📌 Choose columns to ADD to the table", candidate_cols)
 
-        selected_col = st.selectbox("Choose a column to filter by", [""] + candidate_cols)
-        if selected_col:
-            try:
-                unique_vals = df[selected_col].dropna().astype(str).unique().tolist()
-                selected_vals = st.multiselect(f"Select values for: {selected_col}", sorted(unique_vals), key=selected_col)
-                if selected_vals:
-                    filtered_df = filtered_df[filtered_df[selected_col].astype(str).isin(selected_vals)]
-                    optional_display_cols.append(selected_col)
-            except Exception as e:
-                st.warning(f"⚠️ Could not apply filter for {selected_col}: {e}")
+        for col in selected_display_cols:
+            optional_display_cols.append(col)
+            if 1 < df[col].nunique() < 50:
+                try:
+                    vals = df[col].dropna().astype(str).unique().tolist()
+                    selected_vals = st.multiselect(f"Filter values for {col}", sorted(vals), key=col)
+                    if selected_vals:
+                        filtered_df = filtered_df[filtered_df[col].astype(str).isin(selected_vals)]
+                        optional_filtered_cols.append(col)
+                except Exception as e:
+                    st.warning(f"⚠️ Could not filter column {col}: {e}")
 
     # === 📋 Case Table ===
     st.subheader(f"📋 Case Table ({len(filtered_df)} records)")
@@ -92,7 +101,6 @@ def run_ui():
         "Case Details First Party Details Default Email Account Address"
     ]
 
-    # Show base + any selected optional filters
     all_display_cols = [col for col in base_display_cols if col in filtered_df.columns] + optional_display_cols
     clean_df = filtered_df[all_display_cols].copy()
 
@@ -104,7 +112,7 @@ def run_ui():
     # === ⬇️ Download Button ===
     st.download_button(
         label="⬇️ Download Filtered Results as CSV",
-        data=filtered_df.to_csv(index=False).encode("utf-8"),
+        data=filtered_df[all_display_cols].to_csv(index=False).encode("utf-8"),
         file_name="filtered_dashboard.csv",
         mime="text/csv"
     )
