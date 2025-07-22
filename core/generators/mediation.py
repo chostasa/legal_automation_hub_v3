@@ -50,6 +50,22 @@ Quotes (if any): {data.get('damages_quotes', '')}
         logger.error(redact_log(f"❌ Mediation section generation failed: {e}"))
         raise RuntimeError("Failed to generate mediation memo sections.")
 
+def generate_plaintext_memo(memo_data: dict) -> str:
+    """
+    Returns a simple plaintext version of the memo for display or backup.
+    """
+    sections = [
+        f"Court: {memo_data.get('Court', '')}",
+        f"Case Number: {memo_data.get('Case_Number', '')}",
+        f"\nIntroduction:\n{memo_data.get('Introduction', '')}",
+        f"\nFacts & Liability:\n{memo_data.get('Facts_Liability', '')}",
+        f"\nCausation, Injuries & Treatment:\n{memo_data.get('Causation_Injuries_Treatment', '')}",
+        f"\nAdditional Harms & Losses:\n{memo_data.get('Additional_Harms_Losses', '')}",
+        f"\nFuture Medical Bills:\n{memo_data.get('Future_Medical_Bills', '')}",
+        f"\nConclusion:\n{memo_data.get('Conclusion', '')}"
+    ]
+    return "\n\n".join(sections)
+
 def generate_mediation_memo(data: dict, template_path: str, output_dir: str) -> (str, dict):
     """
     Main entry point. Accepts raw data and a template, returns output path and memo_data dict.
