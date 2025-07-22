@@ -1,5 +1,6 @@
 # core/openai_client.py
 
+import os
 import openai
 import time
 from logger import logger
