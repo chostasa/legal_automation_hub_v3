@@ -68,4 +68,26 @@ def generate_mediation_memo(data: dict, template_path: str, output_dir: str) -> 
             "Court": cleaned["court"],
             "Case_Number": cleaned["case_number"],
             "Introduction": memo_sections["Introduction"],
-            "Facts_Liability":
+            "Facts_Liability": memo_sections["Facts_Liability"],
+            "Causation_Injuries_Treatment": memo_sections["Causation_Injuries_Treatment"],
+            "Additional_Harms_Losses": memo_sections["Additional_Harms_Losses"],
+            "Future_Medical_Bills": memo_sections["Future_Medical_Bills"],
+            "Conclusion": memo_sections["Conclusion"],
+            "Plaintiffs": cleaned.get("plaintiffs", ""),
+            "Defendants": cleaned.get("defendants", ""),
+            "Parties": cleaned.get("party_information_from_complaint", ""),
+            "Demand": cleaned.get("settlement_summary", ""),
+        }
+
+        # 📁 Generate output
+        filename = sanitize_filename(f"Mediation_{cleaned['case_number']}.docx")
+        output_path = os.path.join(output_dir, filename)
+
+        replace_text_in_docx_all(template_path, memo_data, output_path)
+
+        logger.info(f"✅ Mediation memo generated at {output_path}")
+        return output_path, memo_data
+
+    except Exception as e:
+        logger.error(redact_log(f"❌ Mediation memo generation failed: {e}"))
+        raise RuntimeError("Failed to generate mediation memo.")
