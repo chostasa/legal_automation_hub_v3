@@ -7,9 +7,6 @@ from datetime import datetime, timedelta
 from core.session import get_secure_temp_dir
 from logger import logger
 
-from utils.file_utils import clean_temp_dir
-clean_temp_dir()
-
 
 def clean_temp_dir(expire_minutes: int = 60):
     """
