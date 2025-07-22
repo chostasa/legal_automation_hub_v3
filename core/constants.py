@@ -14,8 +14,8 @@ STATUS_CHOICES = [
 # ----------------------------
 # 📄 Template Paths
 # ----------------------------
-TEMPLATE_DEMAND = "templates/demand_template.docx"
-TEMPLATE_FOIA = "templates/foia_template.docx"
+demand_template = "templates/demand_template.docx"
+foia_template = "templates/foia_template.docx"
 
 # ----------------------------
 # 📧 Default Email Settings
