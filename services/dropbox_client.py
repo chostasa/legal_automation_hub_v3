@@ -23,7 +23,6 @@ class DropboxClient:
     @http_retry
     def download_dashboard_df(self, file_path: str = None, sheet_name: str = "Master Dashboard") -> pd.DataFrame:
         path = file_path or self.config.DROPBOX_MASTER_DASHBOARD_PATH
-
         try:
             metadata, res = self.dbx.files_download(path)
             content = res.content
@@ -32,3 +31,14 @@ class DropboxClient:
         except Exception as e:
             logger.error(f"❌ Failed to download or parse {path}: {e}")
             raise RuntimeError("Dropbox download failed")
+
+
+# 🔁 Optional standalone method for UI modules that expect a global import
+@http_retry
+def download_dashboard_df(file_path: str = None, sheet_name: str = "Master Dashboard") -> pd.DataFrame:
+    """
+    Downloads the dashboard Excel from Dropbox and returns it as a DataFrame.
+    Meant to be imported directly into UI modules.
+    """
+    client = DropboxClient()
+    return client.download_dashboard_df(file_path=file_path, sheet_name=sheet_name)
