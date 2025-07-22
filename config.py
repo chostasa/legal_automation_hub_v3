@@ -3,11 +3,35 @@ import os
 class ConfigError(Exception):
     pass
 
+def get_from_secret_manager(var_name: str) -> str:
+    """
+    Optional: override this stub with Azure Key Vault, AWS Secrets Manager, etc.
+    Return None if secret not found in vault.
+    """
+    # Placeholder logic – customize as needed
+    return None  # Integrate Azure SDK or boto3 here for actual vault access
+
+
 def get_env(var_name: str, required: bool = True, default: str = None) -> str:
-    value = os.getenv(var_name, default)
+    """
+    Retrieves environment variable with support for secret manager override.
+    Priority: Secret Vault > os.environ > Default
+    """
+    value = None
+
+    # 1. Secret Vault (for production)
+    if os.getenv("ENV", "").lower() == "production":
+        value = get_from_secret_manager(var_name)
+
+    # 2. Environment fallback
+    if value is None:
+        value = os.getenv(var_name, default)
+
     if required and not value:
         raise ConfigError(f"Missing required environment variable: {var_name}")
+    
     return value
+
 
 class AppConfig:
     def __init__(self):

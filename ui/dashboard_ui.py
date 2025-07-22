@@ -1,26 +1,35 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+
 from services.dropbox_client import DropboxClient
 from core.security import sanitize_text, redact_log
+from utils.file_utils import clean_temp_dir
+from core.usage_tracker import log_usage
+from core.auth import get_user_id, get_tenant_id
 from logger import logger
+
+# 🔁 Auto-cleanup on every load
+clean_temp_dir()
 
 @st.cache_data(ttl=300)
 def load_dashboard_data():
     client = DropboxClient()
     return client.download_dashboard_df()
 
+
 def run_ui():
     st.title("📊 Litigation Campaign Dashboard")
 
+    error_code = "DASH_001"
     try:
         df = load_dashboard_data()
         if df.empty:
             st.warning("⚠️ The dashboard is currently empty.")
             return
     except Exception as e:
-        logger.error(redact_log(f"❌ Failed to load dashboard: {e}"))
-        st.error("❌ Could not load dashboard data.")
+        logger.error(redact_log(f"[{error_code}] ❌ Failed to load dashboard: {e}"))
+        st.error(f"❌ Could not load dashboard data (code: {error_code})")
         return
 
     df.columns = df.columns.str.strip()
@@ -57,7 +66,7 @@ def run_ui():
         referral_counts.columns = ["Referring Attorney", "Count"]
         st.plotly_chart(px.bar(referral_counts, x="Referring Attorney", y="Count", text="Count"), use_container_width=True)
 
-    # === ➕ Optional Columns (Visible + Filtered) ===
+    # === ➕ Optional Columns ===
     st.subheader("➕ Add Optional Columns")
 
     optional_display_cols = []
@@ -86,7 +95,7 @@ def run_ui():
                         filtered_df = filtered_df[filtered_df[col].astype(str).isin(selected_vals)]
                         optional_filtered_cols.append(col)
                 except Exception as e:
-                    st.warning(f"⚠️ Could not filter column {col}: {e}")
+                    logger.warning(f"⚠️ Could not filter column {col}: {e}")
 
     # === 📋 Case Table ===
     st.subheader(f"📋 Case Table ({len(filtered_df)} records)")
@@ -116,3 +125,23 @@ def run_ui():
         file_name="filtered_dashboard.csv",
         mime="text/csv"
     )
+
+    # === 📈 Optional: Usage Logging ===
+    if campaign_filter or status_filter or referring_filter:
+        try:
+            log_usage(
+                event_type="dashboard_view",
+                tenant_id=get_tenant_id(),
+                user_id=get_user_id(),
+                count=len(filtered_df),
+                metadata={
+                    "filters": {
+                        "campaign": campaign_filter,
+                        "status": status_filter,
+                        "referral": referring_filter,
+                        "extras": optional_filtered_cols
+                    }
+                }
+            )
+        except Exception as log_err:
+            logger.warning(f"⚠️ Failed to log dashboard usage: {log_err}")

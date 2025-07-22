@@ -5,6 +5,9 @@ import config  # Forces early crash if .env is missing or misconfigured
 from core.auth import get_user_id, get_tenant_id
 from core.usage_tracker import get_usage_summary
 
+from utils.file_utils import clean_temp_dir
+clean_temp_dir()
+
 # === App Config ===
 st.set_page_config(page_title="Legal Automation Hub – V3", layout="wide")
 

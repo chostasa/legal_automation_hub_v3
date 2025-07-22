@@ -1,20 +1,26 @@
 import streamlit as st
 import os
 import hashlib
+
+from utils.file_utils import clean_temp_dir
+clean_temp_dir()
+
 from core.session import get_secure_temp_dir
-from core.security import sanitize_text, sanitize_filename, redact_log
-from core.generators.mediation import generate_mediation_memo, generate_plaintext_memo
-from core.generators.quote_parser import (
-    normalize_deposition_lines,
-    merge_multiline_qas,
-    generate_quotes_in_chunks
-)
+from core.security import sanitize_text, redact_log
 from logger import logger
+from services.memo_service import (
+    generate_quotes_from_raw_depo,
+    generate_memo_from_fields,
+    generate_plaintext_memo
+)
+
+error_code = "MEMO_GEN_001"
 
 def stream_file(path: str):
     with open(path, "rb") as f:
         while chunk := f.read(8192):
             yield chunk
+
 
 def run_ui():
     st.header("🧾 Mediation Memo Generator")
@@ -54,7 +60,6 @@ def run_ui():
         st.session_state.memo_cache = {}
 
     if submitted:
-        # 🚨 Validation
         errors = []
 
         if not uploaded_template or not uploaded_template.name.endswith(".docx"):
@@ -83,7 +88,6 @@ def run_ui():
             return
 
         try:
-            # 🔑 Cache fingerprint
             input_fingerprint = "|".join([
                 court, case_number, complaint_narrative, party_info,
                 settlement_summary, medical_summary, raw_depo,
@@ -91,20 +95,17 @@ def run_ui():
             ])
             form_key = hashlib.md5(input_fingerprint.encode()).hexdigest()
 
-            # 🧠 Use cache if available
             if form_key in st.session_state.memo_cache:
                 file_path, memo_data, raw_quotes = st.session_state.memo_cache[form_key]
             else:
                 with st.spinner("🔄 Generating memo..."):
-                    # 🔍 Quote extraction
+
+                    # 🧠 Step 1: Extract quotes
                     raw_quotes = {}
                     if raw_depo:
-                        lines = normalize_deposition_lines(raw_depo)
-                        qa_text = merge_multiline_qas(lines)
-                        chunks = [qa_text[i:i+9000] for i in range(0, len(qa_text), 9000)]
-                        raw_quotes = generate_quotes_in_chunks(chunks, categories=quote_categories)
+                        raw_quotes = generate_quotes_from_raw_depo(raw_depo, quote_categories)
 
-                    # 📦 Assemble sanitized data
+                    # 🧠 Step 2: Assemble sanitized data
                     data = {
                         "court": sanitize_text(court),
                         "case_number": sanitize_text(case_number),
@@ -124,17 +125,17 @@ def run_ui():
                     for i, name in enumerate(defendants, 1):
                         data[f"defendant{i}"] = sanitize_text(name)
 
+                    # 🧠 Step 3: Generate memo
                     temp_dir = get_secure_temp_dir()
-                    file_path, memo_data = generate_mediation_memo(
+                    file_path, memo_data = generate_memo_from_fields(
                         data=data,
                         template_path=uploaded_template,
                         output_dir=temp_dir
                     )
 
-                    # ✅ Cache it
                     st.session_state.memo_cache[form_key] = (file_path, memo_data, raw_quotes)
 
-            # ✅ Download buttons
+            # ✅ UI: Downloads + Previews
             st.success("✅ Memo generated successfully!")
             st.download_button(
                 label="⬇️ Download Mediation Memo (.docx)",
@@ -151,7 +152,6 @@ def run_ui():
                 mime="text/plain"
             )
 
-            # 🗂️ Quote previews
             for key, value in raw_quotes.items():
                 if value.strip():
                     label = key.replace("_quotes", "").replace("_", " ").title()
@@ -160,6 +160,27 @@ def run_ui():
                         for q in value.strip().split("\n\n"):
                             st.markdown(f"- {q.strip()}")
 
+            from core.usage_tracker import log_usage
+            from core.auth import get_user_id, get_tenant_id
+
+            try:
+                log_usage(
+                    event_type="memo_generated",
+                    tenant_id=get_tenant_id(),
+                    user_id=get_user_id(),
+                    count=1,
+                    metadata={
+                        "court": court,
+                        "plaintiffs": valid_plaintiffs,
+                        "defendants": valid_defendants,
+                        "quote_categories": quote_categories
+                    }
+                )
+            except Exception as log_err:
+                logger.warning(f"⚠️ Failed to log memo usage: {log_err}")
+
+
         except Exception as e:
-            logger.error(redact_log(f"❌ Mediation memo generation failed: {e}"))
-            st.error("❌ An unexpected error occurred while generating the memo.")
+            logger.error(redact_log(f"[{error_code}] ❌ Mediation memo generation failed: {e}"))
+            st.error(f"❌ An unexpected error occurred (code: {error_code}). Please contact support.")
+

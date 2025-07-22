@@ -6,32 +6,27 @@ from datetime import datetime
 from core.session import get_secure_temp_dir
 from core.security import sanitize_text, sanitize_filename, redact_log
 from core.constants import foia_template as TEMPLATE_FOIA
-from core.generators.foia import generate_foia_sections
-from utils.docx_utils import replace_text_in_docx_all
+from services.foia_service import generate_foia_request
 from logger import logger
+
+from utils.file_utils import clean_temp_dir
+clean_temp_dir()
+
 
 def stream_file(path: str):
     with open(path, "rb") as f:
         while chunk := f.read(8192):
             yield chunk
 
+
 def run_ui():
     st.header("📬 FOIA Letter Generator")
 
     with st.form("foia_form"):
-        client_id = st.text_input("Client ID")
-        defendant_name = st.text_input("Recipient Name")
-        address_line1 = st.text_input("Recipient Address Line 1")
-        address_line2 = st.text_input("Recipient Address Line 2 (City, State, Zip)")
+        client_name = st.text_input("Client Name")
+        agency_name = st.text_input("Agency / Facility Name")
         date_of_incident = st.date_input("Date of Incident")
-        location = st.text_input("Location of Incident")
-
-        case_synopsis = st.text_area("Case Synopsis")
-        potential_requests = st.text_area("Potential Requests (optional)")
-        explicit_instructions = st.text_area("Explicit Instructions (optional)")
-        case_type = st.text_input("Case Type")
-        facility = st.text_input("Facility or System")
-        defendant_role = st.text_input("Recipient Role")
+        case_summary = st.text_area("Case Summary or Request Details")
 
         submitted = st.form_submit_button("⚙️ Generate FOIA Letter")
 
@@ -40,13 +35,12 @@ def run_ui():
 
     if submitted:
         errors = []
-
-        if not client_id.strip():
-            errors.append("Client ID is required.")
-        if not defendant_name.strip():
-            errors.append("Recipient name is required.")
-        if not case_synopsis.strip():
-            errors.append("Case synopsis is required.")
+        if not client_name.strip():
+            errors.append("Client name is required.")
+        if not agency_name.strip():
+            errors.append("Agency name is required.")
+        if not case_summary.strip():
+            errors.append("Summary is required.")
 
         if errors:
             for msg in errors:
@@ -54,66 +48,39 @@ def run_ui():
             return
 
         try:
-            # 🔐 Sanitize all fields
-            client_id_safe = sanitize_text(client_id)
-            defendant_name = sanitize_text(defendant_name)
-            address_line1 = sanitize_text(address_line1)
-            address_line2 = sanitize_text(address_line2)
-            location = sanitize_text(location)
-            case_synopsis = sanitize_text(case_synopsis)
-            potential_requests = sanitize_text(potential_requests)
-            explicit_instructions = sanitize_text(explicit_instructions)
-            case_type = sanitize_text(case_type)
-            facility = sanitize_text(facility)
-            defendant_role = sanitize_text(defendant_role)
+            # 🔐 Sanitize
+            client_name = sanitize_text(client_name)
+            agency_name = sanitize_text(agency_name)
+            case_summary = sanitize_text(case_summary)
+            doi = date_of_incident.strftime("%B %d, %Y")
 
-            # 🔑 Caching key
-            fingerprint = "|".join([
-                client_id_safe, defendant_name, address_line1, address_line2, location,
-                case_synopsis, potential_requests, explicit_instructions, case_type,
-                facility, defendant_role
-            ])
+            # 🔑 Fingerprint
+            fingerprint = "|".join([client_name, agency_name, case_summary, doi])
             form_key = hashlib.md5(fingerprint.encode()).hexdigest()
 
             if form_key in st.session_state.foia_cache:
-                file_path, replacements = st.session_state.foia_cache[form_key]
+                file_path, _ = st.session_state.foia_cache[form_key]
             else:
                 with st.spinner("🧠 Generating FOIA letter..."):
-                    # 🤖 GPT content
-                    sections = generate_foia_sections(
-                        case_synopsis=case_synopsis,
-                        case_type=case_type,
-                        facility=facility,
-                        defendant_role=defendant_role,
-                        potential_requests=potential_requests,
-                        explicit_instructions=explicit_instructions,
-                    )
-
-                    replacements = {
-                        "client_id": client_id_safe,
-                        "date": datetime.today().strftime("%B %d, %Y"),
-                        "defendant_name": defendant_name,
-                        "defendant_line1": address_line1,
-                        "defendant_line2": address_line2,
-                        "doi": date_of_incident.strftime("%B %d, %Y"),
-                        "location": location,
-                        "synopsis": sections["synopsis"],
-                        "foia_request_bullet_points": sections["foia_request_bullet_points"],
-                    }
-
                     if not TEMPLATE_FOIA.lower().endswith(".docx"):
                         st.error("❌ The FOIA template must be a .docx file.")
                         return
 
-                    # 💾 Save to file
                     temp_dir = get_secure_temp_dir()
                     output_filename = sanitize_filename(
-                        f"FOIA_{client_id_safe}_{datetime.today().strftime('%Y-%m-%d')}.docx"
+                        f"FOIA_{client_name}_{datetime.today().strftime('%Y-%m-%d')}.docx"
                     )
                     file_path = os.path.join(temp_dir, output_filename)
 
-                    replace_text_in_docx_all(TEMPLATE_FOIA, replacements, file_path)
-                    st.session_state.foia_cache[form_key] = (file_path, replacements)
+                    _, _ = generate_foia_request(
+                        client_name=client_name,
+                        agency_name=agency_name,
+                        details=case_summary,
+                        template_path=TEMPLATE_FOIA,
+                        output_path=file_path
+                    )
+
+                    st.session_state.foia_cache[form_key] = (file_path, {})
 
             st.success("✅ FOIA letter generated!")
             st.download_button(
@@ -122,6 +89,21 @@ def run_ui():
                 file_name=os.path.basename(file_path),
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
+
+            # 📈 Log usage
+            from core.usage_tracker import log_usage
+            from core.auth import get_user_id, get_tenant_id
+
+            try:
+                log_usage(
+                    event_type="foia_generated",
+                    tenant_id=get_tenant_id(),
+                    user_id=get_user_id(),
+                    count=1,
+                    metadata={"client_name": client_name, "agency": agency_name}
+                )
+            except Exception as log_err:
+                logger.warning(f"⚠️ Failed to log FOIA usage: {log_err}")
 
         except Exception as e:
             logger.error(redact_log(f"❌ FOIA letter generation failed: {e}"))
