@@ -30,3 +30,6 @@ class AppConfig:
         self.DROPBOX_APP_SECRET = get_env("DROPBOX_APP_SECRET")
         self.DROPBOX_REFRESH_TOKEN = get_env("DROPBOX_REFRESH_TOKEN")
         self.DROPBOX_MASTER_DASHBOARD_PATH = get_env("DROPBOX_MASTER_DASHBOARD_PATH", default="/Master Dashboard.xlsx")
+
+def get_config() -> AppConfig:
+    return AppConfig()
