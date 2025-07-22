@@ -67,5 +67,7 @@ try:
         st.error("❌ Unknown module selected.")
 
 except Exception as e:
-    logger.error(f"❌ Module loading failed: {e}")
-    st.error("❌ Failed to load selected module. Please contact support.")
+    import traceback
+    st.error("❌ Failed to load selected module. See below.")
+    st.exception(e)
+    st.code(traceback.format_exc())
