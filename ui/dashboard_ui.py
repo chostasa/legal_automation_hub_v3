@@ -1,14 +1,20 @@
 import streamlit as st
 import pandas as pd
-from services.dropbox_client import download_dashboard_df
+import plotly.express as px
+from services.dropbox_client import DropboxClient
 from core.security import sanitize_text, redact_log
 from logger import logger
 
+@st.cache_data(ttl=300)
+def load_dashboard_data():
+    client = DropboxClient()
+    return client.download_dashboard_df()
+
 def run_ui():
-    st.header("📊 Litigation Campaign Dashboard")
+    st.title("📊 Litigation Campaign Dashboard")
 
     try:
-        df = download_dashboard_df()
+        df = load_dashboard_data()
         if df.empty:
             st.warning("⚠️ The dashboard is currently empty.")
             return
@@ -17,47 +23,91 @@ def run_ui():
         st.error("❌ Could not load dashboard data.")
         return
 
-    # === Filter UI ===
-    st.sidebar.title("🔍 Filters")
+    # ========== 🔍 Filter Sidebar ==========
+    st.sidebar.header("Primary Filters")
+    campaign_filter = st.sidebar.multiselect("📁 Campaign", sorted(df["Case Type"].dropna().unique()))
+    referring_filter = st.sidebar.multiselect("👤 Referring Attorney", sorted(df["Referring Attorney"].dropna().unique()))
+    status_filter = st.sidebar.multiselect("📌 Case Status", sorted(df["Class Code Title"].dropna().unique()))
 
-    campaigns = df["Case Type"].dropna().unique().tolist()
-    campaign_filter = st.sidebar.selectbox("Filter by Campaign", ["All"] + sorted(campaigns))
+    filtered_df = df.copy()
+    if campaign_filter:
+        filtered_df = filtered_df[filtered_df["Case Type"].isin(campaign_filter)]
+    if referring_filter:
+        filtered_df = filtered_df[filtered_df["Referring Attorney"].isin(referring_filter)]
+    if status_filter:
+        filtered_df = filtered_df[filtered_df["Class Code Title"].isin(status_filter)]
 
-    if campaign_filter != "All":
-        df = df[df["Case Type"] == campaign_filter]
+    # ========== ⚙️ Optional Dynamic Filters ==========
+    st.sidebar.header("Optional Filters")
+    base_filters = ["Case Type", "Referring Attorney", "Class Code Title"]
+    for col in filtered_df.columns:
+        if col not in base_filters and 1 < filtered_df[col].nunique() < 25:
+            values = st.sidebar.multiselect(f"{col}", sorted(filtered_df[col].dropna().unique()))
+            if values:
+                filtered_df = filtered_df[filtered_df[col].isin(values)]
 
-    # === KPI Summary ===
-    st.subheader("📈 Case Status Overview")
-    if "Class Code Title" in df.columns:
-        status_counts = df["Class Code Title"].value_counts()
-        st.bar_chart(status_counts)
+    # ========== 🧭 KPI Overview ==========
+    st.subheader("📌 Key Insights")
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Cases", f"{len(filtered_df)}")
+    if "Class Code Title" in filtered_df.columns:
+        top_status = filtered_df["Class Code Title"].value_counts().idxmax()
+        col2.metric("Most Common Status", top_status)
+    if "Referring Attorney" in filtered_df.columns:
+        top_attorney = filtered_df["Referring Attorney"].value_counts().idxmax()
+        col3.metric("Top Referring Atty", top_attorney)
+
+    # ========== 📊 Visualizations ==========
+    if "Class Code Title" in filtered_df.columns:
+        st.subheader("📊 Case Status Distribution")
+        status_counts = filtered_df["Class Code Title"].value_counts().reset_index()
+        status_counts.columns = ["Case Status", "Count"]
+        fig_status = px.bar(
+            status_counts, x="Case Status", y="Count", text="Count", title="Case Status Overview",
+            color="Case Status"
+        )
+        fig_status.update_traces(textposition="outside")
+        st.plotly_chart(fig_status, use_container_width=True)
+
+    if "Referring Attorney" in filtered_df.columns:
+        st.subheader("👥 Referring Attorney Distribution")
+        referral_counts = filtered_df["Referring Attorney"].value_counts().reset_index()
+        referral_counts.columns = ["Referring Attorney", "Count"]
+        fig_referrals = px.pie(
+            referral_counts, values="Count", names="Referring Attorney",
+            title="Case Distribution by Referring Attorney", hole=0.4
+        )
+        st.plotly_chart(fig_referrals, use_container_width=True)
+
+    if "Case Type" in filtered_df.columns:
+        st.subheader("📁 Campaign Breakdown")
+        case_counts = filtered_df["Case Type"].value_counts().reset_index()
+        case_counts.columns = ["Campaign", "Count"]
+        fig_campaigns = px.bar(
+            case_counts, x="Campaign", y="Count", text="Count", title="Cases per Campaign",
+            color="Campaign"
+        )
+        fig_campaigns.update_traces(textposition="outside")
+        st.plotly_chart(fig_campaigns, use_container_width=True)
+
+    # ========== 📋 Data Table ==========
+    st.subheader(f"📄 Filtered Case Table ({len(filtered_df)} records)")
+    display_cols = ["Client Name", "Case Type", "Class Code Title", "Referring Attorney", "Phone Number", "Email"]
+    columns_to_show = [col for col in display_cols if col in filtered_df.columns]
+
+    if columns_to_show:
+        safe_df = filtered_df[columns_to_show].copy()
+        for col in safe_df.columns:
+            safe_df[col] = safe_df[col].apply(lambda x: sanitize_text(str(x)))
+        st.dataframe(safe_df.reset_index(drop=True), use_container_width=True)
     else:
-        st.info("ℹ️ No 'Class Code Title' data to display.")
+        st.warning("⚠️ No matching columns to display.")
 
-    st.subheader("👨‍⚖️ Referring Attorney Overview")
-    if "Referring Attorney" in df.columns:
-        referral_counts = df["Referring Attorney"].value_counts()
-        st.bar_chart(referral_counts)
-    else:
-        st.info("ℹ️ No 'Referring Attorney' data to display.")
-
-    # === Table View ===
-    st.subheader("📋 Case Table")
-    table_fields = ["Client Name", "Case Type", "Class Code Title", "Referring Attorney", "Phone Number", "Email"]
-    filtered_fields = [col for col in table_fields if col in df.columns]
-
-    if filtered_fields:
-        display_df = df[filtered_fields].copy()
-        for col in display_df.columns:
-            display_df[col] = display_df[col].apply(lambda x: sanitize_text(str(x)))
-        st.dataframe(display_df.reset_index(drop=True))
-    else:
-        st.warning("⚠️ No matching fields found to display.")
-
-    # === Download Option ===
+    # ========== ⬇️ Download ==========
     st.download_button(
-        label="⬇️ Download Current Filtered Data",
-        data=df.to_csv(index=False).encode("utf-8"),
-        file_name="filtered_dashboard.csv",
+        label="⬇️ Download Filtered CSV",
+        data=filtered_df.to_csv(index=False).encode("utf-8"),
+        file_name="litigation_dashboard_filtered.csv",
         mime="text/csv"
     )
