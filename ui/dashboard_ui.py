@@ -25,12 +25,12 @@ def run_ui():
 
     df.columns = df.columns.str.strip()
 
-    # Define constants
+    # === Constants ===
     CAMPAIGN_COL = "Case Type"
     STATUS_COL = "Class Code Title"
     REFERRAL_COL = "Referred By Name (Full - Last, First)"
 
-    # ========== 🔍 Base Filters ==========
+    # === 🔍 Sidebar Base Filters ===
     st.sidebar.header("🔍 Base Filters")
     campaign_filter = st.sidebar.multiselect("📁 Campaign", sorted(df[CAMPAIGN_COL].dropna().unique()))
     referring_filter = st.sidebar.multiselect("👤 Referring Attorney", sorted(df[REFERRAL_COL].dropna().unique()))
@@ -44,29 +44,7 @@ def run_ui():
     if status_filter:
         filtered_df = filtered_df[filtered_df[STATUS_COL].isin(status_filter)]
 
-    # ========== ➕ Optional Filters ==========
-    st.sidebar.header("➕ Add Optional Filters")
-
-    with st.sidebar.expander("Advanced Filters"):
-        optional_columns = [
-            col for col in df.columns
-            if col not in [CAMPAIGN_COL, STATUS_COL, REFERRAL_COL]
-            and df[col].nunique() > 1
-            and df[col].nunique() < 50  # only show dropdowns for reasonable cardinality
-        ]
-
-        selected_col = st.selectbox("Choose a column to filter by", [""] + optional_columns)
-        if selected_col:
-            try:
-                # Type-safe unique sort
-                unique_vals = df[selected_col].dropna().astype(str).unique().tolist()
-                selected_vals = st.multiselect(f"Filter values for {selected_col}", sorted(unique_vals))
-                if selected_vals:
-                    filtered_df = filtered_df[df[selected_col].astype(str).isin(selected_vals)]
-            except Exception as e:
-                st.warning(f"⚠️ Could not load filter values for {selected_col}: {e}")
-
-    # ========== 📊 KPI Charts ==========
+    # === 📊 KPI Charts ===
     st.subheader("📌 Case Status Overview")
     if STATUS_COL in filtered_df.columns:
         status_counts = filtered_df[STATUS_COL].value_counts().reset_index()
@@ -79,8 +57,31 @@ def run_ui():
         referral_counts.columns = ["Referring Attorney", "Count"]
         st.plotly_chart(px.bar(referral_counts, x="Referring Attorney", y="Count", text="Count"), use_container_width=True)
 
-    # ========== 📋 Case Table ==========
+    # === ➕ Optional Filters ===
+    st.subheader("➕ Add Optional Filters")
+
+    optional_display_cols = []
+    with st.expander("Add Filters from Additional Columns"):
+        candidate_cols = [
+            col for col in df.columns
+            if col not in [CAMPAIGN_COL, STATUS_COL, REFERRAL_COL]
+            and 1 < df[col].nunique() < 50
+        ]
+
+        selected_col = st.selectbox("Choose a column to filter by", [""] + candidate_cols)
+        if selected_col:
+            try:
+                unique_vals = df[selected_col].dropna().astype(str).unique().tolist()
+                selected_vals = st.multiselect(f"Select values for: {selected_col}", sorted(unique_vals), key=selected_col)
+                if selected_vals:
+                    filtered_df = filtered_df[filtered_df[selected_col].astype(str).isin(selected_vals)]
+                    optional_display_cols.append(selected_col)
+            except Exception as e:
+                st.warning(f"⚠️ Could not apply filter for {selected_col}: {e}")
+
+    # === 📋 Case Table ===
     st.subheader(f"📋 Case Table ({len(filtered_df)} records)")
+
     base_display_cols = [
         "Case Type",
         "Class Code Title",
@@ -91,15 +92,16 @@ def run_ui():
         "Case Details First Party Details Default Email Account Address"
     ]
 
-    available_cols = [col for col in base_display_cols if col in filtered_df.columns]
-    table_df = filtered_df[available_cols].copy()
+    # Show base + any selected optional filters
+    all_display_cols = [col for col in base_display_cols if col in filtered_df.columns] + optional_display_cols
+    clean_df = filtered_df[all_display_cols].copy()
 
-    for col in table_df.columns:
-        table_df[col] = table_df[col].apply(lambda x: sanitize_text(str(x)))
+    for col in clean_df.columns:
+        clean_df[col] = clean_df[col].apply(lambda x: sanitize_text(str(x)))
 
-    st.dataframe(table_df.reset_index(drop=True), use_container_width=True)
+    st.dataframe(clean_df.reset_index(drop=True), use_container_width=True)
 
-    # ========== ⬇️ Download ==========
+    # === ⬇️ Download Button ===
     st.download_button(
         label="⬇️ Download Filtered Results as CSV",
         data=filtered_df.to_csv(index=False).encode("utf-8"),
