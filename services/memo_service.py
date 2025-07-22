@@ -2,7 +2,7 @@ import os
 from core.security import sanitize_text
 from utils.docx_utils import replace_text_in_docx_all
 from core.openai_client import safe_generate
-from core.token_utils import trim_to_token_limit
+from utils.token_utils import trim_to_token_limit
 from utils.template_engine import render_template_string
 from core.generators.quote_parser import (
     normalize_deposition_lines,
