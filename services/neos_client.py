@@ -8,7 +8,7 @@ class NeosClient:
     def __init__(self, config: AppConfig = None):
         self.config = config or get_config()
         self.base_url = self.config.NEOS_BASE_URL.rstrip("/")
-        self.token = self.config.NEOS_API_TOKEN
+        self.token = self.config.NEOS_API_KEY  # ✅ corrected name
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json"
@@ -44,7 +44,10 @@ class NeosClient:
             files = {
                 "file": (filename, file_bytes),
             }
-            response = requests.post(url, headers={"Authorization": f"Bearer {self.token}"}, files=files, timeout=20)
+            headers = {
+                "Authorization": f"Bearer {self.token}"
+            }
+            response = requests.post(url, headers=headers, files=files, timeout=20)
             response.raise_for_status()
             logger.info(f"✅ Document '{filename}' uploaded to NEOS case {case_id}")
         except Exception as e:

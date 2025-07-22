@@ -8,22 +8,20 @@ from core.session import get_secure_temp_dir
 from logger import logger
 
 
-def clean_temp_dir(expire_minutes: int = 60):
+def clean_temp_dir(base_dir: str = "temp", expire_minutes: int = 60):
     """
-    Removes all files in the secure session temp directory older than X minutes.
+    Deletes all subfolders in `temp/` older than X minutes.
     """
     try:
-        temp_dir = get_secure_temp_dir()
         cutoff = time.time() - (expire_minutes * 60)
-
-        for fname in os.listdir(temp_dir):
-            fpath = os.path.join(temp_dir, fname)
-            if os.path.isfile(fpath) and os.path.getmtime(fpath) < cutoff:
-                os.remove(fpath)
-            elif os.path.isdir(fpath) and os.path.getmtime(fpath) < cutoff:
-                shutil.rmtree(fpath)
+        for session_folder in os.listdir(base_dir):
+            session_path = os.path.join(base_dir, session_folder)
+            if not os.path.isdir(session_path):
+                continue
+            if os.path.getmtime(session_path) < cutoff:
+                shutil.rmtree(session_path)
     except Exception as e:
-        logger.error(f"❌ Failed to clean temp dir: {e}")
+        logger.error(f"❌ Failed to clean temp directory: {e}")
 
 
 def remove_file_safe(path: str):

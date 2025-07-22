@@ -1,38 +1,58 @@
 import os
+from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
 
+# === Exception for Missing Required Configs ===
 class ConfigError(Exception):
     pass
 
+# === Azure Key Vault Setup (lazy initialization) ===
+_keyvault_client = None
+
 def get_from_secret_manager(var_name: str) -> str:
     """
-    Optional: override this stub with Azure Key Vault, AWS Secrets Manager, etc.
-    Return None if secret not found in vault.
+    Attempts to retrieve a secret from Azure Key Vault.
+    Returns None if Key Vault is not available or the secret is not found.
     """
-    # Placeholder logic – customize as needed
-    return None  # Integrate Azure SDK or boto3 here for actual vault access
+    global _keyvault_client
+    try:
+        vault_url = os.getenv("AZURE_KEYVAULT_URL")
+        if not vault_url:
+            return None  # Key Vault not configured
 
+        if not _keyvault_client:
+            credential = DefaultAzureCredential()
+            _keyvault_client = SecretClient(vault_url=vault_url, credential=credential)
+
+        secret = _keyvault_client.get_secret(var_name)
+        return secret.value
+    except Exception:
+        return None  # Gracefully fallback to env
 
 def get_env(var_name: str, required: bool = True, default: str = None) -> str:
     """
-    Retrieves environment variable with support for secret manager override.
-    Priority: Secret Vault > os.environ > Default
+    Retrieves a configuration value in the following priority:
+    1. Azure Key Vault (if configured)
+    2. Environment variable (.env or Streamlit secrets)
+    3. Default (if provided)
     """
     value = None
 
-    # 1. Secret Vault (for production)
-    if os.getenv("ENV", "").lower() == "production":
+    # Priority 1: Azure Key Vault (only if ENV=production or AZURE_KEYVAULT_URL set)
+    if os.getenv("ENV", "").lower() == "production" or os.getenv("AZURE_KEYVAULT_URL"):
         value = get_from_secret_manager(var_name)
 
-    # 2. Environment fallback
+    # Priority 2: Environment fallback
     if value is None:
         value = os.getenv(var_name, default)
 
+    # Enforce required check
     if required and not value:
         raise ConfigError(f"Missing required environment variable: {var_name}")
-    
+
     return value
 
-
+# === Centralized Configuration Loader ===
 class AppConfig:
     def __init__(self):
         # === OpenAI ===
@@ -55,5 +75,6 @@ class AppConfig:
         self.DROPBOX_REFRESH_TOKEN = get_env("DROPBOX_REFRESH_TOKEN")
         self.DROPBOX_MASTER_DASHBOARD_PATH = get_env("DROPBOX_MASTER_DASHBOARD_PATH", default="/Master Dashboard.xlsx")
 
+# === Accessor ===
 def get_config() -> AppConfig:
     return AppConfig()

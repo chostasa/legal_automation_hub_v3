@@ -73,4 +73,6 @@ except Exception as e:
     import traceback
     st.error("❌ Failed to load selected module. See below.")
     st.exception(e)
-    st.code(traceback.format_exc())
+    import traceback
+    st.code(redact_log(traceback.format_exc()))
+

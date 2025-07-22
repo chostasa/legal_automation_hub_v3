@@ -35,13 +35,14 @@ class OpenAIClient:
                 temperature=temperature
             )
 
-            if not response.choices:
-                logger.error("❌ OpenAI returned no choices.")
-                raise RuntimeError("Empty response from OpenAI.")
+            # Validate and extract
+            choices = getattr(response, "choices", [])
+            if not choices:
+                raise RuntimeError("❌ OpenAI returned no completions.")
 
-            content = response.choices[0].message.content.strip()
+            content = choices[0].message.content.strip()
 
-            # ✅ Token usage logging
+            # ✅ Optional token logging
             usage = getattr(response, "usage", None)
             if usage:
                 log_usage(
@@ -61,6 +62,7 @@ class OpenAIClient:
         except OpenAIError as e:
             logger.error(redact_log(f"❌ OpenAI API error: {e}"))
             raise RuntimeError("OpenAI generation failed due to API error.")
+
         except Exception as e:
             logger.error(redact_log(f"❌ Unexpected OpenAI failure: {e}"))
             raise RuntimeError("OpenAI generation failed unexpectedly.")

@@ -11,7 +11,7 @@ from core.security import sanitize_text, sanitize_filename, redact_log
 from utils.stream_utils import stream_bytesio
 from logger import logger
 
-# Cleanup expired temp files on load
+# === Cleanup old temp files for all sessions (not just current) ===
 clean_temp_dir()
 
 def run_ui():
@@ -20,7 +20,7 @@ def run_ui():
     error_code = "BATCH_GEN_001"
     df = None
 
-    # === Upload Spreadsheet FIRST ===
+    # === Step 1: Upload Excel Sheet ===
     uploaded_excel = st.file_uploader("📊 Upload Excel Sheet (.xlsx)", type=["xlsx"])
 
     if uploaded_excel:
@@ -39,14 +39,14 @@ def run_ui():
                 for col in df.columns:
                     st.code(f"{{{{{col}}}}}", language="jinja")
 
-                st.info("✏️ Open your Word template in Microsoft Word and insert the placeholders above. Then upload it below to generate documents.")
+                st.info("✏️ Be sure your template includes the correct placeholders before continuing.")
 
         except Exception as e:
             logger.error(redact_log(f"[{error_code}] ❌ Failed to load Excel: {e}"))
-            st.error(f"❌ Could not read spreadsheet (code: {error_code}).")
+            st.error("❌ Could not read spreadsheet. Please check formatting.")
             df = None
 
-    # === Upload Word Template and Generate ===
+    # === Step 2: Upload Template & Generate ===
     if df is not None:
         st.markdown("---")
         st.subheader("📄 Upload Word Template and Generate")
@@ -67,19 +67,19 @@ def run_ui():
 
                 with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_out:
                     for i, row in df.iterrows():
-                        replacements = {
-                            str(k).strip(): sanitize_text(str(v)) if pd.notnull(v) else ""
-                            for k, v in row.items()
-                        }
-
-                        output_filename = filename_pattern
-                        for key, val in replacements.items():
-                            output_filename = output_filename.replace(f"{{{{{key}}}}}", val.strip())
-
-                        output_filename = sanitize_filename(output_filename or f"Letter_{i}.docx")
-                        output_path = os.path.join(temp_dir, f"temp_{i}.docx")
-
                         try:
+                            replacements = {
+                                str(k).strip(): sanitize_text(str(v)) if pd.notnull(v) else ""
+                                for k, v in row.items()
+                            }
+
+                            output_filename = filename_pattern
+                            for key, val in replacements.items():
+                                output_filename = output_filename.replace(f"{{{{{key}}}}}", val.strip())
+
+                            output_filename = sanitize_filename(output_filename or f"Letter_{i}.docx")
+                            output_path = os.path.join(temp_dir, f"temp_{i}.docx")
+
                             replace_text_in_docx_all(
                                 docx_path=uploaded_template,
                                 replacements=replacements,
@@ -104,10 +104,11 @@ def run_ui():
                         file_name="batch_output.zip",
                         mime="application/zip"
                     )
+                    st.caption("⚠️ Generated files will be automatically deleted after 1 hour. Please download promptly.")
 
                 if total_fail:
-                    st.warning(f"⚠️ {total_fail} documents failed. See logs for more info.")
+                    st.warning(f"⚠️ {total_fail} documents failed to generate. See logs for details.")
 
             except Exception as e:
                 logger.error(redact_log(f"[{error_code}] ❌ Batch generation failed: {e}"))
-                st.error(f"❌ Unexpected error occurred (code: {error_code}). Please contact support.")
+                st.error("❌ Unexpected error occurred. Please contact support.")

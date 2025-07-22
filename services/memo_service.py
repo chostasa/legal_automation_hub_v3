@@ -1,7 +1,7 @@
 import os
-from core.security import sanitize_text
+from core.security import sanitize_text, redact_log
 from utils.docx_utils import replace_text_in_docx_all
-from core.openai_client import safe_generate
+from services.openai_client import safe_generate
 from utils.token_utils import trim_to_token_limit
 from utils.template_engine import render_template_string
 from core.generators.quote_parser import (
@@ -12,6 +12,12 @@ from core.generators.quote_parser import (
 from utils.thread_utils import run_in_thread
 from logger import logger
 
+# === Prompt Messages ===
+INTRO_MSG = "You are a legal writer."
+FACTS_MSG = "Summarize the facts and liability issues."
+CAUSATION_MSG = "Summarize injuries and causation clearly."
+HARMS_MSG = "Summarize damages and human harms."
+CONCLUSION_MSG = "Draft a professional mediation conclusion."
 
 def generate_quotes_from_raw_depo(raw_text: str, categories: list) -> dict:
     try:
@@ -20,9 +26,8 @@ def generate_quotes_from_raw_depo(raw_text: str, categories: list) -> dict:
         chunks = [qa_text[i:i+9000] for i in range(0, len(qa_text), 9000)]
         return generate_quotes_in_chunks(chunks, categories=categories)
     except Exception as e:
-        logger.error(f"❌ Failed to extract quotes from deposition: {e}")
+        logger.error(redact_log(f"❌ Failed to extract quotes from deposition: {e}"))
         return {}
-
 
 def generate_memo_from_fields(data: dict, template_path, output_dir: str) -> tuple:
     """
@@ -38,7 +43,7 @@ def generate_memo_from_fields(data: dict, template_path, output_dir: str) -> tup
 You are drafting the Introduction section of a mediation memo. Plaintiffs: {data.get('plaintiffs')}. Defendants: {data.get('defendants')}.
 Court: {data.get('court')}. Case No: {data.get('case_number')}.
 """.strip()
-        content_sections["Introduction"] = run_in_thread(safe_generate, "You are a legal writer.", intro_prompt)
+        content_sections["Introduction"] = run_in_thread(safe_generate, INTRO_MSG, intro_prompt)
 
         # === Section 2: Facts and Liability
         facts_prompt = f"""
@@ -47,7 +52,7 @@ Liability Quotes: {data.get('liability_quotes', '')}
 """.strip()
         content_sections["Facts_Liability"] = run_in_thread(
             safe_generate,
-            "Summarize the facts and liability issues.",
+            FACTS_MSG,
             trim_to_token_limit(facts_prompt, 3000)
         )
 
@@ -58,7 +63,7 @@ Medical Summary: {data['medical_summary']}
 """.strip()
         content_sections["Causation_Injuries_Treatment"] = run_in_thread(
             safe_generate,
-            "Summarize injuries and causation clearly.",
+            CAUSATION_MSG,
             trim_to_token_limit(medical_prompt, 3000)
         )
 
@@ -69,7 +74,7 @@ Damages narrative and harms to Plaintiff.
 """.strip()
         content_sections["Additional_Harms_Losses"] = run_in_thread(
             safe_generate,
-            "Summarize damages and human harms.",
+            HARMS_MSG,
             trim_to_token_limit(damages_prompt, 2500)
         )
 
@@ -79,36 +84,38 @@ Plaintiffs are {data.get('plaintiffs')} and request confidential resolution.
 """.strip()
         content_sections["Conclusion"] = run_in_thread(
             safe_generate,
-            "Draft a professional mediation conclusion.",
+            CONCLUSION_MSG,
             conclusion_prompt
         )
 
-        # === Merge into Word doc ===
-        replacements = {
+        # === Merge for Template Replacement
+        memo_data = {
             "Court": data.get("court"),
             "Case_Number": data.get("case_number"),
             "Plaintiffs": data.get("plaintiffs"),
             "Defendants": data.get("defendants"),
             "Parties": data.get("party_information_from_complaint"),
             "Demand": data.get("settlement_summary"),
+            **content_sections
         }
 
-        replacements.update(content_sections)
-
+        # Add numbered plaintiffs and defendants
         for i in range(1, 4):
-            replacements[f"Plaintiff_{i}"] = data.get(f"plaintiff{i}", "")
+            memo_data[f"Plaintiff_{i}"] = data.get(f"plaintiff{i}", "")
         for i in range(1, 8):
-            replacements[f"Defendant_{i}"] = data.get(f"defendant{i}", "")
+            memo_data[f"Defendant_{i}"] = data.get(f"defendant{i}", "")
 
         output_path = os.path.join(output_dir, "mediation_memo.docx")
-        run_in_thread(replace_text_in_docx_all, template_path, replacements, output_path)
+        run_in_thread(replace_text_in_docx_all, template_path, memo_data, output_path)
 
-        return output_path, replacements
+        if not os.path.exists(output_path):
+            raise RuntimeError("❌ Memo DOCX was not created.")
+
+        return output_path, memo_data
 
     except Exception as e:
-        logger.error(f"❌ Memo generation failed: {e}")
-        raise RuntimeError(f"Memo generation failed: {e}")
-
+        logger.error(redact_log(f"❌ Memo generation failed: {e}"))
+        raise RuntimeError("Memo generation failed.")
 
 def generate_plaintext_memo(data: dict) -> str:
     """
@@ -125,5 +132,5 @@ def generate_plaintext_memo(data: dict) -> str:
         output = [f"## {section.replace('_', ' ')}\n\n{data.get(section, '').strip()}" for section in sections]
         return "\n\n".join(output)
     except Exception as e:
-        logger.error(f"❌ Failed to generate plaintext memo: {e}")
+        logger.error(redact_log(f"❌ Failed to generate plaintext memo: {e}"))
         return ""

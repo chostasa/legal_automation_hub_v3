@@ -25,9 +25,13 @@ class GraphClient:
             headers = {"Content-Type": "application/x-www-form-urlencoded"}
             response = requests.post(url, data=data, headers=headers, timeout=10)
             response.raise_for_status()
-            token = response.json().get("access_token")
+
+            json_resp = response.json()
+            token = json_resp.get("access_token")
             if not token:
+                logger.error("❌ Graph token response missing 'access_token'")
                 raise ValueError("No access token returned from Microsoft.")
+
             return token
         except Exception as e:
             logger.error(redact_log(f"❌ Failed to retrieve Graph access token: {e}"))
@@ -51,7 +55,8 @@ class GraphClient:
                     "toRecipients": [
                         {"emailAddress": {"address": to}}
                     ]
-                }
+                },
+                "saveToSentItems": "true"  # 🔐 Optional but useful for audit trail
             }
 
             response = requests.post(url, headers=headers, json=payload, timeout=10)

@@ -1,5 +1,5 @@
 import os
-from core.openai_client import safe_generate
+from services.openai_client import safe_generate
 from utils.docx_utils import replace_text_in_docx_all
 from core.security import sanitize_text
 from utils.token_utils import trim_to_token_limit

@@ -28,7 +28,11 @@ python-dotenv
 # OCR / Document Conversion (optional)
 PyMuPDF
 pytesseract
-pypandoc
-pandoc
+
+#Azure Packages
+azure-identity
+azure-keyvault-secrets
+
+
 
 
