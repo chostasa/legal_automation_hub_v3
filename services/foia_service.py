@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from services.openai_client import safe_generate
 from utils.docx_utils import replace_text_in_docx_all
 from utils.token_utils import trim_to_token_limit
@@ -21,31 +22,40 @@ DEFAULT_SAFETY = "\n\n".join([
     NO_PASSIVE_LANGUAGE_NOTE,
 ])
 
-def generate_foia_request(client_name: str, agency_name: str, details: str, template_path: str, output_path: str) -> tuple:
+def generate_foia_request(data: dict, template_path: str, output_path: str) -> tuple:
     """
     Generates a FOIA request letter using GPT and fills the Word template.
-    All blocking steps are executed in background threads.
+    Accepts sanitized data dict with full FOIA metadata.
     Returns (output_path, generated_body).
     """
     try:
-        # 🧼 Sanitize inputs
-        client_name = sanitize_text(client_name)
-        agency_name = sanitize_text(agency_name)
-        details = sanitize_text(details)
+        # ⏳ Prepare inputs
+        formatted_date = datetime.today().strftime("%B %d, %Y")
+        synopsis = trim_to_token_limit(data.get("case_synopsis", ""), 2000)
+        explicit_instructions = data.get("explicit_instructions", "")
 
-        # ✂️ Trim for safety
-        facts = trim_to_token_limit(details, 2000)
-
-        # 🧠 GPT Prompt
+        # ✍️ Prompt with full context
         prompt = f"""
-You are drafting a formal FOIA request to {agency_name} regarding the following incident involving {client_name}:
+You are drafting a formal FOIA request letter for legal counsel.
 
-{facts}
+Recipient: {data.get("recipient_name")}
+Client ID: {data.get("client_id")}
+Incident Date: {data.get("date_of_incident")}
+Location: {data.get("location")}
+Case Type: {data.get("case_type")}
+Facility/System: {data.get("facility_system")}
+Synopsis: {synopsis}
+
+Potential Records Requests:
+{data.get("potential_requests", "")}
+
+Explicit Instructions (optional):
+{explicit_instructions}
 
 {DEFAULT_SAFETY}
 """.strip()
 
-        # 🧵 Run GPT in background thread
+        # 🧠 Generate letter body using GPT
         body = run_in_thread(
             safe_generate,
             "You are a government records request expert.",
@@ -53,16 +63,24 @@ You are drafting a formal FOIA request to {agency_name} regarding the following 
         )
         body = sanitize_text(body)
 
-        # 🧵 Fill Word template using background thread
+        # 📄 Prepare replacements for template
+        replacements = {
+            "date": formatted_date,
+            "defendant_name": data.get("recipient_name", ""),
+            "defendant_line1": data.get("recipient_address_1", ""),
+            "defendant_line2": data.get("recipient_address_2", ""),
+            "client_id": data.get("client_id", ""),
+            "location": data.get("location", ""),
+            "doi": data.get("date_of_incident", ""),
+            "synopsis": synopsis,
+            "foia_request_bullet_points": data.get("potential_requests", ""),
+            "Body": body
+        }
+
         run_in_thread(
             replace_text_in_docx_all,
             template_path,
-            {
-                "ClientName": client_name,
-                "Agency": agency_name,
-                "Details": details,
-                "Body": body
-            },
+            replacements,
             output_path
         )
 
