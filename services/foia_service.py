@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 from services.openai_client import safe_generate
 from utils.docx_utils import replace_text_in_docx_all
 from utils.token_utils import trim_to_token_limit
@@ -7,7 +6,6 @@ from core.security import sanitize_text, redact_log
 from utils.thread_utils import run_in_thread
 from logger import logger
 
-# === Safety Notes for All Prompts ===
 from core.banned_phrases import (
     NO_HALLUCINATION_NOTE,
     LEGAL_FLUENCY_NOTE,
@@ -22,67 +20,77 @@ DEFAULT_SAFETY = "\n\n".join([
     NO_PASSIVE_LANGUAGE_NOTE,
 ])
 
+
 def generate_foia_request(data: dict, template_path: str, output_path: str) -> tuple:
     """
-    Generates a FOIA request letter using GPT and fills the Word template.
-    Accepts sanitized data dict with full FOIA metadata.
-    Returns (output_path, generated_body).
+    Accepts a structured dict of FOIA input fields and generates a formal GPT-based FOIA letter.
+    Returns (output_path, gpt_body_text).
     """
     try:
-        # ⏳ Prepare inputs
-        formatted_date = datetime.today().strftime("%B %d, %Y")
-        synopsis = trim_to_token_limit(data.get("case_synopsis", ""), 2000)
-        explicit_instructions = data.get("explicit_instructions", "")
+        # Sanitize and extract fields
+        formatted_date = data.get("formatted_date", "")
+        client_id = sanitize_text(data.get("client_id", ""))
+        agency = sanitize_text(data.get("recipient_name", ""))
+        defendant_line1 = sanitize_text(data.get("recipient_line1", ""))
+        defendant_line2 = sanitize_text(data.get("recipient_line2", ""))
+        location = sanitize_text(data.get("location", ""))
+        doi = sanitize_text(data.get("doi", ""))
+        synopsis = sanitize_text(data.get("synopsis", ""))
+        request_bullets = sanitize_text(data.get("potential_requests", ""))
+        instructions = sanitize_text(data.get("explicit_instructions", ""))
+        case_type = sanitize_text(data.get("case_type", ""))
+        system = sanitize_text(data.get("facility_or_system", ""))
+        role = sanitize_text(data.get("recipient_role", ""))
 
-        # ✍️ Prompt with full context
+        # Prompt to GPT
         prompt = f"""
-You are drafting a formal FOIA request letter for legal counsel.
+You are drafting a professional FOIA request letter from a law firm.
 
-Recipient: {data.get("recipient_name")}
-Client ID: {data.get("client_id")}
-Incident Date: {data.get("date_of_incident")}
-Location: {data.get("location")}
-Case Type: {data.get("case_type")}
-Facility/System: {data.get("facility_system")}
-Synopsis: {synopsis}
+Client: {client_id}
+Agency: {agency}
+Facility/System: {system}
+Role: {role}
+Date of Incident: {doi}
+Location: {location}
+Case Type: {case_type}
 
-Potential Records Requests:
-{data.get("potential_requests", "")}
+Case Summary:
+{synopsis}
 
-Explicit Instructions (optional):
-{explicit_instructions}
+Requests:
+{request_bullets}
+
+Instructions:
+{instructions}
+
+Write a clear, formal FOIA request that:
+- References the above incident and context
+- Lists the types of information sought (bullet points are fine)
+- Includes a closing paragraph with contact information
+Avoid passive voice. Keep tone professional.
 
 {DEFAULT_SAFETY}
 """.strip()
 
-        # 🧠 Generate letter body using GPT
-        body = run_in_thread(
-            safe_generate,
-            "You are a government records request expert.",
-            prompt
-        )
+        # Run GPT
+        body = run_in_thread(safe_generate, "You are a legal records request writer.", prompt)
         body = sanitize_text(body)
 
-        # 📄 Prepare replacements for template
+        # Replace placeholders
         replacements = {
             "date": formatted_date,
-            "defendant_name": data.get("recipient_name", ""),
-            "defendant_line1": data.get("recipient_address_1", ""),
-            "defendant_line2": data.get("recipient_address_2", ""),
-            "client_id": data.get("client_id", ""),
-            "location": data.get("location", ""),
-            "doi": data.get("date_of_incident", ""),
+            "defendant_name": agency,
+            "defendant_line1": defendant_line1,
+            "defendant_line2": defendant_line2,
+            "client_id": client_id,
+            "location": location,
+            "doi": doi,
             "synopsis": synopsis,
-            "foia_request_bullet_points": data.get("potential_requests", ""),
+            "foia_request_bullet_points": request_bullets,
             "Body": body
         }
 
-        run_in_thread(
-            replace_text_in_docx_all,
-            template_path,
-            replacements,
-            output_path
-        )
+        run_in_thread(replace_text_in_docx_all, template_path, replacements, output_path)
 
         if not os.path.exists(output_path):
             raise RuntimeError("❌ FOIA DOCX file was not created.")
