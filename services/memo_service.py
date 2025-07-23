@@ -39,7 +39,7 @@ def generate_quotes_from_raw_depo(raw_text: str, categories: list) -> dict:
     try:
         lines = normalize_deposition_lines(raw_text)
         qa_text = merge_multiline_qas(lines)
-        chunks = [qa_text[i:i+9000] for i in range(0, len(qa_text), 9000)]
+        chunks = [qa_text[i:i + 9000] for i in range(0, len(qa_text), 9000)]
         return generate_quotes_in_chunks(chunks, categories=categories)
     except Exception as e:
         logger.error(redact_log(f"❌ Failed to extract quotes from deposition: {e}"))
@@ -57,7 +57,7 @@ def generate_memo_from_fields(data: dict, template_path, output_dir: str) -> tup
         example_text = data.get("example_text", "").strip()
         example_clause = f"\n\nMatch the tone, structure, and style of this example:\n{example_text[:1500]}" if example_text else ""
 
-        # === Section 1: Introduction
+        # === Section 1: Introduction (gpt-3.5-turbo)
         intro_prompt = f"""
 You are drafting the Introduction section of a mediation memo.
 Plaintiffs: {data.get('plaintiffs')}.
@@ -68,7 +68,12 @@ Court: {data.get('court')}. Case No: {data.get('case_number')}.
 {DEFAULT_SAFETY}
 """.strip()
 
-        content_sections["Introduction"] = run_in_thread(safe_generate, INTRO_MSG, intro_prompt)
+        content_sections["Introduction"] = run_in_thread(
+            safe_generate,
+            prompt=intro_prompt,
+            model="gpt-3.5-turbo",
+            system_msg=INTRO_MSG
+        )
 
         # === Section 2: Facts and Liability
         facts_prompt = f"""
@@ -81,8 +86,8 @@ Liability Quotes: {data.get('liability_quotes', '')}
 
         content_sections["Facts_Liability"] = run_in_thread(
             safe_generate,
-            FACTS_MSG,
-            trim_to_token_limit(facts_prompt, 3000)
+            prompt=trim_to_token_limit(facts_prompt, 3000),
+            system_msg=FACTS_MSG
         )
 
         # === Section 3: Causation / Medical
@@ -96,8 +101,8 @@ Medical Summary: {data['medical_summary']}
 
         content_sections["Causation_Injuries_Treatment"] = run_in_thread(
             safe_generate,
-            CAUSATION_MSG,
-            trim_to_token_limit(medical_prompt, 3000)
+            prompt=trim_to_token_limit(medical_prompt, 3000),
+            system_msg=CAUSATION_MSG
         )
 
         # === Section 4: Damages / Harms
@@ -111,8 +116,8 @@ Damages narrative and harms to Plaintiff.
 
         content_sections["Additional_Harms_Losses"] = run_in_thread(
             safe_generate,
-            HARMS_MSG,
-            trim_to_token_limit(damages_prompt, 2500)
+            prompt=trim_to_token_limit(damages_prompt, 2500),
+            system_msg=HARMS_MSG
         )
 
         # === Section 5: Conclusion
@@ -125,8 +130,8 @@ Plaintiffs are {data.get('plaintiffs')} and request confidential resolution.
 
         content_sections["Conclusion"] = run_in_thread(
             safe_generate,
-            CONCLUSION_MSG,
-            conclusion_prompt
+            prompt=conclusion_prompt,
+            system_msg=CONCLUSION_MSG
         )
 
         # === Merge for Template Replacement

@@ -7,7 +7,7 @@ from core.usage_tracker import log_usage
 from core.auth import get_user_id, get_tenant_id
 from logger import logger
 
-DEFAULT_MODEL = "gpt-4"
+DEFAULT_MODEL = "gpt-3.5-turbo"
 DEFAULT_SYSTEM_MSG = "You are a professional legal writer. Stay concise and legally fluent."
 
 class OpenAIClient:
