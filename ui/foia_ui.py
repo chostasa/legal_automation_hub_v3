@@ -13,6 +13,7 @@ from core.audit import log_audit_event
 from logger import logger
 from utils.file_utils import clean_temp_dir
 
+# 🧹 Clean temp dir on startup
 clean_temp_dir()
 
 def stream_file(path: str):
@@ -22,6 +23,24 @@ def stream_file(path: str):
 
 def run_ui():
     st.header("📬 FOIA Letter Generator")
+
+    # === Optional: Style Example ===
+    st.subheader("🎨 Optional Style Example")
+    example_text = ""
+    EXAMPLE_DIR = os.path.join("examples", "foia", get_tenant_id())
+    os.makedirs(EXAMPLE_DIR, exist_ok=True)
+
+    example_files = sorted([f for f in os.listdir(EXAMPLE_DIR) if f.endswith(".txt")])
+    if example_files:
+        selected_example = st.selectbox("Choose Style Example", ["None"] + example_files)
+        if selected_example != "None":
+            path = os.path.join(EXAMPLE_DIR, selected_example)
+            with open(path, "r", encoding="utf-8") as f:
+                example_text = f.read()
+            with st.expander("🧠 Preview Example Text"):
+                st.code(example_text[:3000], language="markdown")
+    else:
+        st.info(f"No style examples found in `{EXAMPLE_DIR}`")
 
     with st.form("foia_form"):
         st.subheader("📌 Basic Info")
@@ -51,7 +70,7 @@ def run_ui():
         st.session_state.foia_cache = {}
 
     if submitted:
-        # Validate required fields
+        # ✅ Validate fields
         required_fields = {
             "Client ID": client_id,
             "Recipient Name": recipient_name,
@@ -91,7 +110,13 @@ def run_ui():
                 "recipient_role": sanitize_text(recipient_role)
             }
 
-            fingerprint = "|".join([data["client_id"], data["recipient_abbrev"], data["recipient_name"], data["case_synopsis"]])
+            fingerprint = "|".join([
+                data["client_id"],
+                data["recipient_abbrev"],
+                data["recipient_name"],
+                data["synopsis"],
+                example_text.strip()[:100]
+            ])
             form_key = hashlib.md5(fingerprint.encode()).hexdigest()
 
             if form_key in st.session_state.foia_cache:
@@ -107,7 +132,8 @@ def run_ui():
                     _, _ = generate_foia_request(
                         data=data,
                         template_path=TEMPLATE_FOIA,
-                        output_path=file_path
+                        output_path=file_path,
+                        example_text=example_text
                     )
 
                     st.session_state.foia_cache[form_key] = (file_path, {})
@@ -118,7 +144,7 @@ def run_ui():
 
             st.download_button(
                 label="⬇️ Download Letter (.docx)",
-                data=docx_bytes,  # ✅ raw bytes
+                data=docx_bytes,
                 file_name=os.path.basename(file_path),
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
