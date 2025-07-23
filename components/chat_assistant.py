@@ -6,13 +6,11 @@ from core.auth import get_user_id, get_tenant_id
 from core.security import redact_log
 from logger import logger
 
-# === System Prompt for Assistant ===
 ASSISTANT_SYSTEM_PROMPT = """
 You are a helpful internal assistant for litigation staff using the Legal Automation Hub.
 You help rephrase legal text, explain outputs, and answer module questions.
 """
 
-# === Log Assistant Interactions ===
 def log_assistant_interaction(user, tenant, question, answer):
     try:
         log_dir = os.path.join("logs", "assistant_logs")
@@ -23,60 +21,45 @@ def log_assistant_interaction(user, tenant, question, answer):
     except Exception as e:
         logger.error(redact_log(f"❌ Assistant log failed: {e}"))
 
-# === Render Floating Assistant Button + Modal ===
 def render_chat_modal():
     if "show_assistant" not in st.session_state:
         st.session_state.show_assistant = False
 
-    # === Floating button CSS (bottom-left)
+    # Inject custom CSS for floating layout
     st.markdown("""
         <style>
-        .floating-chat-button {
+        .chat-bubble {
             position: fixed;
             bottom: 25px;
             left: 25px;
             z-index: 9999;
         }
-        .floating-chat-button button {
-            background-color: #0A1D3B;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 65px;
-            height: 65px;
-            font-size: 28px;
-            cursor: pointer;
-            box-shadow: 0px 4px 10px rgba(0,0,0,0.25);
+        .chat-modal {
+            position: fixed;
+            bottom: 100px;
+            left: 25px;
+            z-index: 9998;
+            background: white;
+            border: 2px solid #0A1D3B;
+            border-radius: 12px;
+            padding: 1rem;
+            width: 360px;
+            max-height: 500px;
+            overflow-y: auto;
+            box-shadow: 0px 6px 15px rgba(0,0,0,0.25);
         }
         </style>
-        <div class="floating-chat-button">
     """, unsafe_allow_html=True)
 
-    # === Native Streamlit toggle button
-    if st.button("💬", key="chat_toggle_button"):
-        st.session_state.show_assistant = not st.session_state.show_assistant
+    # === Floating Button
+    with st.container():
+        chat_toggle = st.button("💬", key="chat_toggle", help="Toggle Assistant", args=(), kwargs={}, use_container_width=False)
+        if chat_toggle:
+            st.session_state.show_assistant = not st.session_state.show_assistant
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # === Assistant modal panel (sticky floating)
+    # === Floating Modal if Active
     if st.session_state.show_assistant:
-        st.markdown("""
-            <div style="
-                position: fixed;
-                bottom: 100px;
-                left: 25px;
-                z-index: 9998;
-                background: white;
-                border: 2px solid #0A1D3B;
-                border-radius: 12px;
-                padding: 1rem;
-                width: 360px;
-                max-height: 500px;
-                overflow-y: auto;
-                box-shadow: 0px 6px 15px rgba(0,0,0,0.25);
-            ">
-        """, unsafe_allow_html=True)
-
+        st.markdown('<div class="chat-modal">', unsafe_allow_html=True)
         st.markdown("#### 🧠 Legal Automation Assistant")
 
         if "chat_log" not in st.session_state:
@@ -100,3 +83,6 @@ def render_chat_modal():
             st.experimental_rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
+
+    # === Floating Button Div (overlay)
+    st.markdown('<div class="chat-bubble"></div>', unsafe_allow_html=True)
