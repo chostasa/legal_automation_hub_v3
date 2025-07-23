@@ -167,7 +167,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             "location": data.get("location", ""),
             "doi": data.get("doi", ""),
             "synopsis": data["synopsis"],
-            "foia_request_bullet_points": "\n".join(request_list.split("\n")),
+            "foia_request_bullet_points": [line.strip("• ").strip() for line in request_list.split("\n") if line.strip()],
             "Body": foia_body
         }
 
