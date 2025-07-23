@@ -7,8 +7,15 @@ from core.usage_tracker import log_usage
 from core.auth import get_user_id, get_tenant_id
 from logger import logger
 
+# === Default Settings ===
 DEFAULT_MODEL = "gpt-3.5-turbo"
 DEFAULT_SYSTEM_MSG = "You are a professional legal writer. Stay concise and legally fluent."
+
+# === Supported Model Aliases (map to versioned models)
+MODEL_ALIASES = {
+    "gpt-3.5-turbo": "gpt-3.5-turbo-1106",
+    "gpt-4": "gpt-4-0613"
+}
 
 class OpenAIClient:
     def __init__(self, config: AppConfig = None):
@@ -26,8 +33,12 @@ class OpenAIClient:
     ) -> str:
         try:
             trimmed = trim_to_token_limit(prompt)
+
+            # 🔁 Resolve model alias
+            resolved_model = MODEL_ALIASES.get(model or self.model, model or self.model)
+
             response = self.client.chat.completions.create(
-                model=model or self.model,
+                model=resolved_model,
                 messages=[
                     {"role": "system", "content": system_msg},
                     {"role": "user", "content": trimmed}
@@ -35,14 +46,14 @@ class OpenAIClient:
                 temperature=temperature
             )
 
-            # Validate and extract
+            # ✅ Extract content
             choices = getattr(response, "choices", [])
             if not choices:
                 raise RuntimeError("❌ OpenAI returned no completions.")
 
             content = choices[0].message.content.strip()
 
-            # ✅ Optional token logging
+            # 🧮 Optional: track token usage
             usage = getattr(response, "usage", None)
             if usage:
                 log_usage(
@@ -51,7 +62,7 @@ class OpenAIClient:
                     user_id=get_user_id(),
                     amount=usage.total_tokens,
                     metadata={
-                        "model": model or self.model,
+                        "model": resolved_model,
                         "prompt_tokens": usage.prompt_tokens,
                         "completion_tokens": usage.completion_tokens,
                     }
