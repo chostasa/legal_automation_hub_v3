@@ -142,7 +142,11 @@ Plaintiffs are {data.get('plaintiffs')} and request confidential resolution.
             "Parties": data.get("party_information_from_complaint"),
             "Demand": data.get("settlement_summary"),
             "Future_Medical_Bills": data.get("future_medical_bills", ""),
-            **content_sections
+            "Introduction": content_sections.get("Introduction", ""),
+            "Facts_Liability": content_sections.get("Facts_Liability", ""),
+            "Causation_Injuries_Treatment": content_sections.get("Causation_Injuries_Treatment", ""),
+            "Additional_Harms_Losses": content_sections.get("Additional_Harms_Losses", ""),
+            "Conclusion": content_sections.get("Conclusion", "")
         }
 
         for i in range(1, 4):
