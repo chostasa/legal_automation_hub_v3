@@ -135,9 +135,13 @@ def run_ui():
                 st.session_state.memo_cache[form_key] = (file_path, memo_data, raw_quotes)
 
         st.success("✅ Memo generated successfully!")
+
+        with open(file_path, "rb") as f:
+            memo_bytes = f.read()
+
         st.download_button(
             label="⬇️ Download Mediation Memo (.docx)",
-            data=stream_file(file_path),
+            data=memo_bytes,
             file_name=os.path.basename(file_path),
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
