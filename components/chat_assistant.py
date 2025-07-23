@@ -6,11 +6,13 @@ from core.auth import get_user_id, get_tenant_id
 from core.security import redact_log
 from logger import logger
 
+# === Assistant Prompt ===
 ASSISTANT_SYSTEM_PROMPT = """
 You are a helpful internal assistant for litigation staff using the Legal Automation Hub.
 You help rephrase legal text, explain outputs, and answer module questions.
 """
 
+# === Log Assistant Activity ===
 def log_assistant_interaction(user, tenant, question, answer):
     try:
         log_dir = os.path.join("logs", "assistant_logs")
@@ -21,11 +23,12 @@ def log_assistant_interaction(user, tenant, question, answer):
     except Exception as e:
         logger.error(redact_log(f"❌ Assistant log failed: {e}"))
 
+# === Main Render Function ===
 def render_chat_modal():
     if "show_assistant" not in st.session_state:
         st.session_state.show_assistant = False
 
-    # Inject floating bubble that clicks Streamlit button
+    # --- Floating Bubble CSS + Trigger ---
     st.markdown("""
         <style>
         .chat-toggle-container {
@@ -52,11 +55,12 @@ def render_chat_modal():
         </div>
     """, unsafe_allow_html=True)
 
-    # Hidden real Streamlit button
-    if st.button("💬", key="chat-toggle-btn", label_visibility="collapsed"):
+    # --- Hidden Streamlit Trigger Button ---
+    trigger = st.empty()
+    if trigger.button("Toggle Assistant", key="chat-toggle-btn"):
         st.session_state.show_assistant = not st.session_state.show_assistant
 
-    # Assistant Modal
+    # --- Assistant Modal ---
     if st.session_state.show_assistant:
         with st.container():
             st.markdown("""
