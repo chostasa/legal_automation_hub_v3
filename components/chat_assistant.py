@@ -25,42 +25,46 @@ def render_chat_modal():
     if "show_assistant" not in st.session_state:
         st.session_state.show_assistant = False
 
-    # --- Floating brain bubble (styled button) ---
-    with st.container():
-        st.markdown("""
-            <style>
-            div[data-testid="brain-button"] button {
-                position: fixed;
-                bottom: 25px;
-                left: 25px;
-                width: 60px;
-                height: 60px;
-                border-radius: 50%;
-                background-color: #0A1D3B;
-                box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                padding: 0;
-                z-index: 9999;
-            }
-            div[data-testid="brain-button"] button span {
-                visibility: hidden;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-        col = st.columns([0.0001, 0.9999])
-        with col[0]:
-            if st.button("🧠", key="brain-button"):
-                st.session_state.show_assistant = not st.session_state.show_assistant
-                # Greet on first open
-                if st.session_state.show_assistant and "assistant_greeted" not in st.session_state:
-                    welcome = "Hi there! I'm your Legal Automation Assistant. I can help explain outputs, troubleshoot, or fix writing tone."
-                    st.session_state.chat_log = st.session_state.get("chat_log", [])
-                    st.session_state.chat_log.append({"user": "System", "assistant": welcome})
-                    st.session_state.assistant_greeted = True
+    if "chat_log" not in st.session_state:
+        st.session_state.chat_log = []
 
-    # --- Assistant popup modal ---
+    # === Floating Brain Button (positioned and styled)
+    st.markdown("""
+        <style>
+        .brain-fab {
+            position: fixed;
+            bottom: 25px;
+            left: 25px;
+            width: 60px;
+            height: 60px;
+            background-color: #0A1D3B;
+            border-radius: 50%;
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 9999;
+        }
+        .brain-fab span {
+            font-size: 30px;
+        }
+        </style>
+        <div class="brain-fab" onclick="document.getElementById('assistant-toggle').click()">
+            <span>🧠</span>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # === Hidden Streamlit Toggle Button
+    if st.button("🧠", key="assistant-toggle", label_visibility="collapsed"):
+        st.session_state.show_assistant = not st.session_state.show_assistant
+        if st.session_state.show_assistant and not st.session_state.chat_log:
+            st.session_state.chat_log.append({
+                "user": None,
+                "assistant": "Hi there! I'm your Legal Automation Assistant. I can help explain outputs, troubleshoot, or fix writing tone."
+            })
+
+    # === Assistant Modal Popup
     if st.session_state.show_assistant:
         with st.container():
             st.markdown("""
@@ -80,27 +84,21 @@ def render_chat_modal():
                 ">
             """, unsafe_allow_html=True)
 
-            # --- Modal Header with Close Button ---
-            cols = st.columns([0.85, 0.15])
-            with cols[0]:
+            col1, col2 = st.columns([0.9, 0.1])
+            with col1:
                 st.markdown("### 🧠 Legal Automation Assistant")
                 st.caption("How can I help you today? I can answer questions, fix tone, explain outputs, and troubleshoot.")
-            with cols[1]:
-                if st.button("×", key="close_assistant"):
+            with col2:
+                if st.button("❌", key="close-assistant"):
                     st.session_state.show_assistant = False
                     st.stop()
 
-            # --- Chat history ---
-            if "chat_log" not in st.session_state:
-                st.session_state.chat_log = []
-
-            for entry in st.session_state.chat_log[-6:]:
-                if entry["user"] != "System":
+            for entry in st.session_state.chat_log[-5:]:
+                if entry["user"]:
                     st.markdown(f"**You:** {entry['user']}")
                 st.markdown(f"**Assistant:** {entry['assistant']}")
                 st.markdown("---")
 
-            # --- Prompt input ---
             prompt = st.text_input("Ask the assistant...", key="assistant_input")
             if prompt:
                 try:
