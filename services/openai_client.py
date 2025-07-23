@@ -1,5 +1,5 @@
 from openai import OpenAI, OpenAIError
-from config import AppConfig, get_config
+from config_loader import AppConfig, get_config
 from utils.retry_utils import openai_retry
 from utils.token_utils import trim_to_token_limit
 from core.security import redact_log
