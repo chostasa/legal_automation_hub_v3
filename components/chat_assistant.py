@@ -25,34 +25,63 @@ def render_chat_modal():
     if "show_assistant" not in st.session_state:
         st.session_state.show_assistant = False
 
-    # === Floating chat bubble button (Streamlit native & styled)
+    # === Floating Button + Modal Container (Injected HTML + CSS)
     st.markdown("""
         <style>
-        div[data-testid="assistant-button-container"] {
+        .chat-bubble {
             position: fixed;
-            bottom: 25px;
-            left: 25px;
-            z-index: 9999;
+            bottom: 20px;
+            left: 20px;
+            z-index: 10001;
+            width: 65px;
+            height: 65px;
+            background-color: #0A1D3B;
+            color: white;
+            border-radius: 50%;
+            font-size: 30px;
+            text-align: center;
+            line-height: 65px;
+            cursor: pointer;
+        }
+        .chat-box {
+            position: fixed;
+            bottom: 100px;
+            left: 20px;
+            z-index: 10000;
+            width: 350px;
+            max-height: 500px;
+            overflow-y: auto;
+            background-color: #ffffff;
+            border: 2px solid #0A1D3B;
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.2);
         }
         </style>
+        <script>
+            const bubble = window.parent.document.querySelector('.chat-bubble')
+            if (bubble) bubble.onclick = () => {
+                const frame = window.parent.document.querySelector('iframe')
+                frame.contentWindow.postMessage({ type: "streamlit:rerun" }, "*")
+            }
+        </script>
     """, unsafe_allow_html=True)
 
-    with st.container():
-        col = st.columns([1])[0]
-        with col:
-            with st.container():
-                placeholder = st.empty()
-                with placeholder.container():
-                    if st.button("💬", key="toggle_assistant", help="Toggle Legal Automation Assistant"):
-                        st.session_state.show_assistant = not st.session_state.show_assistant
+    # Streamlit button to toggle state
+    clicked = st.button("💬", key="chat_bubble_button", help="Open Assistant", use_container_width=False)
+    if clicked:
+        st.session_state.show_assistant = not st.session_state.show_assistant
 
-    # === Assistant Modal
+    # Render Chat Assistant
     if st.session_state.show_assistant:
-        with st.expander("🧠 Legal Automation Assistant", expanded=True):
+        with st.container():
+            st.markdown('<div class="chat-box">', unsafe_allow_html=True)
+            st.markdown("#### 🧠 Legal Automation Assistant")
+
             if "chat_log" not in st.session_state:
                 st.session_state.chat_log = []
 
-            for entry in st.session_state.chat_log:
+            for entry in st.session_state.chat_log[-5:]:
                 st.markdown(f"**You:** {entry['user']}")
                 st.markdown(f"**Assistant:** {entry['assistant']}")
                 st.markdown("---")
@@ -68,3 +97,5 @@ def render_chat_modal():
                 st.session_state.chat_log.append({"user": prompt, "assistant": response})
                 log_assistant_interaction(get_user_id(), get_tenant_id(), prompt, response)
                 st.experimental_rerun()
+
+            st.markdown("</div>", unsafe_allow_html=True)
