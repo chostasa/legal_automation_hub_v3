@@ -44,38 +44,34 @@ Only include items that would reasonably be within the possession, custody, or c
 Format output as Word-style bullet points using asterisks (*).
 
 === EXAMPLES ===
-• Any and all highway-rail grade crossing incident reports, including initial accident reports, police or first responder reports submitted to the FRA, internal FRA documentation concerning the accident, and any witness statements or interviews conducted as part of the investigation;
-• Any and all photographs, videos, surveillance footage, or imaging depicting the March 18, 2024 incident, or the truck or train involved in the collision immediately prior to, during, or immediately following the incident;
-• Any and all correspondence, filings, emails, call logs, call recordings, complaints or other documents regarding the safety of or hazards imposed by the railroad crossing from 1990 to present;
-• Any and all track inspection history for the segment of track at or near the railroad crossing, including routine and special inspection reports, records of deficiencies found during inspections, correspondence regarding any required or recommended repairs, and work orders or maintenance logs indicating repairs, modifications, or upgrades;
-• Any and all safety audits of the crossing, including risk assessments conducted by the FRA; evaluations of crossing visibility, signaling, and warning devices; reports analyzing compliance with federal, state, or local safety regulations; and recommendations for safety improvements made by the FRA;
-• Any and all complaints and prior accident reports associated with the railroad crossing, including complaints from the public, local government agencies, or railroad employees regarding the crossing's safety; reports of previous train-vehicle or train-pedestrian collisions at the location; and documentation of near-miss incidents or operational concerns;
-• Any and all communication records related to the safety of the crossing before and after the March 18, 2024, accident, including emails, letters, or internal memoranda, as well as correspondence between the FRA and BNSF Railway, ODOT, or local authorities regarding maintenance, safety measures, or proposed improvements;
-• Any and all data on train operations at the crossing, including records of train speeds and scheduled operations through the crossing, as well as any reports of delays or deviations from normal operations near the crossing on or around March 18, 2024;
-• Any and all video footage or surveillance records, including any available locomotive event recorder (black box) data related to the accident and footage from onboard train cameras or nearby traffic cameras; and
-• Any and all records, reports, correspondence, or other documentation concerning other motor vehicle accidents or injuries at the railroad crossing from 1990 to present.
-Any and all maintenance logs for the railroad crossing, including records of inspections, repairs, modifications, or other maintenance activities conducted by or reported to ODOT;
-• Any and all recommendations or evaluations relating to the railroad crossing, including internal assessments, third-party evaluations, proposed safety improvements, and engineering studies regarding the crossing’s condition or necessary upgrades;
-• Any and all complaints or records of prior accidents at the railroad crossing, including reports submitted by the public, local government agencies, railroad personnel, or other stakeholders regarding safety concerns, near-misses, or previous collisions;
-• Any and all records of ODOT’s involvement in response to this incident, including internal communications, coordination with law enforcement or emergency responders, and any actions taken following the March 18, 2024, accident;
-• Any and all meeting minutes or records of discussions related to the safety of the railroad crossing, including agendas, notes, or transcripts from meetings involving ODOT, local officials, railroad representatives, or other relevant stakeholders;
-• Any and all documents, reports, correspondence, or records concerning the inspection, maintenance, or safety improvements of the railroad crossing from 1990 to the present. This would encompass historical safety efforts, recommendations, and maintenance schedules;
-• Records regarding any construction, maintenance, or safety improvements planned or implemented at the railroad crossing from 1990 to the present, including any planned upgrades or pending projects at the site to improve safety or functionality;
-• Any and all records related to the communication between ODOT and third parties (including but not limited to BNSF Railway Company, local municipalities, or other agencies) concerning the safety, condition, or need for repair, maintenance, or other improvements to the railroad crossing; and
-• Any and all documents or records concerning the jurisdictional responsibility of ODOT for maintaining the railroad crossing and any cross-agency discussions regarding safety protocols or enforcement of regulations at the crossing.
-• Any and all reports related to this occurrence, (Case Number: 2024-0856);
-• Any and all additional documents prepared in relation to this incident.
-• Any and all NRFD reports documenting responses to incidents involving agents and/or employees of Hartgrove Hospital concerning a patient and/or minor during the time period from 1984 to the present.
-• Any and all incident reports generated by the NRFD detailing responses to calls involving agents and/or employees of Hartgrove Hospital concerning a student and/or minor during the time period from 1984 to the present.
-• Any and all recordings and/or transcripts of emergency calls (e.g., 911 calls) made to the NRFD or emergency services related to incidents involving agents and/or employees of Hartgrove Hospital concerning a patient and/or minor during the time period from 1984 to the present.
-• Any and all communications, whether written or recorded, received by or sent from the NRFD, referencing incidents involving agents and/or employees of Hartgrove Hospital concerning a patient and/or minor during the time period from 1984 to the present.
-• Copies of any and all statements, whether written or recorded, involving NRFD personnel or emergency responders in relation to investigations into incidents involving agents and/or employees of Hartgrove Hospital
-Any and all BFS reports documenting responses to incidents involving agents and/or employees of Streamwood Hospital concerning a patient and/or minor during the time period from 1983 to the present.
-• Any and all incident reports generated by the BFS detailing responses to calls involving agents and/or employees of Streamwood Hospital concerning a student and/or minor during the time period from 1983 to the present.
-• Any and all recordings and/or transcripts of emergency calls (e.g., 911 calls) made to the BFS or emergency services related to incidents involving agents and/or employees of Streamwood Hospital concerning a patient and/or minor during the time period from 1983 to the present.
-• Any and all communications, whether written or recorded, received by or sent from the BFS, referencing incidents involving agents and/or employees of Streamwood Hospital concerning a patient and/or minor during the time period from 1983 to the present.
-• Copies of any and all statements, whether written or recorded, involving BFS personnel or emergency responders in relation to investigations into incidents involving agents and/or employees of Streamwood Hospital concerning a student and/or minor during the time period from 1983 to the present.
-• Complete copies of any and all BFS investigative reports and/or files related to incidents involving a minor/student and agents and/or employees of Streamwood Hospital during the time period from 1983 to the present.
+• Any and all incident reports, including initial responder documentation, internal agency reports, and witness statements regarding the event;
+• Any and all photographs, videos, surveillance footage, or imaging depicting the incident or the individuals or vehicles involved before, during, or after the event;
+• Any and all correspondence, emails, call logs, complaints, or other documents discussing safety hazards, complaints, or warnings related to the area or subject of the incident;
+• Any and all inspection records or maintenance logs for the area or equipment involved in the incident, including reports of deficiencies and records of repairs or upgrades;
+• Any and all safety audits, risk assessments, compliance evaluations, or recommendations for safety improvements made by internal or external entities;
+• Any and all prior complaints, reports of similar incidents, near-misses, or operational concerns relevant to the location or system involved in the incident;
+• Any and all internal communications, memoranda, or correspondence related to the incident or any prior concerns about the safety or condition of the area or system involved;
+• Any and all operational records for the system or facility in question, including logs, schedules, and deviations from normal operations around the time of the incident;
+• Any and all surveillance or monitoring system footage, including any available black box, body camera, dashcam, or building camera recordings relevant to the event;
+• Any and all historical records of similar accidents, injuries, or safety complaints in the same area or facility, spanning the past several decades;
+• Any and all maintenance logs, service records, or repair histories related to the location, equipment, or personnel involved in the incident;
+• Any and all evaluations, studies, or engineering assessments related to safety conditions, risks, or recommended upgrades in the area where the incident occurred;
+• Any and all documentation of previous incidents or accidents in the relevant area, including safety complaints and related agency responses;
+• Any and all internal records or communications reflecting the agency’s involvement in the investigation or response to the incident;
+• Any and all agendas, meeting minutes, or discussion records referencing the incident or safety concerns prior to the incident;
+• Any and all documentation related to historical safety efforts, maintenance schedules, and inspection results relevant to the location or parties involved;
+• Any and all records of proposed or completed construction, maintenance, or upgrades that relate to the facility or location of the incident;
+• Any and all inter-agency or third-party communications concerning safety risks, required improvements, or regulatory concerns in the location or facility involved;
+• Any and all records discussing legal, operational, or jurisdictional responsibility for the facility, area, or process related to the incident;
+• Any and all reports or documentation prepared in relation to the incident;
+• Any and all supporting documentation, exhibits, summaries, or analysis prepared during or following the investigation into the incident;
+• Any and all reports detailing emergency responses to incidents involving minors or vulnerable individuals at the facility;
+• Any and all incident reports generated in response to calls concerning misconduct, abuse, or harm involving facility staff or agents;
+• Any and all transcripts or audio recordings of emergency calls (e.g., 911) made in connection with the incident or similar events;
+• Any and all written or recorded communications by emergency responders referencing the incident or the individuals involved;
+• Any and all statements, testimony, or interviews with emergency responders related to the incident;
+• Any and all investigative reports or files related to incidents involving harm to minors, patients, or clients in the facility's custody or care.
+
 Only return the list.
 
 Do not include placeholder terms like “[Client Name]”, “[date]”, “[location]”, or similar.
@@ -170,7 +166,11 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             "location": data.get("location", ""),
             "doi": data.get("doi", ""),
             "synopsis": data["synopsis"],
-            "foia_request_bullet_points": [line.lstrip("• ").strip() for line in request_list.split("\n") if line.strip()],
+            "foia_request_bullet_points": [
+                re.sub(r"^\*\s+", "", line).strip()
+                for line in request_list.split("\n")
+                if line.strip()
+            ],
             "Body": foia_body,
         }
 
