@@ -69,6 +69,10 @@ try:
     else:
         st.error("❌ Unknown module selected.")
 
+# === Floating Chat Assistant ===
+from components.chat_assistant import render_chat_modal
+render_chat_modal()
+
 except Exception as e:
     import traceback
     st.error("❌ Failed to load selected module. See below.")

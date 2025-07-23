@@ -6,6 +6,20 @@ from core.security import sanitize_text, redact_log
 from utils.thread_utils import run_in_thread
 from logger import logger
 
+# === Safety Notes for All Prompts ===
+from core.banned_phrases import (
+    NO_HALLUCINATION_NOTE,
+    LEGAL_FLUENCY_NOTE,
+    BAN_PHRASES_NOTE,
+    NO_PASSIVE_LANGUAGE_NOTE,
+)
+
+DEFAULT_SAFETY = "\n\n".join([
+    NO_HALLUCINATION_NOTE,
+    LEGAL_FLUENCY_NOTE,
+    BAN_PHRASES_NOTE,
+    NO_PASSIVE_LANGUAGE_NOTE,
+])
 
 def generate_foia_request(client_name, agency_name, details, template_path, output_path):
     """
@@ -18,9 +32,11 @@ def generate_foia_request(client_name, agency_name, details, template_path, outp
 
         # 🧠 GPT Prompt
         prompt = f"""
-Draft a FOIA request to {agency_name} regarding the following details for {client_name}:
+You are drafting a formal FOIA request to {agency_name} regarding the following incident involving {client_name}:
 
 {facts}
+
+{DEFAULT_SAFETY}
 """.strip()
 
         # 🧵 Run GPT in background thread

@@ -19,6 +19,21 @@ CAUSATION_MSG = "Summarize injuries and causation clearly."
 HARMS_MSG = "Summarize damages and human harms."
 CONCLUSION_MSG = "Draft a professional mediation conclusion."
 
+# === Safety Notes (Appended to all GPT Prompts) ===
+from core.banned_phrases import (
+    NO_HALLUCINATION_NOTE,
+    LEGAL_FLUENCY_NOTE,
+    BAN_PHRASES_NOTE,
+    NO_PASSIVE_LANGUAGE_NOTE,
+)
+
+DEFAULT_SAFETY = "\n\n".join([
+    NO_HALLUCINATION_NOTE,
+    LEGAL_FLUENCY_NOTE,
+    BAN_PHRASES_NOTE,
+    NO_PASSIVE_LANGUAGE_NOTE,
+])
+
 def generate_quotes_from_raw_depo(raw_text: str, categories: list) -> dict:
     try:
         lines = normalize_deposition_lines(raw_text)
@@ -40,15 +55,22 @@ def generate_memo_from_fields(data: dict, template_path, output_dir: str) -> tup
 
         # === Section 1: Introduction
         intro_prompt = f"""
-You are drafting the Introduction section of a mediation memo. Plaintiffs: {data.get('plaintiffs')}. Defendants: {data.get('defendants')}.
+You are drafting the Introduction section of a mediation memo.
+Plaintiffs: {data.get('plaintiffs')}.
+Defendants: {data.get('defendants')}.
 Court: {data.get('court')}. Case No: {data.get('case_number')}.
+
+{DEFAULT_SAFETY}
 """.strip()
+
         content_sections["Introduction"] = run_in_thread(safe_generate, INTRO_MSG, intro_prompt)
 
         # === Section 2: Facts and Liability
         facts_prompt = f"""
 Facts: {data['complaint_narrative']}
 Liability Quotes: {data.get('liability_quotes', '')}
+
+{DEFAULT_SAFETY}
 """.strip()
         content_sections["Facts_Liability"] = run_in_thread(
             safe_generate,
@@ -60,6 +82,8 @@ Liability Quotes: {data.get('liability_quotes', '')}
         medical_prompt = f"""
 Settlement Summary: {data['settlement_summary']}
 Medical Summary: {data['medical_summary']}
+
+{DEFAULT_SAFETY}
 """.strip()
         content_sections["Causation_Injuries_Treatment"] = run_in_thread(
             safe_generate,
@@ -71,6 +95,8 @@ Medical Summary: {data['medical_summary']}
         damages_prompt = f"""
 Damages narrative and harms to Plaintiff.
 {data.get('damages_quotes', '')}
+
+{DEFAULT_SAFETY}
 """.strip()
         content_sections["Additional_Harms_Losses"] = run_in_thread(
             safe_generate,
@@ -81,6 +107,8 @@ Damages narrative and harms to Plaintiff.
         # === Section 5: Conclusion
         conclusion_prompt = f"""
 Plaintiffs are {data.get('plaintiffs')} and request confidential resolution.
+
+{DEFAULT_SAFETY}
 """.strip()
         content_sections["Conclusion"] = run_in_thread(
             safe_generate,

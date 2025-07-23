@@ -17,7 +17,6 @@ def load_dashboard_data():
     client = DropboxClient()
     return client.download_dashboard_df()
 
-
 def run_ui():
     st.title("📊 Litigation Campaign Dashboard")
 
@@ -117,6 +116,11 @@ def run_ui():
         clean_df[col] = clean_df[col].apply(lambda x: sanitize_text(str(x)))
 
     st.dataframe(clean_df.reset_index(drop=True), use_container_width=True)
+
+    # === 📤 Send to Batch Generator ===
+    if st.button("📤 Send to Batch Generator"):
+        st.session_state.dashboard_df = filtered_df[all_display_cols].copy()
+        st.success("✅ Data sent! Go to the '📄 Batch Doc Generator' to merge.")
 
     # === ⬇️ Download Button ===
     st.download_button(
