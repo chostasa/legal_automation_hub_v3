@@ -13,7 +13,6 @@ from core.banned_phrases import (
     NO_PASSIVE_LANGUAGE_NOTE,
 )
 
-# 🔐 Default safety reinforcement for all GPT prompts
 DEFAULT_SAFETY = "\n\n".join([
     NO_HALLUCINATION_NOTE,
     LEGAL_FLUENCY_NOTE,
@@ -21,27 +20,29 @@ DEFAULT_SAFETY = "\n\n".join([
     NO_PASSIVE_LANGUAGE_NOTE,
 ])
 
+# === PROMPT BUILDING ===
 def build_request_prompt(data: dict) -> str:
     return f"""
 You are drafting FOIA bullet points for a civil legal claim.
 
-Case Synopsis:
+Case synopsis:
 {data['synopsis']}
 
-Case Type: {data['case_type']}
-Facility or System: {data['facility_or_system']}
-Defendant Role: {data['recipient_role']}
+Case type: {data['case_type']}
+Facility or system involved: {data['facility_or_system']}
+Defendant role: {data['recipient_role']}
 
-Explicit Instructions:
-{data['explicit_instructions'] or "None provided"}
+Explicit instructions:
+{data.get('explicit_instructions') or "None provided"}
 
-Common Requests or Priorities:
-{data['potential_requests']}
+Common requests or priorities:
+{data.get('potential_requests') or "None provided"}
 
-Please return a detailed and role-specific list of records, documents, media, and internal communications that a skilled civil attorney would request from this type of facility or entity. 
-Only include items that would reasonably be within the possession, custody, or control of a {data['recipient_role']} operating within a {data['facility_or_system']}.
+Please return a detailed and **role-specific** list of records, documents, media, and internal communications that a skilled civil attorney would request from this type of facility or entity. 
+Only include items that would reasonably be within the possession, custody, or control of a {data['recipient_role']} operating within a {data['facility_or_system']}. Do not include irrelevant medical, financial, or third-party institutional records if they would not be held by this entity.
 
-Format output as Word-style bullet points using asterisks (*). Only return the list.
+Format output as Word-style bullet points using asterisks (*).
+Only return the list.
 
 {DEFAULT_SAFETY}
 """.strip()
@@ -78,17 +79,21 @@ Write a clear, formal FOIA request letter that:
 - Uses active voice and professional tone
 - Closes with a formal response deadline and contact info
 
+Avoid filler like “I can assist with…” or “Please provide…” and do not refer to yourself.
+
 {DEFAULT_SAFETY}
 """.strip()
 
-def generate_synopsis(case_summary: str) -> str:
+# === SYNOPSIS GENERATOR ===
+def generate_synopsis(case_synopsis: str) -> str:
     prompt = f"""
-Summarize the following case background in 2 professional sentences explaining what occurred and the resulting harm. Do not include names or identifiers:
+Summarize the following legal case background in 2 professional sentences explaining what happened and the resulting harm or damages. Do not include any parties' names or personal identifiers:
 
-{case_summary}
+{case_synopsis}
 """
     return run_in_thread(safe_generate, "You are a legal summarization assistant.", prompt)
 
+# === MAIN GENERATOR ===
 def generate_foia_request(data: dict, template_path: str, output_path: str, example_text: str = "") -> tuple:
     try:
         # 🔐 Sanitize all input fields
@@ -102,10 +107,10 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
         request_list = run_in_thread(safe_generate, "You are a FOIA request generator.", bullet_prompt)
         request_list = sanitize_text(request_list).replace("* ", "• ")
 
-        # 🧠 Full FOIA body letter with optional style
+        # 🧠 Generate FOIA body letter
         letter_prompt = build_letter_prompt(data, request_list, example_text)
         foia_body = run_in_thread(safe_generate, "You are a legal letter writer.", letter_prompt)
-        foia_body = sanitize_text(foia_body)
+        foia_body = remove_gpt_filler(sanitize_text(foia_body))
 
         # 🧩 Replace into DOCX template
         replacements = {
