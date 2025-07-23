@@ -6,11 +6,13 @@ from core.auth import get_user_id, get_tenant_id
 from core.security import redact_log
 from logger import logger
 
+# === Assistant System Prompt ===
 ASSISTANT_SYSTEM_PROMPT = """
 You are a helpful internal assistant for litigation staff using the Legal Automation Hub.
 You help rephrase legal text, explain outputs, and answer module questions.
 """
 
+# === Log Assistant Interactions ===
 def log_assistant_interaction(user, tenant, question, answer):
     try:
         log_dir = os.path.join("logs", "assistant_logs")
@@ -21,11 +23,12 @@ def log_assistant_interaction(user, tenant, question, answer):
     except Exception as e:
         logger.error(redact_log(f"❌ Assistant log failed: {e}"))
 
+# === Render Floating Chat Modal ===
 def render_chat_modal():
     if "show_assistant" not in st.session_state:
         st.session_state.show_assistant = False
 
-    # --- Floating Button ---
+    # --- Floating Bubble Button ---
     st.markdown("""
         <style>
             .chat-bubble {
@@ -53,10 +56,11 @@ def render_chat_modal():
         </div>
     """, unsafe_allow_html=True)
 
+    # --- Hidden Streamlit Button for Toggling Modal ---
     if st.button("💬", key="chat-btn"):
         st.session_state.show_assistant = not st.session_state.show_assistant
 
-    # --- Assistant Popup Modal ---
+    # --- Assistant Modal Window ---
     if st.session_state.show_assistant:
         with st.container():
             st.markdown("""
