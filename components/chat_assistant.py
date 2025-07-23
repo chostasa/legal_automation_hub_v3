@@ -1,81 +1,68 @@
-import streamlit as st
-import os
-from datetime import datetime
-from services.openai_client import safe_generate
-from core.auth import get_user_id, get_tenant_id
-from core.security import redact_log
-from logger import logger
-
-ASSISTANT_SYSTEM_PROMPT = """
-You are a helpful internal assistant for litigation staff using the Legal Automation Hub.
-You help rephrase legal text, explain outputs, and answer module questions.
-"""
-
-def log_assistant_interaction(user, tenant, question, answer):
-    try:
-        log_dir = os.path.join("logs", "assistant_logs")
-        os.makedirs(log_dir, exist_ok=True)
-        log_path = os.path.join(log_dir, f"{tenant}_{user}.csv")
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(f"{datetime.now().isoformat()},{question.strip().replace(',', ' ')},{answer.strip().replace(',', ' ')}\n")
-    except Exception as e:
-        logger.error(redact_log(f"❌ Assistant log failed: {e}"))
-
 def render_chat_modal():
     if "show_assistant" not in st.session_state:
         st.session_state.show_assistant = False
 
-    # === Floating Button + Modal Container (Injected HTML + CSS)
+    # Inject floating bubble HTML
     st.markdown("""
         <style>
-        .chat-bubble {
+        .chat-button {
             position: fixed;
-            bottom: 20px;
-            left: 20px;
-            z-index: 10001;
+            bottom: 25px;
+            left: 25px;
+            z-index: 9999;
             width: 65px;
             height: 65px;
+            border-radius: 50%;
             background-color: #0A1D3B;
             color: white;
-            border-radius: 50%;
             font-size: 30px;
             text-align: center;
             line-height: 65px;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
             cursor: pointer;
         }
-        .chat-box {
-            position: fixed;
-            bottom: 100px;
-            left: 20px;
-            z-index: 10000;
-            width: 350px;
-            max-height: 500px;
-            overflow-y: auto;
-            background-color: #ffffff;
-            border: 2px solid #0A1D3B;
-            border-radius: 10px;
-            padding: 1rem;
-            box-shadow: 0px 4px 12px rgba(0,0,0,0.2);
-        }
         </style>
+        <div class="chat-button" onclick="toggleAssistant()">💬</div>
         <script>
-            const bubble = window.parent.document.querySelector('.chat-bubble')
-            if (bubble) bubble.onclick = () => {
-                const frame = window.parent.document.querySelector('iframe')
-                frame.contentWindow.postMessage({ type: "streamlit:rerun" }, "*")
-            }
+        function toggleAssistant() {
+            const frame = window.parent.document.querySelector('iframe');
+            frame.contentWindow.postMessage({ type: 'streamlit:rerun' }, '*');
+            fetch('/_stcore/_broadcast', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ event: 'toggle_chat_state' })
+            });
+        }
         </script>
     """, unsafe_allow_html=True)
 
-    # Streamlit button to toggle state
-    clicked = st.button("💬", key="chat_bubble_button", help="Open Assistant", use_container_width=False)
-    if clicked:
-        st.session_state.show_assistant = not st.session_state.show_assistant
+    # Fallback toggle logic (for Streamlit rerun)
+    toggle = st.experimental_get_query_params().get("chat", [None])[0]
+    if toggle == "show":
+        st.session_state.show_assistant = True
+    elif toggle == "hide":
+        st.session_state.show_assistant = False
 
-    # Render Chat Assistant
-    if st.session_state.show_assistant:
+    # Render chat modal
+    if st.session_state.get("show_assistant", False):
         with st.container():
-            st.markdown('<div class="chat-box">', unsafe_allow_html=True)
+            st.markdown("""
+                <div style="
+                    position: fixed;
+                    bottom: 100px;
+                    left: 25px;
+                    z-index: 9998;
+                    background: white;
+                    border: 2px solid #0A1D3B;
+                    border-radius: 12px;
+                    padding: 1rem;
+                    width: 360px;
+                    max-height: 500px;
+                    overflow-y: auto;
+                    box-shadow: 0px 6px 15px rgba(0,0,0,0.25);
+                ">
+            """, unsafe_allow_html=True)
+
             st.markdown("#### 🧠 Legal Automation Assistant")
 
             if "chat_log" not in st.session_state:
