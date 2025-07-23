@@ -25,64 +25,64 @@ def render_chat_modal():
     if "show_assistant" not in st.session_state:
         st.session_state.show_assistant = False
 
-    # Inject custom CSS for floating layout
+    # === Inject floating button container
     st.markdown("""
         <style>
-        .chat-bubble {
+        .chat-toggle-container {
             position: fixed;
-            bottom: 25px;
-            left: 25px;
+            bottom: 20px;
+            left: 20px;
             z-index: 9999;
         }
-        .chat-modal {
+        .chat-modal-container {
             position: fixed;
             bottom: 100px;
-            left: 25px;
-            z-index: 9998;
-            background: white;
-            border: 2px solid #0A1D3B;
-            border-radius: 12px;
-            padding: 1rem;
+            left: 20px;
             width: 360px;
             max-height: 500px;
             overflow-y: auto;
+            background-color: white;
+            border: 2px solid #0A1D3B;
+            border-radius: 12px;
             box-shadow: 0px 6px 15px rgba(0,0,0,0.25);
+            padding: 1rem;
+            z-index: 9998;
         }
         </style>
+        <div class="chat-toggle-container">
+            <button onclick="document.getElementById('chat-toggle-btn').click()">💬</button>
+        </div>
     """, unsafe_allow_html=True)
 
-    # === Floating Button
-    with st.container():
-        chat_toggle = st.button("💬", key="chat_toggle", help="Toggle Assistant", args=(), kwargs={}, use_container_width=False)
-        if chat_toggle:
-            st.session_state.show_assistant = not st.session_state.show_assistant
+    # === Invisible native Streamlit toggle (triggers rerun safely)
+    if st.button("💬", key="chat-toggle-btn"):
+        st.session_state.show_assistant = not st.session_state.show_assistant
 
-    # === Floating Modal if Active
+    # === Floating modal rendered with st.empty()
     if st.session_state.show_assistant:
-        st.markdown('<div class="chat-modal">', unsafe_allow_html=True)
-        st.markdown("#### 🧠 Legal Automation Assistant")
+        with st.container():
+            st.markdown('<div class="chat-modal-container">', unsafe_allow_html=True)
 
-        if "chat_log" not in st.session_state:
-            st.session_state.chat_log = []
+            st.markdown("#### 🧠 Legal Automation Assistant")
 
-        for entry in st.session_state.chat_log[-5:]:
-            st.markdown(f"**You:** {entry['user']}")
-            st.markdown(f"**Assistant:** {entry['assistant']}")
-            st.markdown("---")
+            if "chat_log" not in st.session_state:
+                st.session_state.chat_log = []
 
-        prompt = st.text_input("Ask the assistant...", key="assistant_input")
-        if prompt:
-            try:
-                response = safe_generate(prompt, system_msg=ASSISTANT_SYSTEM_PROMPT)
-            except Exception as e:
-                response = "❌ Something went wrong."
-                logger.error(redact_log(f"❌ Assistant failed: {e}"))
+            for entry in st.session_state.chat_log[-5:]:
+                st.markdown(f"**You:** {entry['user']}")
+                st.markdown(f"**Assistant:** {entry['assistant']}")
+                st.markdown("---")
 
-            st.session_state.chat_log.append({"user": prompt, "assistant": response})
-            log_assistant_interaction(get_user_id(), get_tenant_id(), prompt, response)
-            st.experimental_rerun()
+            prompt = st.text_input("Ask the assistant...", key="assistant_input")
+            if prompt:
+                try:
+                    response = safe_generate(prompt, system_msg=ASSISTANT_SYSTEM_PROMPT)
+                except Exception as e:
+                    response = "❌ Something went wrong."
+                    logger.error(redact_log(f"❌ Assistant failed: {e}"))
 
-        st.markdown("</div>", unsafe_allow_html=True)
+                st.session_state.chat_log.append({"user": prompt, "assistant": response})
+                log_assistant_interaction(get_user_id(), get_tenant_id(), prompt, response)
+                st.experimental_rerun()
 
-    # === Floating Button Div (overlay)
-    st.markdown('<div class="chat-bubble"></div>', unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
