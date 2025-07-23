@@ -141,6 +141,7 @@ Plaintiffs are {data.get('plaintiffs')} and request confidential resolution.
             "Defendants": data.get("defendants"),
             "Parties": data.get("party_information_from_complaint"),
             "Demand": data.get("settlement_summary"),
+            "Future_Medical_Bills": data.get("future_medical_bills", ""),
             **content_sections
         }
 
