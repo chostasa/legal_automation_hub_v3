@@ -1,8 +1,34 @@
+import streamlit as st
+import os
+from datetime import datetime
+from services.openai_client import safe_generate
+from core.auth import get_user_id, get_tenant_id
+from core.security import redact_log
+from logger import logger
+
+# === System Prompt for Assistant ===
+ASSISTANT_SYSTEM_PROMPT = """
+You are a helpful internal assistant for litigation staff using the Legal Automation Hub.
+You help rephrase legal text, explain outputs, and answer module questions.
+"""
+
+# === Log Assistant Interactions ===
+def log_assistant_interaction(user, tenant, question, answer):
+    try:
+        log_dir = os.path.join("logs", "assistant_logs")
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, f"{tenant}_{user}.csv")
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"{datetime.now().isoformat()},{question.strip().replace(',', ' ')},{answer.strip().replace(',', ' ')}\n")
+    except Exception as e:
+        logger.error(redact_log(f"❌ Assistant log failed: {e}"))
+
+# === Render Chat Modal UI ===
 def render_chat_modal():
     if "show_assistant" not in st.session_state:
         st.session_state.show_assistant = False
 
-    # Inject floating bubble HTML
+    # Inject floating chat bubble (bottom-left)
     st.markdown("""
         <style>
         .chat-button {
@@ -36,14 +62,14 @@ def render_chat_modal():
         </script>
     """, unsafe_allow_html=True)
 
-    # Fallback toggle logic (for Streamlit rerun)
+    # Fallback toggle logic via query params (optional)
     toggle = st.experimental_get_query_params().get("chat", [None])[0]
     if toggle == "show":
         st.session_state.show_assistant = True
     elif toggle == "hide":
         st.session_state.show_assistant = False
 
-    # Render chat modal
+    # Render assistant panel
     if st.session_state.get("show_assistant", False):
         with st.container():
             st.markdown("""
