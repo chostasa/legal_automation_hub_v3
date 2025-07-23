@@ -27,45 +27,50 @@ def render_chat_modal():
     if "chat_log" not in st.session_state:
         st.session_state.chat_log = []
 
-    # === Floating Brain Bubble Button (styled with custom JS trigger)
+    # === Brain Bubble Button (trigger hidden Streamlit button)
     st.markdown("""
         <style>
-        .chat-bubble {
+        .floating-brain {
             position: fixed;
             bottom: 25px;
             left: 25px;
-            z-index: 9999;
-            background-color: #0A1D3B;
             width: 60px;
             height: 60px;
             border-radius: 50%;
-            box-shadow: 0px 4px 12px rgba(0,0,0,0.3);
+            background-color: #0A1D3B;
             display: flex;
-            align-items: center;
             justify-content: center;
+            align-items: center;
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.3);
             cursor: pointer;
+            z-index: 9999;
         }
-        .chat-bubble img {
-            width: 30px;
-            height: 30px;
+        .floating-brain img {
+            width: 32px;
+            height: 32px;
+        }
+
+        /* Hide Streamlit button from layout */
+        div[data-testid="stButton"] > button[data-testid="assistant-toggle-btn"] {
+            display: none;
         }
         </style>
-        <div class="chat-bubble" onclick="fetch('?toggle_assistant=true')">
+
+        <div class="floating-brain" onclick="document.querySelector('button[data-testid=assistant-toggle-btn]').click()">
             <img src="https://img.icons8.com/fluency/48/brain.png" />
         </div>
     """, unsafe_allow_html=True)
 
-    # === URL param trigger (invisible)
-    if st.query_params.get("toggle_assistant") == ["true"]:
+    # === Hidden Streamlit Button Trigger
+    if st.button("Toggle Assistant", key="assistant-toggle-btn"):
         st.session_state.show_assistant = not st.session_state.show_assistant
-        st.query_params.clear()
         if st.session_state.show_assistant and not st.session_state.chat_log:
             st.session_state.chat_log.append({
                 "user": None,
                 "assistant": "Hi there! I'm your Legal Automation Assistant. I can help explain outputs, troubleshoot, or fix writing tone."
             })
 
-    # === Assistant Modal
+    # === Assistant Modal UI
     if st.session_state.show_assistant:
         with st.container():
             st.markdown("""
