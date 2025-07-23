@@ -56,7 +56,7 @@ def render_chat_modal():
     """, unsafe_allow_html=True)
 
     # === Hidden Streamlit Toggle Button
-    if st.button("🧠", key="assistant-toggle", label_visibility="collapsed"):
+    if st.button("🧠", key="assistant-toggle"):
         st.session_state.show_assistant = not st.session_state.show_assistant
         if st.session_state.show_assistant and not st.session_state.chat_log:
             st.session_state.chat_log.append({
