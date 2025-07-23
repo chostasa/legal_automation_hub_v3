@@ -76,8 +76,3 @@ except Exception as e:
     from core.security import redact_log
     st.code(redact_log(traceback.format_exc()))
 
-# === Floating Chat Assistant (Always Visible) ===
-from components.chat_assistant import render_chat_modal
-render_chat_modal()
-
-
