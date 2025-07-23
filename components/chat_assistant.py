@@ -24,47 +24,48 @@ def log_assistant_interaction(user, tenant, question, answer):
 def render_chat_modal():
     if "show_assistant" not in st.session_state:
         st.session_state.show_assistant = False
-
     if "chat_log" not in st.session_state:
         st.session_state.chat_log = []
 
-    # === Floating Brain Button (positioned and styled)
+    # === Floating Brain Bubble Button (styled with custom JS trigger)
     st.markdown("""
         <style>
-        .brain-fab {
+        .chat-bubble {
             position: fixed;
             bottom: 25px;
             left: 25px;
+            z-index: 9999;
+            background-color: #0A1D3B;
             width: 60px;
             height: 60px;
-            background-color: #0A1D3B;
             border-radius: 50%;
             box-shadow: 0px 4px 12px rgba(0,0,0,0.3);
             display: flex;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
             cursor: pointer;
-            z-index: 9999;
         }
-        .brain-fab span {
-            font-size: 30px;
+        .chat-bubble img {
+            width: 30px;
+            height: 30px;
         }
         </style>
-        <div class="brain-fab" onclick="document.getElementById('assistant-toggle').click()">
-            <span>🧠</span>
+        <div class="chat-bubble" onclick="fetch('?toggle_assistant=true')">
+            <img src="https://img.icons8.com/fluency/48/brain.png" />
         </div>
     """, unsafe_allow_html=True)
 
-    # === Hidden Streamlit Toggle Button
-    if st.button("🧠", key="assistant-toggle"):
+    # === URL param trigger (invisible)
+    if st.query_params.get("toggle_assistant") == ["true"]:
         st.session_state.show_assistant = not st.session_state.show_assistant
+        st.query_params.clear()
         if st.session_state.show_assistant and not st.session_state.chat_log:
             st.session_state.chat_log.append({
                 "user": None,
                 "assistant": "Hi there! I'm your Legal Automation Assistant. I can help explain outputs, troubleshoot, or fix writing tone."
             })
 
-    # === Assistant Modal Popup
+    # === Assistant Modal
     if st.session_state.show_assistant:
         with st.container():
             st.markdown("""
