@@ -78,6 +78,8 @@ Any and all BFS reports documenting responses to incidents involving agents and/
 • Complete copies of any and all BFS investigative reports and/or files related to incidents involving a minor/student and agents and/or employees of Streamwood Hospital during the time period from 1983 to the present.
 Only return the list.
 
+Ensure that each bullet point is on its own line. Do not cluster or compress the items into a single paragraph.
+
 {DEFAULT_SAFETY}
 """.strip()
 
@@ -148,7 +150,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
         bullet_prompt = build_request_prompt(data)
         request_list = run_in_thread(safe_generate, prompt=bullet_prompt)
 
-        request_list = sanitize_text(request_list).replace("* ", "• ")
+        request_list = sanitize_text(request_list).replace("* ", "\n• ")
 
         # 🧠 Generate FOIA body letter
         letter_prompt = build_letter_prompt(data, request_list, example_text)
