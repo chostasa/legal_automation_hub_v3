@@ -112,9 +112,12 @@ def run_ui():
                     st.session_state.foia_cache[form_key] = (file_path, {})
 
             st.success("✅ FOIA letter generated!")
+            with open(file_path, "rb") as f:
+                docx_bytes = f.read()
+
             st.download_button(
                 label="⬇️ Download Letter (.docx)",
-                data=stream_file(file_path),
+                data=docx_bytes,  # ✅ raw bytes
                 file_name=os.path.basename(file_path),
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
