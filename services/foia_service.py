@@ -136,14 +136,23 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
                 data[k] = sanitize_text(v)
 
         # ✂️ Generate synopsis and request bullets
-        data["synopsis"] = generate_synopsis(data.get("synopsis", ""))
+        data["synopsis"] = run_in_thread(
+            safe_generate,
+            prompt=f"""
+        Summarize the following legal case background in 2 professional sentences explaining what happened and the resulting harm or damages. Do not include any parties' names or personal identifiers:
+
+        {data.get("synopsis", "")}
+        """
+        )
+
         bullet_prompt = build_request_prompt(data)
-        request_list = run_in_thread(safe_generate, "You are a FOIA request generator.", bullet_prompt)
+        request_list = run_in_thread(safe_generate, prompt=bullet_prompt)
+
         request_list = sanitize_text(request_list).replace("* ", "• ")
 
         # 🧠 Generate FOIA body letter
         letter_prompt = build_letter_prompt(data, request_list, example_text)
-        foia_body = run_in_thread(safe_generate, "You are a legal letter writer.", letter_prompt)
+        foia_body = run_in_thread(safe_generate, prompt=letter_prompt)
         foia_body = sanitize_text(foia_body)
 
         # 🧩 Replace into DOCX template
