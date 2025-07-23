@@ -57,7 +57,7 @@ def generate_memo_from_fields(data: dict, template_path, output_dir: str) -> tup
         example_text = data.get("example_text", "").strip()
         example_clause = f"\n\nMatch the tone, structure, and style of this example:\n{example_text[:1500]}" if example_text else ""
 
-        # === Section 1: Introduction (gpt-3.5-turbo)
+        # === Section 1: Introduction
         intro_prompt = f"""
 You are drafting the Introduction section of a mediation memo.
 Plaintiffs: {data.get('plaintiffs')}.
@@ -85,8 +85,8 @@ Liability Quotes: {data.get('liability_quotes', '')}
 
         content_sections["Facts_Liability"] = run_in_thread(lambda: safe_generate(
             prompt=trim_to_token_limit(facts_prompt, 3000),
-            system_msg=FACTS_MSG,
-            model="gpt-3.5-turbo"
+            model="gpt-3.5-turbo",
+            system_msg=FACTS_MSG
         ))
 
         # === Section 3: Causation / Medical
@@ -100,8 +100,8 @@ Medical Summary: {data['medical_summary']}
 
         content_sections["Causation_Injuries_Treatment"] = run_in_thread(lambda: safe_generate(
             prompt=trim_to_token_limit(medical_prompt, 3000),
-            system_msg=CAUSATION_MSG,
-            model="gpt-3.5-turbo"
+            model="gpt-3.5-turbo",
+            system_msg=CAUSATION_MSG
         ))
 
         # === Section 4: Damages / Harms
@@ -115,8 +115,8 @@ Damages narrative and harms to Plaintiff.
 
         content_sections["Additional_Harms_Losses"] = run_in_thread(lambda: safe_generate(
             prompt=trim_to_token_limit(damages_prompt, 2500),
-            system_msg=HARMS_MSG,
-            model="gpt-3.5-turbo"
+            model="gpt-3.5-turbo",
+            system_msg=HARMS_MSG
         ))
 
         # === Section 5: Conclusion
@@ -129,8 +129,8 @@ Plaintiffs are {data.get('plaintiffs')} and request confidential resolution.
 
         content_sections["Conclusion"] = run_in_thread(lambda: safe_generate(
             prompt=conclusion_prompt,
-            system_msg=CONCLUSION_MSG,
-            model="gpt-3.5-turbo"
+            model="gpt-3.5-turbo",
+            system_msg=CONCLUSION_MSG
         ))
 
         # === Merge for Template Replacement
