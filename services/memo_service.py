@@ -34,6 +34,7 @@ DEFAULT_SAFETY = "\n\n".join([
     NO_PASSIVE_LANGUAGE_NOTE,
 ])
 
+
 def generate_quotes_from_raw_depo(raw_text: str, categories: list) -> dict:
     try:
         lines = normalize_deposition_lines(raw_text)
@@ -44,6 +45,7 @@ def generate_quotes_from_raw_depo(raw_text: str, categories: list) -> dict:
         logger.error(redact_log(f"❌ Failed to extract quotes from deposition: {e}"))
         return {}
 
+
 def generate_memo_from_fields(data: dict, template_path, output_dir: str) -> tuple:
     """
     Accepts cleaned data dictionary and outputs filled-in memo.
@@ -52,6 +54,8 @@ def generate_memo_from_fields(data: dict, template_path, output_dir: str) -> tup
     """
     try:
         content_sections = {}
+        example_text = data.get("example_text", "").strip()
+        example_clause = f"\n\nMatch the tone, structure, and style of this example:\n{example_text[:1500]}" if example_text else ""
 
         # === Section 1: Introduction
         intro_prompt = f"""
@@ -59,6 +63,7 @@ You are drafting the Introduction section of a mediation memo.
 Plaintiffs: {data.get('plaintiffs')}.
 Defendants: {data.get('defendants')}.
 Court: {data.get('court')}. Case No: {data.get('case_number')}.
+{example_clause}
 
 {DEFAULT_SAFETY}
 """.strip()
@@ -69,9 +74,11 @@ Court: {data.get('court')}. Case No: {data.get('case_number')}.
         facts_prompt = f"""
 Facts: {data['complaint_narrative']}
 Liability Quotes: {data.get('liability_quotes', '')}
+{example_clause}
 
 {DEFAULT_SAFETY}
 """.strip()
+
         content_sections["Facts_Liability"] = run_in_thread(
             safe_generate,
             FACTS_MSG,
@@ -82,9 +89,11 @@ Liability Quotes: {data.get('liability_quotes', '')}
         medical_prompt = f"""
 Settlement Summary: {data['settlement_summary']}
 Medical Summary: {data['medical_summary']}
+{example_clause}
 
 {DEFAULT_SAFETY}
 """.strip()
+
         content_sections["Causation_Injuries_Treatment"] = run_in_thread(
             safe_generate,
             CAUSATION_MSG,
@@ -95,9 +104,11 @@ Medical Summary: {data['medical_summary']}
         damages_prompt = f"""
 Damages narrative and harms to Plaintiff.
 {data.get('damages_quotes', '')}
+{example_clause}
 
 {DEFAULT_SAFETY}
 """.strip()
+
         content_sections["Additional_Harms_Losses"] = run_in_thread(
             safe_generate,
             HARMS_MSG,
@@ -107,9 +118,11 @@ Damages narrative and harms to Plaintiff.
         # === Section 5: Conclusion
         conclusion_prompt = f"""
 Plaintiffs are {data.get('plaintiffs')} and request confidential resolution.
+{example_clause}
 
 {DEFAULT_SAFETY}
 """.strip()
+
         content_sections["Conclusion"] = run_in_thread(
             safe_generate,
             CONCLUSION_MSG,
@@ -127,7 +140,6 @@ Plaintiffs are {data.get('plaintiffs')} and request confidential resolution.
             **content_sections
         }
 
-        # Add numbered plaintiffs and defendants
         for i in range(1, 4):
             memo_data[f"Plaintiff_{i}"] = data.get(f"plaintiff{i}", "")
         for i in range(1, 8):
@@ -144,6 +156,7 @@ Plaintiffs are {data.get('plaintiffs')} and request confidential resolution.
     except Exception as e:
         logger.error(redact_log(f"❌ Memo generation failed: {e}"))
         raise RuntimeError("Memo generation failed.")
+
 
 def generate_plaintext_memo(data: dict) -> str:
     """

@@ -7,6 +7,7 @@ clean_temp_dir()
 
 from core.session import get_secure_temp_dir
 from core.security import sanitize_text, redact_log
+from core.audit import log_audit_event
 from logger import logger
 from services.memo_service import (
     generate_quotes_from_raw_depo,
@@ -20,7 +21,6 @@ def stream_file(path: str):
     with open(path, "rb") as f:
         while chunk := f.read(8192):
             yield chunk
-
 
 def run_ui():
     st.header("🧾 Mediation Memo Generator")
@@ -44,7 +44,6 @@ def run_ui():
 
         st.subheader("Deposition Excerpts (Optional)")
         raw_depo = st.text_area("📑 Paste Deposition Transcript (with line #s)", height=250)
-
         quote_categories = st.multiselect(
             "Quote Categories to Extract",
             options=["Liability", "Damages", "Additional Harms", "Facts", "Causation"],
@@ -53,6 +52,9 @@ def run_ui():
 
         st.subheader("Template")
         uploaded_template = st.file_uploader("Upload Mediation Memo Template (.docx)", type=["docx"])
+
+        st.subheader("🧠 Optional Style Example")
+        example_text = st.text_area("📘 Paste Example for Style/Tone Matching (optional)", height=120)
 
         submitted = st.form_submit_button("⚙️ Generate Mediation Memo")
 
@@ -91,7 +93,8 @@ def run_ui():
             input_fingerprint = "|".join([
                 court, case_number, complaint_narrative, party_info,
                 settlement_summary, medical_summary, raw_depo,
-                ",".join(plaintiffs), ",".join(defendants), ",".join(quote_categories)
+                ",".join(plaintiffs), ",".join(defendants), ",".join(quote_categories),
+                example_text
             ])
             form_key = hashlib.md5(input_fingerprint.encode()).hexdigest()
 
@@ -100,12 +103,10 @@ def run_ui():
             else:
                 with st.spinner("🔄 Generating memo..."):
 
-                    # 🧠 Step 1: Extract quotes
                     raw_quotes = {}
                     if raw_depo:
                         raw_quotes = generate_quotes_from_raw_depo(raw_depo, quote_categories)
 
-                    # 🧠 Step 2: Assemble sanitized data
                     data = {
                         "court": sanitize_text(court),
                         "case_number": sanitize_text(case_number),
@@ -113,8 +114,9 @@ def run_ui():
                         "party_information_from_complaint": sanitize_text(party_info),
                         "settlement_summary": sanitize_text(settlement_summary),
                         "medical_summary": sanitize_text(medical_summary),
-                        "plaintiffs": ", ".join([sanitize_text(p) for p in plaintiffs if p.strip()]),
-                        "defendants": ", ".join([sanitize_text(d) for d in defendants if d.strip()])
+                        "plaintiffs": ", ".join([sanitize_text(p) for p in valid_plaintiffs]),
+                        "defendants": ", ".join([sanitize_text(d) for d in valid_defendants]),
+                        "example_text": sanitize_text(example_text)
                     }
 
                     for key, value in raw_quotes.items():
@@ -125,7 +127,6 @@ def run_ui():
                     for i, name in enumerate(defendants, 1):
                         data[f"defendant{i}"] = sanitize_text(name)
 
-                    # 🧠 Step 3: Generate memo
                     temp_dir = get_secure_temp_dir()
                     file_path, memo_data = generate_memo_from_fields(
                         data=data,
@@ -135,7 +136,6 @@ def run_ui():
 
                     st.session_state.memo_cache[form_key] = (file_path, memo_data, raw_quotes)
 
-            # ✅ UI: Downloads + Previews
             st.success("✅ Memo generated successfully!")
             st.download_button(
                 label="⬇️ Download Mediation Memo (.docx)",
@@ -179,8 +179,17 @@ def run_ui():
             except Exception as log_err:
                 logger.warning(f"⚠️ Failed to log memo usage: {log_err}")
 
+            try:
+                log_audit_event("Mediation Memo Generated", {
+                    "court": court,
+                    "case_number": case_number,
+                    "plaintiffs": valid_plaintiffs,
+                    "defendants": valid_defendants,
+                    "module": "mediation"
+                })
+            except Exception as audit_err:
+                logger.warning(f"⚠️ Failed to write audit log: {audit_err}")
 
         except Exception as e:
             logger.error(redact_log(f"[{error_code}] ❌ Mediation memo generation failed: {e}"))
             st.error(f"❌ An unexpected error occurred (code: {error_code}). Please contact support.")
-

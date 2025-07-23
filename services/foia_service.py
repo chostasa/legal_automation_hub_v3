@@ -21,13 +21,19 @@ DEFAULT_SAFETY = "\n\n".join([
     NO_PASSIVE_LANGUAGE_NOTE,
 ])
 
-def generate_foia_request(client_name, agency_name, details, template_path, output_path):
+def generate_foia_request(client_name: str, agency_name: str, details: str, template_path: str, output_path: str) -> tuple:
     """
-    Generates a FOIA request letter using GPT and fills the template.
-    All blocking calls are offloaded to background threads for performance.
+    Generates a FOIA request letter using GPT and fills the Word template.
+    All blocking steps are executed in background threads.
+    Returns (output_path, generated_body).
     """
     try:
-        # ✅ Token-trimmed summary
+        # 🧼 Sanitize inputs
+        client_name = sanitize_text(client_name)
+        agency_name = sanitize_text(agency_name)
+        details = sanitize_text(details)
+
+        # ✂️ Trim for safety
         facts = trim_to_token_limit(details, 2000)
 
         # 🧠 GPT Prompt
@@ -40,12 +46,12 @@ You are drafting a formal FOIA request to {agency_name} regarding the following 
 """.strip()
 
         # 🧵 Run GPT in background thread
-        result = run_in_thread(
+        body = run_in_thread(
             safe_generate,
             "You are a government records request expert.",
             prompt
         )
-        result = sanitize_text(result)
+        body = sanitize_text(body)
 
         # 🧵 Fill Word template using background thread
         run_in_thread(
@@ -55,13 +61,16 @@ You are drafting a formal FOIA request to {agency_name} regarding the following 
                 "ClientName": client_name,
                 "Agency": agency_name,
                 "Details": details,
-                "Body": result
+                "Body": body
             },
             output_path
         )
 
-        return output_path, result
+        if not os.path.exists(output_path):
+            raise RuntimeError("❌ FOIA DOCX file was not created.")
+
+        return output_path, body
 
     except Exception as e:
-        logger.error(redact_log(f"❌ Failed to generate FOIA letter: {e}"))
+        logger.error(redact_log(f"❌ FOIA generation failed: {e}"))
         raise RuntimeError("FOIA request generation failed.")

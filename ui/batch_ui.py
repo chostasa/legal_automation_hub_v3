@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import zipfile
 import os
+import json
+from datetime import datetime
 from io import BytesIO
 
 from utils.docx_utils import replace_text_in_docx_all
@@ -11,16 +13,14 @@ from core.security import sanitize_text, sanitize_filename, redact_log
 from utils.stream_utils import stream_bytesio
 from logger import logger
 from core.auth import get_tenant_id
+from core.audit import log_audit_event
 
-# === Cleanup expired files from all sessions ===
 clean_temp_dir()
-
 TEMPLATE_DIR = os.path.join("templates", "batch_docs", get_tenant_id())
 os.makedirs(TEMPLATE_DIR, exist_ok=True)
 
 def run_ui():
     st.header("📄 Batch Document Generator (Saved Templates + Guided Merge)")
-
     error_code = "BATCH_GEN_001"
     df = None
 
@@ -51,8 +51,6 @@ def run_ui():
         for col in df.columns:
             st.code(f"{{{{{col}}}}}", language="jinja")
 
-        st.info("✏️ Be sure your template includes the correct placeholders before continuing.")
-
         removable_cols = st.multiselect("🧹 Remove columns before merge:", df.columns.tolist())
         if removable_cols:
             df.drop(columns=removable_cols, inplace=True)
@@ -64,33 +62,70 @@ def run_ui():
         st.subheader("📁 Template Manager")
 
         template_mode = st.radio("Choose Template Mode:", ["Upload New Template", "Select Saved Template", "Template Options"])
-        template_path = None
         filename_pattern = st.text_input("Output Filename Pattern", value="Letter_{{Client Name}}.docx")
         folder_pattern = st.text_input("📁 Folder Name Pattern", value="Petitions for {{Client Name}}")
         docname_pattern = st.text_input("📄 Document Name Pattern", value="{{index}} {{Client Name}}.docx")
+        template_paths, selected_templates = [], []
 
         if template_mode == "Upload New Template":
             uploaded_template = st.file_uploader("Upload Word Template (.docx)", type=["docx"])
+            tags = st.text_input("🏷️ Add tags (comma-separated)", key="upload_tags")
+
             if uploaded_template:
                 template_path = os.path.join(TEMPLATE_DIR, sanitize_filename(uploaded_template.name))
                 with open(template_path, "wb") as f:
                     f.write(uploaded_template.read())
+
+                meta = {
+                    "filename": os.path.basename(template_path),
+                    "tags": [t.strip() for t in tags.split(",") if t.strip()],
+                    "uploaded_at": datetime.utcnow().isoformat()
+                }
+                with open(template_path.replace(".docx", ".json"), "w") as f:
+                    json.dump(meta, f, indent=2)
+
                 st.success(f"✅ Uploaded and saved as: {os.path.basename(template_path)}")
+                try:
+                    log_audit_event("Template Uploaded", {
+                        "filename": os.path.basename(template_path),
+                        "tags": meta["tags"],
+                        "module": "batch_generator"
+                    })
+                except Exception as audit_err:
+                    logger.warning(f"⚠️ Failed to write audit log: {audit_err}")
 
                 template_paths = [template_path]
                 selected_templates = [os.path.basename(template_path)]
 
         elif template_mode == "Select Saved Template":
-            available_templates = sorted([f for f in os.listdir(TEMPLATE_DIR) if f.endswith(".docx")])
-            search_term = st.text_input("🔍 Search Templates")
-            filtered = [t for t in available_templates if search_term.lower() in t.lower()]
-            selected_templates = st.multiselect("📂 Choose Template(s)", filtered)
+            tag_filter = st.text_input("🔍 Filter by tag or name (optional)").lower()
+            available_templates = []
+            template_info = {}
+
+            for f in os.listdir(TEMPLATE_DIR):
+                if f.endswith(".docx"):
+                    path = os.path.join(TEMPLATE_DIR, f)
+                    meta_path = path.replace(".docx", ".json")
+                    tags = []
+                    if os.path.exists(meta_path):
+                        try:
+                            with open(meta_path, "r") as mf:
+                                meta = json.load(mf)
+                                tags = meta.get("tags", [])
+                                template_info[f] = meta
+                        except:
+                            pass
+                    label = f"{f} {'| ' + ', '.join(tags) if tags else ''}"
+                    if tag_filter in label.lower():
+                        available_templates.append(label)
+
+            available_templates.sort(key=lambda name: os.path.getmtime(os.path.join(TEMPLATE_DIR, name.split(" | ")[0])), reverse=True)
+            selected = st.multiselect("📂 Choose Template(s)", available_templates)
+            selected_templates = [s.split(" | ")[0] for s in selected]
             template_paths = [os.path.join(TEMPLATE_DIR, t) for t in selected_templates]
 
         elif template_mode == "Template Options":
-            st.subheader("⚙️ Template Options")
             available_templates = sorted([f for f in os.listdir(TEMPLATE_DIR) if f.endswith(".docx")])
-
             search_term = st.text_input("🔍 Search for template to manage")
             filtered_templates = [f for f in available_templates if search_term.lower() in f.lower()]
 
@@ -106,22 +141,32 @@ def run_ui():
                         st.warning("⚠️ A file with that name already exists.")
                     else:
                         os.rename(template_path, new_path)
+                        try:
+                            os.rename(template_path.replace(".docx", ".json"), new_path.replace(".docx", ".json"))
+                        except:
+                            pass
                         st.success(f"✅ Renamed to {new_name}.docx")
+                        log_audit_event("Template Renamed", {
+                            "from": template_choice,
+                            "to": new_name + ".docx",
+                            "module": "batch_generator"
+                        })
                         st.rerun()
 
                 st.subheader("🗑️ Delete Template")
                 confirm_delete = st.checkbox("Yes, delete this template permanently.")
                 if st.button("Delete Template") and confirm_delete:
                     os.remove(template_path)
+                    try:
+                        os.remove(template_path.replace(".docx", ".json"))
+                    except:
+                        pass
                     st.success(f"✅ Deleted '{template_choice}'")
+                    log_audit_event("Template Deleted", {
+                        "filename": template_choice,
+                        "module": "batch_generator"
+                    })
                     st.rerun()
-
-                if available_templates and st.button("🚩 Delete ALL Templates (Cannot Be Undone)"):
-                    for t in available_templates:
-                        os.remove(os.path.join(TEMPLATE_DIR, t))
-                    st.success("✅ All templates deleted.")
-                    st.rerun()
-
             else:
                 st.warning("⚠️ No templates found matching your search.")
 
@@ -136,45 +181,31 @@ def run_ui():
                     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_out:
                         for i, row in df.iterrows():
                             try:
-                                # Step 1: Prepare replacement map
                                 replacements = {
                                     str(k).strip(): sanitize_text(str(v)) if pd.notnull(v) else ""
                                     for k, v in row.items()
                                 }
                                 replacements["index"] = str(i + 1)
 
-                                # Step 2: Format subfolder for this record
                                 folder_name = folder_pattern
                                 for key, val in replacements.items():
                                     folder_name = folder_name.replace(f"{{{{{key}}}}}", val.strip())
                                 folder_name = sanitize_filename(folder_name)
 
                                 for template_path in template_paths:
-                                    template_label = os.path.splitext(os.path.basename(template_path))[0]
-
-                                    # Step 3: Format output document name
                                     output_filename = docname_pattern
                                     for key, val in replacements.items():
                                         output_filename = output_filename.replace(f"{{{{{key}}}}}", val.strip())
                                     output_filename = sanitize_filename(output_filename.replace(".docx", "") + ".docx")
 
-                                    # Step 4: Output path
-                                    temp_dir = get_session_temp_dir()
                                     output_path = os.path.join(temp_dir, f"{folder_name}_{output_filename}")
+                                    replace_text_in_docx_all(template_path, replacements, output_path)
 
-                                    replace_text_in_docx_all(
-                                        docx_path=template_path,
-                                        replacements=replacements,
-                                        save_path=output_path
-                                    )
-
-                                    # Step 5: Add to ZIP with folder structure
                                     zip_entry_path = os.path.join(folder_name, output_filename)
                                     with open(output_path, "rb") as f:
                                         zip_out.writestr(zip_entry_path, f.read())
 
                                     total_success += 1
-
                             except Exception as doc_err:
                                 logger.error(redact_log(f"[{error_code}] ❌ Failed on row {i}: {doc_err}"))
                                 total_fail += 1
@@ -187,11 +218,16 @@ def run_ui():
                             file_name="batch_output.zip",
                             mime="application/zip"
                         )
-                        st.caption("⚠️ Generated files will be automatically deleted after 1 hour. Please download promptly.")
+                        st.caption("⚠️ Files will be deleted after 1 hour. Please download promptly.")
+                        log_audit_event("Batch Docs Generated", {
+                            "rows_processed": len(df),
+                            "template_count": len(template_paths),
+                            "module": "batch_generator"
+                        })
 
                     if total_fail:
-                        st.warning(f"⚠️ {total_fail} documents failed to generate. See logs for details.")
+                        st.warning(f"⚠️ {total_fail} documents failed. See logs.")
 
                 except Exception as e:
                     logger.error(redact_log(f"[{error_code}] ❌ Batch generation failed: {e}"))
-                    st.error("❌ Unexpected error occurred. Please contact support.")
+                    st.error("❌ Unexpected error. Please contact support.")
