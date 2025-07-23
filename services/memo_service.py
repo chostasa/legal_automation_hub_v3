@@ -68,12 +68,11 @@ Court: {data.get('court')}. Case No: {data.get('case_number')}.
 {DEFAULT_SAFETY}
 """.strip()
 
-        content_sections["Introduction"] = run_in_thread(
-            safe_generate,
+        content_sections["Introduction"] = run_in_thread(lambda: safe_generate(
             prompt=intro_prompt,
             model="gpt-3.5-turbo",
             system_msg=INTRO_MSG
-        )
+        ))
 
         # === Section 2: Facts and Liability
         facts_prompt = f"""
@@ -84,11 +83,11 @@ Liability Quotes: {data.get('liability_quotes', '')}
 {DEFAULT_SAFETY}
 """.strip()
 
-        content_sections["Facts_Liability"] = run_in_thread(
-            safe_generate,
+        content_sections["Facts_Liability"] = run_in_thread(lambda: safe_generate(
             prompt=trim_to_token_limit(facts_prompt, 3000),
-            system_msg=FACTS_MSG
-        )
+            system_msg=FACTS_MSG,
+            model="gpt-3.5-turbo"
+        ))
 
         # === Section 3: Causation / Medical
         medical_prompt = f"""
@@ -99,11 +98,11 @@ Medical Summary: {data['medical_summary']}
 {DEFAULT_SAFETY}
 """.strip()
 
-        content_sections["Causation_Injuries_Treatment"] = run_in_thread(
-            safe_generate,
+        content_sections["Causation_Injuries_Treatment"] = run_in_thread(lambda: safe_generate(
             prompt=trim_to_token_limit(medical_prompt, 3000),
-            system_msg=CAUSATION_MSG
-        )
+            system_msg=CAUSATION_MSG,
+            model="gpt-3.5-turbo"
+        ))
 
         # === Section 4: Damages / Harms
         damages_prompt = f"""
@@ -114,11 +113,11 @@ Damages narrative and harms to Plaintiff.
 {DEFAULT_SAFETY}
 """.strip()
 
-        content_sections["Additional_Harms_Losses"] = run_in_thread(
-            safe_generate,
+        content_sections["Additional_Harms_Losses"] = run_in_thread(lambda: safe_generate(
             prompt=trim_to_token_limit(damages_prompt, 2500),
-            system_msg=HARMS_MSG
-        )
+            system_msg=HARMS_MSG,
+            model="gpt-3.5-turbo"
+        ))
 
         # === Section 5: Conclusion
         conclusion_prompt = f"""
@@ -128,11 +127,11 @@ Plaintiffs are {data.get('plaintiffs')} and request confidential resolution.
 {DEFAULT_SAFETY}
 """.strip()
 
-        content_sections["Conclusion"] = run_in_thread(
-            safe_generate,
+        content_sections["Conclusion"] = run_in_thread(lambda: safe_generate(
             prompt=conclusion_prompt,
-            system_msg=CONCLUSION_MSG
-        )
+            system_msg=CONCLUSION_MSG,
+            model="gpt-3.5-turbo"
+        ))
 
         # === Merge for Template Replacement
         memo_data = {
