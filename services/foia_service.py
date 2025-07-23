@@ -110,7 +110,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
         # 🧠 Generate FOIA body letter
         letter_prompt = build_letter_prompt(data, request_list, example_text)
         foia_body = run_in_thread(safe_generate, "You are a legal letter writer.", letter_prompt)
-        foia_body = remove_gpt_filler(sanitize_text(foia_body))
+        foia_body = sanitize_text(foia_body)
 
         # 🧩 Replace into DOCX template
         replacements = {
