@@ -25,43 +25,56 @@ def render_chat_modal():
     if "show_assistant" not in st.session_state:
         st.session_state.show_assistant = False
 
-    # === Inject floating button container
+    # Inject floating bubble that clicks Streamlit button
     st.markdown("""
         <style>
         .chat-toggle-container {
             position: fixed;
-            bottom: 20px;
-            left: 20px;
+            bottom: 25px;
+            left: 25px;
             z-index: 9999;
         }
-        .chat-modal-container {
-            position: fixed;
-            bottom: 100px;
-            left: 20px;
-            width: 360px;
-            max-height: 500px;
-            overflow-y: auto;
-            background-color: white;
-            border: 2px solid #0A1D3B;
-            border-radius: 12px;
-            box-shadow: 0px 6px 15px rgba(0,0,0,0.25);
-            padding: 1rem;
-            z-index: 9998;
+        .chat-button {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: #0A1D3B;
+            color: white;
+            font-size: 26px;
+            text-align: center;
+            line-height: 60px;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+            cursor: pointer;
         }
         </style>
         <div class="chat-toggle-container">
-            <button onclick="document.getElementById('chat-toggle-btn').click()">💬</button>
+            <div class="chat-button" onclick="document.getElementById('chat-toggle-btn').click()">💬</div>
         </div>
     """, unsafe_allow_html=True)
 
-    # === Invisible native Streamlit toggle (triggers rerun safely)
-    if st.button("💬", key="chat-toggle-btn"):
+    # Hidden real Streamlit button
+    if st.button("💬", key="chat-toggle-btn", label_visibility="collapsed"):
         st.session_state.show_assistant = not st.session_state.show_assistant
 
-    # === Floating modal rendered with st.empty()
+    # Assistant Modal
     if st.session_state.show_assistant:
         with st.container():
-            st.markdown('<div class="chat-modal-container">', unsafe_allow_html=True)
+            st.markdown("""
+                <div style="
+                    position: fixed;
+                    bottom: 100px;
+                    left: 25px;
+                    z-index: 9998;
+                    background: white;
+                    border: 2px solid #0A1D3B;
+                    border-radius: 12px;
+                    padding: 1rem;
+                    width: 360px;
+                    max-height: 500px;
+                    overflow-y: auto;
+                    box-shadow: 0px 6px 15px rgba(0,0,0,0.25);
+                ">
+            """, unsafe_allow_html=True)
 
             st.markdown("#### 🧠 Legal Automation Assistant")
 
