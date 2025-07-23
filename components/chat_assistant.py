@@ -6,13 +6,11 @@ from core.auth import get_user_id, get_tenant_id
 from core.security import redact_log
 from logger import logger
 
-# === Assistant System Prompt ===
 ASSISTANT_SYSTEM_PROMPT = """
 You are a helpful internal assistant for litigation staff using the Legal Automation Hub.
 You help rephrase legal text, explain outputs, and answer module questions.
 """
 
-# === Log Assistant Interactions ===
 def log_assistant_interaction(user, tenant, question, answer):
     try:
         log_dir = os.path.join("logs", "assistant_logs")
@@ -23,44 +21,46 @@ def log_assistant_interaction(user, tenant, question, answer):
     except Exception as e:
         logger.error(redact_log(f"❌ Assistant log failed: {e}"))
 
-# === Render Floating Chat Modal ===
 def render_chat_modal():
     if "show_assistant" not in st.session_state:
         st.session_state.show_assistant = False
 
-    # --- Floating Bubble Button ---
-    st.markdown("""
-        <style>
-            .chat-bubble {
+    # --- Floating brain bubble (styled button) ---
+    with st.container():
+        st.markdown("""
+            <style>
+            div[data-testid="brain-button"] button {
                 position: fixed;
                 bottom: 25px;
                 left: 25px;
-                z-index: 9999;
-                background-color: #0A1D3B;
                 width: 60px;
                 height: 60px;
                 border-radius: 50%;
+                background-color: #0A1D3B;
                 box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                cursor: pointer;
+                padding: 0;
+                z-index: 9999;
             }
-            .chat-bubble img {
-                width: 28px;
-                height: 28px;
+            div[data-testid="brain-button"] button span {
+                visibility: hidden;
             }
-        </style>
-        <div class="chat-bubble" onclick="document.getElementById('chat-btn').click()">
-            <img src="https://img.icons8.com/fluency/48/brain.png"/>
-        </div>
-    """, unsafe_allow_html=True)
+            </style>
+        """, unsafe_allow_html=True)
+        col = st.columns([0.0001, 0.9999])
+        with col[0]:
+            if st.button("🧠", key="brain-button"):
+                st.session_state.show_assistant = not st.session_state.show_assistant
+                # Greet on first open
+                if st.session_state.show_assistant and "assistant_greeted" not in st.session_state:
+                    welcome = "Hi there! I'm your Legal Automation Assistant. I can help explain outputs, troubleshoot, or fix writing tone."
+                    st.session_state.chat_log = st.session_state.get("chat_log", [])
+                    st.session_state.chat_log.append({"user": "System", "assistant": welcome})
+                    st.session_state.assistant_greeted = True
 
-    # --- Hidden Streamlit Button for Toggling Modal ---
-    if st.button("💬", key="chat-btn"):
-        st.session_state.show_assistant = not st.session_state.show_assistant
-
-    # --- Assistant Modal Window ---
+    # --- Assistant popup modal ---
     if st.session_state.show_assistant:
         with st.container():
             st.markdown("""
@@ -80,17 +80,27 @@ def render_chat_modal():
                 ">
             """, unsafe_allow_html=True)
 
-            st.markdown("### 🧠 Legal Automation Assistant")
-            st.caption("How can I help you today? I can answer questions, fix tone, explain outputs, and troubleshoot.")
+            # --- Modal Header with Close Button ---
+            cols = st.columns([0.85, 0.15])
+            with cols[0]:
+                st.markdown("### 🧠 Legal Automation Assistant")
+                st.caption("How can I help you today? I can answer questions, fix tone, explain outputs, and troubleshoot.")
+            with cols[1]:
+                if st.button("×", key="close_assistant"):
+                    st.session_state.show_assistant = False
+                    st.stop()
 
+            # --- Chat history ---
             if "chat_log" not in st.session_state:
                 st.session_state.chat_log = []
 
-            for entry in st.session_state.chat_log[-5:]:
-                st.markdown(f"**You:** {entry['user']}")
+            for entry in st.session_state.chat_log[-6:]:
+                if entry["user"] != "System":
+                    st.markdown(f"**You:** {entry['user']}")
                 st.markdown(f"**Assistant:** {entry['assistant']}")
                 st.markdown("---")
 
+            # --- Prompt input ---
             prompt = st.text_input("Ask the assistant...", key="assistant_input")
             if prompt:
                 try:
