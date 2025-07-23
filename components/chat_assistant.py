@@ -22,17 +22,17 @@ def log_assistant_interaction(user, tenant, question, answer):
         logger.error(redact_log(f"❌ Assistant log failed: {e}"))
 
 def render_chat_modal():
-    # Handle toggle
+    # Set default state
     if "show_assistant" not in st.session_state:
         st.session_state.show_assistant = False
 
-    # Floating chat bubble button
+    # === Bubble toggle button (bottom-left)
     st.markdown("""
-    <style>
-        #chat-toggle-button {
+        <style>
+        .chat-toggle {
             position: fixed;
-            bottom: 25px;
-            left: 25px;
+            bottom: 20px;
+            left: 20px;
             background-color: #0A1D3B;
             color: white;
             border: none;
@@ -44,47 +44,49 @@ def render_chat_modal():
             z-index: 9999;
             cursor: pointer;
         }
-    </style>
-    <button id="chat-toggle-button" onclick="window.parent.postMessage({type: 'toggle_chat'}, '*')">💬</button>
-    <script>
-        const streamlitDoc = window.parent.document;
-
+        </style>
+        <button class="chat-toggle" onclick="window.parent.postMessage({ type: 'toggle-chat' }, '*')">💬</button>
+        <script>
         window.addEventListener("message", (event) => {
-            if (event.data.type === "toggle_chat") {
-                const input = streamlitDoc.querySelector('input[data-testid="stTextInput"][aria-label="assistant_input"]');
-                if (input) {
-                    input.closest('div[data-testid="stVerticalBlock"]').style.display =
-                        input.closest('div[data-testid="stVerticalBlock"]').style.display === "none"
-                        ? "block" : "none";
-                }
+            if (event.data.type === "toggle-chat") {
+                const streamlitInput = window.parent.document.querySelector('iframe');
+                streamlitInput.contentWindow.postMessage({ type: "streamlit:rerun" }, "*");
+                fetch("/_stcore/_broadcast", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ event: "toggle_chat_state" })
+                });
             }
         });
-    </script>
+        </script>
     """, unsafe_allow_html=True)
 
-    # === Assistant Panel ===
-    with st.container():
-        st.markdown("### 🧠 Legal Automation Assistant")
-        if "chat_log" not in st.session_state:
-            st.session_state.chat_log = []
+    # === Manual toggle (Streamlit state-based) — safe fallback
+    toggle = st.experimental_get_query_params().get("chat", [None])[0]
+    if toggle == "show":
+        st.session_state.show_assistant = True
+    elif toggle == "hide":
+        st.session_state.show_assistant = False
 
-        for entry in st.session_state.chat_log:
-            st.markdown(f"**You:** {entry['user']}")
-            st.markdown(f"**Assistant:** {entry['assistant']}")
-            st.markdown("---")
+    # === Render Assistant if visible
+    if st.session_state.show_assistant:
+        with st.expander("🧠 Legal Automation Assistant", expanded=True):
+            if "chat_log" not in st.session_state:
+                st.session_state.chat_log = []
 
-        user_input = st.text_input("Ask the assistant...", key="assistant_input")
-        if user_input:
-            with st.spinner("💭 Thinking..."):
+            for entry in st.session_state.chat_log:
+                st.markdown(f"**You:** {entry['user']}")
+                st.markdown(f"**Assistant:** {entry['assistant']}")
+                st.markdown("---")
+
+            prompt = st.text_input("Ask the assistant...", key="assistant_input")
+            if prompt:
                 try:
-                    reply = safe_generate(user_input, system_msg=ASSISTANT_SYSTEM_PROMPT)
+                    response = safe_generate(prompt, system_msg=ASSISTANT_SYSTEM_PROMPT)
                 except Exception as e:
-                    reply = "❌ Sorry, something went wrong."
+                    response = "❌ Something went wrong."
                     logger.error(redact_log(f"❌ Assistant failed: {e}"))
 
-            st.session_state.chat_log.append({
-                "user": user_input,
-                "assistant": reply
-            })
-            log_assistant_interaction(get_user_id(), get_tenant_id(), user_input, reply)
-            st.experimental_rerun()
+                st.session_state.chat_log.append({"user": prompt, "assistant": response})
+                log_assistant_interaction(get_user_id(), get_tenant_id(), prompt, response)
+                st.experimental_rerun()
