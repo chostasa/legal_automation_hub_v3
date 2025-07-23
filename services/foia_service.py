@@ -78,9 +78,12 @@ Any and all BFS reports documenting responses to incidents involving agents and/
 • Complete copies of any and all BFS investigative reports and/or files related to incidents involving a minor/student and agents and/or employees of Streamwood Hospital during the time period from 1983 to the present.
 Only return the list.
 
-Do not use placeholders like “[date]” or “[location]”. You may refer generally to “the incident” or “the snowplow incident” if needed.
+Do not include placeholder terms like “[Client Name]”, “[date]”, “[location]”, or similar.
+Refer to “the incident” or “the snowplow incident” as needed.
+Do not fabricate or assume facts not provided.
 
-Ensure that each bullet point is on its own line. Do not cluster or compress the items into a single paragraph.
+Each bullet point must appear on its own line using asterisks (*).
+Do not combine multiple bullets into one paragraph.
 
 {DEFAULT_SAFETY}
 """.strip()
@@ -167,8 +170,8 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             "location": data.get("location", ""),
             "doi": data.get("doi", ""),
             "synopsis": data["synopsis"],
-            "foia_request_bullet_points": [line.strip("• ").strip() for line in request_list.split("\n") if line.strip()],
-            "Body": foia_body
+            "foia_request_bullet_points": [line.lstrip("• ").strip() for line in request_list.split("\n") if line.strip()],
+            "Body": foia_body,
         }
 
         run_in_thread(replace_text_in_docx_all, template_path, replacements, output_path)
