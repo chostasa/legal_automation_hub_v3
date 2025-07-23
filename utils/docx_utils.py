@@ -50,7 +50,7 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
     for para in doc.paragraphs:
         for key, val in replacements.items():
             placeholder = f"{{{{{key}}}}}"
-            if placeholder in para.text:
+            if para.text.strip() == placeholder:
                 if isinstance(val, list):
                     for bullet in val:
                         if bullet.strip():
