@@ -6,13 +6,11 @@ from core.auth import get_user_id, get_tenant_id
 from core.security import redact_log
 from logger import logger
 
-# === Assistant Prompt ===
 ASSISTANT_SYSTEM_PROMPT = """
 You are a helpful internal assistant for litigation staff using the Legal Automation Hub.
 You help rephrase legal text, explain outputs, and answer module questions.
 """
 
-# === Log Assistant Activity ===
 def log_assistant_interaction(user, tenant, question, answer):
     try:
         log_dir = os.path.join("logs", "assistant_logs")
@@ -23,44 +21,42 @@ def log_assistant_interaction(user, tenant, question, answer):
     except Exception as e:
         logger.error(redact_log(f"❌ Assistant log failed: {e}"))
 
-# === Main Render Function ===
 def render_chat_modal():
     if "show_assistant" not in st.session_state:
         st.session_state.show_assistant = False
 
-    # --- Floating Bubble CSS + Trigger ---
+    # --- Floating Button ---
     st.markdown("""
         <style>
-        .chat-toggle-container {
-            position: fixed;
-            bottom: 25px;
-            left: 25px;
-            z-index: 9999;
-        }
-        .chat-button {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background-color: #0A1D3B;
-            color: white;
-            font-size: 26px;
-            text-align: center;
-            line-height: 60px;
-            box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
-            cursor: pointer;
-        }
+            .chat-bubble {
+                position: fixed;
+                bottom: 25px;
+                left: 25px;
+                z-index: 9999;
+                background-color: #0A1D3B;
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+            }
+            .chat-bubble img {
+                width: 28px;
+                height: 28px;
+            }
         </style>
-        <div class="chat-toggle-container">
-            <div class="chat-button" onclick="document.getElementById('chat-toggle-btn').click()">💬</div>
+        <div class="chat-bubble" onclick="document.getElementById('chat-btn').click()">
+            <img src="https://img.icons8.com/fluency/48/brain.png"/>
         </div>
     """, unsafe_allow_html=True)
 
-    # --- Hidden Streamlit Trigger Button ---
-    trigger = st.empty()
-    if trigger.button("Toggle Assistant", key="chat-toggle-btn"):
+    if st.button("💬", key="chat-btn", label_visibility="collapsed"):
         st.session_state.show_assistant = not st.session_state.show_assistant
 
-    # --- Assistant Modal ---
+    # --- Assistant Popup Modal ---
     if st.session_state.show_assistant:
         with st.container():
             st.markdown("""
@@ -69,18 +65,19 @@ def render_chat_modal():
                     bottom: 100px;
                     left: 25px;
                     z-index: 9998;
-                    background: white;
-                    border: 2px solid #0A1D3B;
+                    width: 380px;
+                    max-height: 550px;
+                    background: #fff;
                     border-radius: 12px;
+                    border: 1px solid #ccc;
                     padding: 1rem;
-                    width: 360px;
-                    max-height: 500px;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
                     overflow-y: auto;
-                    box-shadow: 0px 6px 15px rgba(0,0,0,0.25);
                 ">
             """, unsafe_allow_html=True)
 
-            st.markdown("#### 🧠 Legal Automation Assistant")
+            st.markdown("### 🧠 Legal Automation Assistant")
+            st.caption("How can I help you today? I can answer questions, fix tone, explain outputs, and troubleshoot.")
 
             if "chat_log" not in st.session_state:
                 st.session_state.chat_log = []
