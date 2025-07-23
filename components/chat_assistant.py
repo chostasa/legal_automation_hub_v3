@@ -53,7 +53,7 @@ def render_chat_modal():
         </div>
     """, unsafe_allow_html=True)
 
-    if st.button("💬", key="chat-btn", label_visibility="collapsed"):
+    if st.button("💬", key="chat-btn"):
         st.session_state.show_assistant = not st.session_state.show_assistant
 
     # --- Assistant Popup Modal ---
