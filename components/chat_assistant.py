@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 from services.openai_client import safe_generate
 from core.auth import get_user_id, get_tenant_id
 from core.security import redact_log
@@ -8,8 +7,8 @@ import os
 from datetime import datetime
 
 ASSISTANT_SYSTEM_PROMPT = """
-You are an internal assistant for litigation staff at a law firm.
-You help with tone, writing style, legal phrasing, and troubleshooting technical issues.
+You are a helpful internal assistant for litigation staff using the Legal Automation Hub.
+You help rephrase legal text, explain outputs, and answer module questions.
 """
 
 def log_assistant_interaction(user, tenant, question, answer):
@@ -23,80 +22,69 @@ def log_assistant_interaction(user, tenant, question, answer):
         logger.error(redact_log(f"❌ Assistant log failed: {e}"))
 
 def render_chat_modal():
-    with st.container():
-        st.markdown("""
-        <style>
-        #chat-bubble {
+    # Handle toggle
+    if "show_assistant" not in st.session_state:
+        st.session_state.show_assistant = False
+
+    # Floating chat bubble button
+    st.markdown("""
+    <style>
+        #chat-toggle-button {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            bottom: 25px;
+            left: 25px;
             background-color: #0A1D3B;
             color: white;
+            border: none;
             border-radius: 50%;
             width: 55px;
             height: 55px;
+            font-size: 26px;
             text-align: center;
-            font-size: 30px;
-            z-index: 1000;
+            z-index: 9999;
             cursor: pointer;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         }
-        #chat-box {
-            position: fixed;
-            bottom: 90px;
-            right: 20px;
-            width: 350px;
-            max-height: 500px;
-            background-color: white;
-            border: 1px solid #ccc;
-            border-radius: 10px;
-            overflow-y: auto;
-            padding: 1rem;
-            z-index: 1000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        }
-        </style>
+    </style>
+    <button id="chat-toggle-button" onclick="window.parent.postMessage({type: 'toggle_chat'}, '*')">💬</button>
+    <script>
+        const streamlitDoc = window.parent.document;
 
-        <div id="chat-bubble" onclick="toggleChat()">💬</div>
-        <script>
-        const toggleChat = () => {
-            const box = window.parent.document.getElementById("chat-box-wrapper");
-            box.style.display = box.style.display === "none" ? "block" : "none";
-        };
-        </script>
-        """, unsafe_allow_html=True)
+        window.addEventListener("message", (event) => {
+            if (event.data.type === "toggle_chat") {
+                const input = streamlitDoc.querySelector('input[data-testid="stTextInput"][aria-label="assistant_input"]');
+                if (input) {
+                    input.closest('div[data-testid="stVerticalBlock"]').style.display =
+                        input.closest('div[data-testid="stVerticalBlock"]').style.display === "none"
+                        ? "block" : "none";
+                }
+            }
+        });
+    </script>
+    """, unsafe_allow_html=True)
 
-        # Chat wrapper container
-        components.html(f"""
-        <div id="chat-box-wrapper" style="display: none;">
-            <div id="chat-box">
-                <h4>💬 Internal Assistant</h4>
-                <div id="chat-content">{render_chat_ui()}</div>
-            </div>
-        </div>
-        """, height=600)
+    # === Assistant Panel ===
+    with st.container():
+        st.markdown("### 🧠 Legal Automation Assistant")
+        if "chat_log" not in st.session_state:
+            st.session_state.chat_log = []
 
-def render_chat_ui():
-    # Session
-    if "chat_log" not in st.session_state:
-        st.session_state.chat_log = []
+        for entry in st.session_state.chat_log:
+            st.markdown(f"**You:** {entry['user']}")
+            st.markdown(f"**Assistant:** {entry['assistant']}")
+            st.markdown("---")
 
-    output = ""
-    for entry in st.session_state.chat_log:
-        output += f"<b>You:</b> {entry['user']}<br><b>Assistant:</b> {entry['assistant']}<hr>"
+        user_input = st.text_input("Ask the assistant...", key="assistant_input")
+        if user_input:
+            with st.spinner("💭 Thinking..."):
+                try:
+                    reply = safe_generate(user_input, system_msg=ASSISTANT_SYSTEM_PROMPT)
+                except Exception as e:
+                    reply = "❌ Sorry, something went wrong."
+                    logger.error(redact_log(f"❌ Assistant failed: {e}"))
 
-    prompt = st.text_input("Ask something...", key="assistant_input")
-    if prompt:
-        try:
-            reply = safe_generate(prompt, system_msg=ASSISTANT_SYSTEM_PROMPT)
             st.session_state.chat_log.append({
-                "user": prompt,
+                "user": user_input,
                 "assistant": reply
             })
-            log_assistant_interaction(get_user_id(), get_tenant_id(), prompt, reply)
+            log_assistant_interaction(get_user_id(), get_tenant_id(), user_input, reply)
             st.experimental_rerun()
-        except Exception as e:
-            reply = "❌ Sorry, something went wrong."
-            logger.error(redact_log(f"❌ Assistant failed: {e}"))
-
-    return output
