@@ -166,10 +166,32 @@ def generate_all_demands(template_path, excel_path, output_dir):
             continue
         fill_template(data, template_path, output_dir)
 
-# === Main Runner ===
+# === UI-compatible wrapper ===
+def generate_demand_letter(
+    client_name,
+    defendant,
+    location,
+    incident_date,
+    summary,
+    damages,
+    template_path,
+    output_path,
+    example_text=None
+):
+    data = {
+        "Client Name": client_name,
+        "Defendant": defendant,
+        "Location": location,
+        "IncidentDate": incident_date,
+        "Summary": summary,
+        "Damages": damages,
+        "Example Text": example_text or ""
+    }
+    return output_path, fill_template(data, template_path, os.path.dirname(output_path))
+
+# === Main Runner for Local Use ===
 if __name__ == "__main__":
     TEMPLATE_PATH = "templates/demand_template.docx"
     EXCEL_PATH = "data_demand_requests.xlsx"
     OUTPUT_DIR = "output_requests"
-
     generate_all_demands(TEMPLATE_PATH, EXCEL_PATH, OUTPUT_DIR)
