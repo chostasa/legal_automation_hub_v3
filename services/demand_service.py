@@ -8,22 +8,10 @@ from openai import OpenAI
 # === OpenAI Setup ===
 client = OpenAI()
 
-# === Prompt Safety Notes ===
-NO_HALLUCINATION_NOTE = """
-Do not fabricate or assume any facts. Use only what is provided. Avoid headings, greetings, and signoffs — the template handles those. Refer to the client by their first name only. Keep all naming, pronouns, and chronology consistent. Do not use more than one version of the incident. Do not repeat injury or treatment details across sections.
-"""
-
-LEGAL_FLUENCY_NOTE = """
-Use the tone and clarity of a senior litigator. Frame facts persuasively using legal reasoning: duty, breach, causation, and harm. Eliminate redundancy, vague phrases, and casual storytelling. Frame liability clearly. Maintain formal, polished, and precise language. Quantify damages where possible. Refer to witnesses, police, and footage once.
-Do not restate the client’s injuries more than once. After the initial mention, refer to them only by category.
-"""
-
-FULL_SAFETY_PROMPT = "\n\n".join([NO_HALLUCINATION_NOTE.strip(), LEGAL_FLUENCY_NOTE.strip()])
-
 # === OpenAI Completion Helper ===
 def generate_with_openai(prompt):
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4",
         messages=[
             {"role": "system", "content": "You are a professional legal writer."},
             {"role": "user", "content": prompt}
@@ -32,77 +20,88 @@ def generate_with_openai(prompt):
     )
     return html.unescape(response.choices[0].message.content.strip())
 
-# === Section Generators ===
-def generate_brief_synopsis(summary, full_name):
-    prompt = f"""
-{NO_HALLUCINATION_NOTE}
-{LEGAL_FLUENCY_NOTE}
+# === Section Generators with Style Examples Injected ===
 
-Write a one-sentence introduction for a legal demand letter. Refer to the client only as {full_name}. Begin with a sentence like: "Our office represents {full_name}, who suffered..." and describe the injuries factually and concisely. Do not repeat the client's name. Do not use more than one sentence.
+from core.prompts.demand_guidelines import FULL_SAFETY_PROMPT
+from core.prompts.demand_example import EXAMPLE_DEMAND, SETTLEMENT_EXAMPLE
+from core.prompts.demand_guidelines import STRUCTURE_GUIDE_NOTE
+from core.gpt.open_ai import safe_generate
+
+def generate_brief_synopsis(summary, full_name, example_text=None):
+    prompt = f"""
+{FULL_SAFETY_PROMPT}
+{STRUCTURE_GUIDE_NOTE}
+
+Write a one-sentence introduction for a legal demand letter.
+Begin with: \"Our office represents {full_name}, who suffered...\"
+and describe the injuries factually and concisely. Do not repeat the client's name.
+Use clinical, direct phrasing.
 
 Summary of Incident:
 {summary}
 """
-    first_sentence = generate_with_openai(prompt).split(".")[0].strip() + "."
-    return first_sentence
+    return safe_generate(prompt).split(".")[0].strip() + "."
 
-def generate_combined_facts(summary, first_name):
-    prompt = f"""{FULL_SAFETY_PROMPT}
+def generate_combined_facts(summary, first_name, example_text=None):
+    prompt = f"""
+{FULL_SAFETY_PROMPT}
+{STRUCTURE_GUIDE_NOTE}
 
-Write a single, polished paragraph that incorporates:
-- duty,
-- standard of care,
-- breach,
-- causation,
-- and harm.
+Below is an example of a professionally written liability paragraph. Use it **only** to mirror tone, fluency, and structure:
+---
+{(example_text or EXAMPLE_DEMAND).strip()}
+---
 
-This is for a legal demand letter for a client named {first_name}. Do not label the sections. Do not repeat injuries verbatim from the summary — reference them categorically instead (e.g., orthopedic trauma, psychological harm, etc.).
+Now write a persuasive, fluent paragraph that presents liability for {first_name}, focusing on:
+- Duty of care
+- Breach of duty
+- Causation
+- Resulting harm
+
+Avoid headings. Do not re-list injuries. Assume summary below provides facts:
 
 Summary:
 {summary}
 """
-    return generate_with_openai(prompt)
+    return safe_generate(prompt)
 
-def generate_combined_damages(damages_text, first_name):
-    prompt = f"""{FULL_SAFETY_PROMPT}
+def generate_combined_damages(damages_text, first_name, example_text=None):
+    prompt = f"""
+{FULL_SAFETY_PROMPT}
+{STRUCTURE_GUIDE_NOTE}
 
-Write a single flowing paragraph describing the damages suffered by {first_name}. Include:
-- medical disruption,
-- treatment efforts,
-- financial strain,
-- and emotional hardship.
+Write a professional, medically grounded paragraph describing the aftermath of the injuries suffered by {first_name}.
+Focus on:
+- Disruption to care and recovery
+- Financial and occupational hardship
+- Emotional and psychological toll
 
-Do not use section titles. Do not repeat injury descriptions. Keep the tone formal and persuasive.
+Avoid re-describing physical injuries. Frame all impacts in terms of ongoing consequences.
+Do not reference the incident again — focus only on aftermath.
 
 Damages Summary:
 {damages_text}
 """
-    return generate_with_openai(prompt)
+    return safe_generate(prompt)
 
-def generate_settlement_demand(summary, damages, first_name):
+def generate_settlement_demand(summary, damages, first_name, example_text=None):
     prompt = f"""
-{NO_HALLUCINATION_NOTE}
-{LEGAL_FLUENCY_NOTE}
+{FULL_SAFETY_PROMPT}
+{STRUCTURE_GUIDE_NOTE}
 
-Use a professional, authoritative tone. Avoid casual or speculative phrasing. Do not invent any facts or sources of liability. Do not reference things like "bus footage" or "witnesses" unless explicitly provided.
+Use the following paragraph ONLY as a tone/style guide — do not use any facts from it:
+---
+{(example_text or SETTLEMENT_EXAMPLE).strip()}
+---
 
-Draft a closing settlement paragraph for {first_name} that justifies the demand based on the facts and injuries described below. Do not add any legal theories or damages not mentioned. Reference the strength of clients position based on factual consistency, corroborating sources, and the nature of their injuries.
+Write the final paragraph of a legal demand letter for {first_name}. Justify settlement based on the facts and harms described above.
+Include:
+- Clear, confident summary of liability
+- Anticipated discovery support
+- Litigation risk if unresolved
+- A formal call to resolve: “We invite resolution of this matter without the need for formal litigation...”
 
-Refine tone to remove informality and literary phrasing.
-
-Where possible, preview anticipated evidence more confidently (e.g., “anticipated to show…” vs. “might show…”).
-
-Condense repetitive phrasing. 
-
-Make the transitions and flow fluent. 
-
-Trim redundancy.
-
-Avoid redundancy.
-
-Integrate a single strong sentence on why litigation risk is high if this isn’t resolved.
-
-End with a direct call to action: “We invite resolution of this matter without the need for formal litigation. Should you fail to respond by [insert date], we are prepared to proceed accordingly.”
+Do not introduce new facts or speculative claims.
 
 Summary:
 {summary}
@@ -110,7 +109,7 @@ Summary:
 Damages:
 {damages}
 """
-    return generate_with_openai(prompt)
+    return safe_generate(prompt)
 
 
 # === Template Replacement ===
@@ -141,7 +140,7 @@ def fill_template(data, template_path, output_dir):
     doc = Document(template_path)
 
     full_name = data.get("Client Name", "").strip()
-    first_name = full_name.split()[0] if full_name else "Client"
+    first_name = full_name.strip().split()[0] if full_name.strip() else "Client"
 
     incident_date = data.get("IncidentDate", "")
     if isinstance(incident_date, datetime):
