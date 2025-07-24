@@ -141,7 +141,16 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
         for k, v in replacements.items():
             print(f"  - {k}: {v[:100]!r}{'...' if len(v) > 100 else ''}")
 
-        run_in_thread(replace_text_in_docx_all, template_path, replacements, output_path)
+        try:
+            run_in_thread(replace_text_in_docx_all, template_path, replacements, output_path)
+        except Exception as docx_error:
+            logger.warning(f"⚠️ DOCX rendering error: {docx_error}")
+            # Try writing a backup template with only the plain text FOIA body for inspection
+            with open(output_path.replace(".docx", "_FAILED.txt"), "w", encoding="utf-8") as f:
+                f.write("⚠️ Failed to render DOCX — inspect the following:\n\n")
+                for k, v in replacements.items():
+                    f.write(f"<<{k}>>: {v}\n\n")
+            raise RuntimeError("⚠️ Template render failed — fallback .txt file created.")
 
         if not os.path.exists(output_path):
             raise RuntimeError("❌ FOIA DOCX file was not created.")
