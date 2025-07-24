@@ -25,7 +25,7 @@ def generate_with_openai(prompt):
 from core.prompts.demand_guidelines import FULL_SAFETY_PROMPT
 from core.prompts.demand_example import EXAMPLE_DEMAND, SETTLEMENT_EXAMPLE
 from core.prompts.demand_guidelines import STRUCTURE_GUIDE_NOTE
-from core.gpt.open_ai import safe_generate
+from services.openai_client import safe_generate
 
 def generate_brief_synopsis(summary, full_name, example_text=None):
     prompt = f"""
