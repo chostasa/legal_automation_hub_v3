@@ -18,11 +18,9 @@ clean_temp_dir()
 EXAMPLE_DIR = os.path.join("examples", "demand", get_tenant_id())
 os.makedirs(EXAMPLE_DIR, exist_ok=True)
 
-def stream_file(path: str):
+def load_binary_file(path: str) -> bytes:
     with open(path, "rb") as f:
-        while chunk := f.read(8192):
-            yield chunk
-
+        return f.read()
 
 def run_ui():
     st.header("📂 Demand Letter Generator")
@@ -119,10 +117,11 @@ def run_ui():
             st.success("✅ Demand letter generated!")
             st.download_button(
                 "⬇️ Download Demand Letter (.docx)",
-                data=stream_file(file_path),
+                data=load_binary_file(file_path),
                 file_name=os.path.basename(file_path),
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
+
 
             # 📈 Log usage
             try:
