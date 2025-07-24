@@ -112,14 +112,6 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
         bullet_prompt = build_request_prompt(data)
         request_list = run_in_thread(safe_generate, prompt=bullet_prompt)
 
-        # 🧹 Clean bullet list for copy/paste and Word doc
-        bullet_lines = [
-            re.sub(r"^\*\s+", "", line).strip()
-            for line in request_list.split("\n")
-            if line.strip()
-        ]
-        bullet_text = "\n".join(f"• {line}" for line in bullet_lines)
-
         # 🧠 Generate FOIA body letter
         letter_prompt = build_letter_prompt(data, request_list, example_text)
         foia_body = run_in_thread(safe_generate, prompt=letter_prompt)
@@ -139,6 +131,11 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             "stateresponsetime": data.get("state_response_time", ""),
         }
 
+        # 🧼 Escape accidental template braces
+        for k, v in replacements.items():
+            if isinstance(v, str):
+                replacements[k] = v.replace("{{", "{ {").replace("}}", "} }")
+
         # 🔎 DEBUG
         print("\n🔍 FOIA Template Replacements:")
         for k, v in replacements.items():
@@ -149,7 +146,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
         if not os.path.exists(output_path):
             raise RuntimeError("❌ FOIA DOCX file was not created.")
 
-        return output_path, foia_body, bullet_lines
+        return output_path, foia_body, request_list.splitlines()
 
     except Exception as e:
         logger.error(redact_log(f"❌ FOIA generation failed: {e}"))
