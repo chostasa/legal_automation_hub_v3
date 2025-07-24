@@ -3,10 +3,10 @@ import html
 from datetime import datetime
 from docx import Document
 from openpyxl import load_workbook
-import openai
+from openai import OpenAI
 
 # === OpenAI Setup ===
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI()
 
 # === Prompt Safety Notes ===
 NO_HALLUCINATION_NOTE = """
@@ -20,15 +20,15 @@ Do not restate the client’s injuries more than once. After the initial mention
 
 # === OpenAI Completion Helper ===
 def generate_with_openai(prompt):
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": "You are a professional legal writer."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.5
     )
-    return html.unescape(response.choices[0].message["content"].strip())
+    return html.unescape(response.choices[0].message.content.strip())
 
 # === Section Generators ===
 def generate_brief_synopsis(summary, full_name):
