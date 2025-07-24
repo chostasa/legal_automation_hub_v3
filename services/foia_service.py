@@ -138,17 +138,17 @@ Summarize the following legal case background in 2 professional sentences explai
 
         # 🧩 Replace into DOCX template
         replacements = {
-            "date": data.get("formatted_date", ""),
-            "clientid": data.get("client_id", ""),
-            "defendantname": data.get("recipient_name", ""),
-            "defendantline1": data.get("recipient_line1", ""),
-            "defendantline2": data.get("recipient_line2", ""),
+            "date": data.get("formatteddate", ""),
+            "clientid": data.get("clientid", ""),
+            "defendantname": data.get("recipientname", ""),
+            "defendantline1": data.get("recipientline1", ""),
+            "defendantline2": data.get("recipientline2", ""),
             "location": data.get("location", ""),
             "doi": data.get("doi", ""),
             "synopsis": data["synopsis"],
             "foiarequestbulletpoints": bullet_text,
-            "statecitation": data.get("state_citation", ""),
-            "stateresponsetime": data.get("state_response_time", ""),
+            "statecitation": data.get("statecitation", ""),
+            "stateresponsetime": data.get("stateresponsetime", ""),
         }
 
         # 🔎 DEBUG: Show keys and trimmed values
