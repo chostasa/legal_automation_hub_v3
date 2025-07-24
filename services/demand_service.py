@@ -8,14 +8,21 @@ from logger import logger
 
 def generate_demand_letter(
     client_name, defendant, location, incident_date,
-    summary, damages, template_path, output_path
+    summary, damages, template_path, output_path,
+    example_text=None
 ):
     try:
         # === First Name Extraction ===
         first_name = client_name.strip().split()[0]
 
         # === Generate Sections via GPT abstraction
-        sections = generate_demand_sections(client_name, first_name, summary, damages)
+        sections = generate_demand_sections(
+            full_name=client_name,
+            first_name=first_name,
+            summary=summary,
+            damages=damages,
+            example_text=example_text
+        )
 
         # === Format & Replace in Word Template
         run_in_thread(
