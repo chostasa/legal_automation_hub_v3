@@ -12,6 +12,8 @@ from core.auth import get_user_id, get_tenant_id
 from core.audit import log_audit_event
 from logger import logger
 from utils.file_utils import clean_temp_dir
+from core.foia_constants import STATE_CITATIONS, STATE_RESPONSE_TIMES
+
 
 # 🧹 Clean temp dir on startup
 clean_temp_dir()
@@ -49,6 +51,17 @@ def run_ui():
         recipient_abbrev = st.text_input("Recipient Abbreviation (for file name)")
         recipient_address_1 = st.text_input("Recipient Address Line 1")
         recipient_address_2 = st.text_input("Recipient Address Line 2 (City, State, Zip)")
+
+        state = st.selectbox("State", [
+            "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
+            "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
+            "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan",
+            "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire",
+            "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio",
+            "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
+            "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia",
+            "Wisconsin", "Wyoming"
+            ])
 
         st.subheader("📅 Incident Details")
         date_of_incident = st.date_input("Date of Incident")
@@ -107,7 +120,10 @@ def run_ui():
                 "explicit_instructions": sanitize_text(explicit_instructions),
                 "case_type": sanitize_text(case_type),
                 "facility_or_system": sanitize_text(facility_system),
-                "recipient_role": sanitize_text(recipient_role)
+                "recipient_role": sanitize_text(recipient_role),
+                "state": sanitize_text(state),
+                "state_citation": STATE_CITATIONS.get(state, ""),
+                "state_response_time": STATE_RESPONSE_TIMES.get(state, ""),
             }
 
             fingerprint = "|".join([

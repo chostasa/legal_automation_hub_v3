@@ -146,6 +146,8 @@ Summarize the following legal case background in 2 professional sentences explai
             "synopsis": data["synopsis"],
             "foia_request_bullet_points": bullet_lines,
             "Body": foia_body,
+            "state_citation": data.get("state_citation", ""),
+            "state_response_time": data.get("state_response_time", ""),
         }
 
         run_in_thread(replace_text_in_docx_all, template_path, replacements, output_path)
