@@ -108,7 +108,7 @@ Summary:
 {summary}
 
 Damages:
-{damages_text}
+{damages}
 """
     return generate_with_openai(prompt)
 
