@@ -189,4 +189,22 @@ def run_ui():
 
         except Exception as e:
             logger.error(redact_log(f"❌ FOIA letter generation failed: {e}"))
-            st.error("❌ An unexpected error occurred while generating the FOIA letter.")
+
+            # Fallback path
+            fallback_path = file_path.replace(".docx", "_FAILED.txt")
+            if os.path.exists(fallback_path):
+                with open(fallback_path, "r", encoding="utf-8") as f:
+                    fallback_contents = f.read()
+
+                st.warning("⚠️ FOIA DOCX failed to render. Fallback debug output below:")
+                st.text_area("📝 Fallback .txt Output", value=fallback_contents, height=400)
+
+                st.download_button(
+                    label="⬇️ Download Debug Output (.txt)",
+                    data=fallback_contents,
+                    file_name=os.path.basename(fallback_path),
+                    mime="text/plain"
+                )
+            else:
+                st.error("❌ FOIA letter generation failed and no fallback output was created.")
+
