@@ -32,7 +32,7 @@ Case synopsis:
 {data['synopsis']}
 
 Case type: {data['case_type']}
-Facility or system involved: {data['facility_or_system']}
+Facility or system involved: {data['facility_system']}
 Defendant role: {data['recipient_role']}
 
 Explicit instructions:
@@ -42,7 +42,7 @@ Common requests or priorities:
 {data.get('potential_requests') or "None provided"}
 
 Please return a detailed and **role-specific** list of records, documents, media, and internal communications that a skilled civil attorney would request from this type of facility or entity. 
-Only include items that would reasonably be within the possession, custody, or control of a {data['recipient_role']} operating within a {data['facility_or_system']}. Do not include irrelevant medical, financial, or third-party institutional records if they would not be held by this entity.
+Only include items that would reasonably be within the possession, custody, or control of a {data['recipient_role']} operating within a {data['facility_system']}. Do not include irrelevant medical, financial, or third-party institutional records if they would not be held by this entity.
 
 Format output as Word-style bullet points using asterisks (*).
 
@@ -51,7 +51,6 @@ Format output as Word-style bullet points using asterisks (*).
 
 {DEFAULT_SAFETY}
 """.strip()
-
 
 def build_letter_prompt(data: dict, request_list: str, example_text: str = "") -> str:
     style_snippet = f"""
@@ -63,16 +62,16 @@ Match the tone, structure, and legal phrasing of the following example letter:
     return f"""
 You are a legal assistant generating a formal FOIA request letter on behalf of a civil law firm.
 
-Client ID: {data['clientid']}
+Client ID: {data['client_id']}
 Recipient Agency: {data['recipient_name']}
 Date of Incident: {data['doi']}
 Location of Incident: {data['location']}
-Case Type: {data['casetype']}
-Facility/System: {data['facilityorsystem']}
-Recipient Role: {data['recipientrole']}
+Case Type: {data['case_type']}
+Facility/System: {data['facility_system']}
+Recipient Role: {data['recipient_role']}
 
 Case Summary:
-{data['synopsis']}
+{data['synopsis_summary']}
 
 Records Requested:
 {request_list}
@@ -90,7 +89,6 @@ Avoid filler like “I can assist with…” or “Please provide…” and do n
 {DEFAULT_SAFETY}
 """.strip()
 
-
 # === SYNOPSIS GENERATOR ===
 def generate_synopsis(casesynopsis: str) -> str:
     prompt = f"""
@@ -99,7 +97,6 @@ Summarize the following legal case background in 2 professional sentences explai
 {casesynopsis}
 """
     return run_in_thread(safe_generate, "You are a legal summarization assistant.", prompt)
-
 
 # === MAIN GENERATOR ===
 def generate_foia_request(data: dict, template_path: str, output_path: str, example_text: str = "") -> tuple:
@@ -110,14 +107,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
                 data[k] = sanitize_text(v)
 
         # ✂️ Generate synopsis and request bullets
-        data["synopsis"] = run_in_thread(
-            safe_generate,
-            prompt=f"""
-Summarize the following legal case background in 2 professional sentences explaining what happened and the resulting harm or damages. Do not include any parties' names or personal identifiers:
-
-{data.get("synopsis", "")}
-"""
-        )
+        data["synopsis_summary"] = generate_synopsis(data.get("synopsis", ""))
 
         bullet_prompt = build_request_prompt(data)
         request_list = run_in_thread(safe_generate, prompt=bullet_prompt)
@@ -128,7 +118,6 @@ Summarize the following legal case background in 2 professional sentences explai
             for line in request_list.split("\n")
             if line.strip()
         ]
-
         bullet_text = "\n".join(f"• {line}" for line in bullet_lines)
 
         # 🧠 Generate FOIA body letter
@@ -139,20 +128,19 @@ Summarize the following legal case background in 2 professional sentences explai
         # 🧩 Replace into DOCX template
         replacements = {
             "date": data.get("formatted_date", ""),
-            "clientid": data.get("clientid", ""),
-            "defendantname": data.get("recipientname", ""),
-            "defendantline1": data.get("recipientline1", ""),
-            "defendantline2": data.get("recipientline2", ""),
+            "clientid": data.get("client_id", ""),
+            "defendantname": data.get("recipient_name", ""),
+            "defendantline1": data.get("recipient_address_1", ""),
+            "defendantline2": data.get("recipient_address_2", ""),
             "location": data.get("location", ""),
             "doi": data.get("doi", ""),
-            "synopsis": data.get("synopsis", ""),
+            "synopsis": data.get("synopsis_summary", ""),
             "foiarequestbulletpoints": bullet_text,
-            "statecitation": data.get("statecitation", ""),
-            "stateresponsetime": data.get("stateresponsetime", ""),
+            "statecitation": data.get("state_citation", ""),
+            "stateresponsetime": data.get("state_response_time", ""),
         }
 
-
-        # 🔎 DEBUG: Show keys and trimmed values
+        # 🔎 DEBUG
         print("\n🔍 FOIA Template Replacements:")
         for k, v in replacements.items():
             print(f"  - {k}: {v[:100]!r}{'...' if len(v) > 100 else ''}")

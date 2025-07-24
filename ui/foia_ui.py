@@ -14,7 +14,6 @@ from logger import logger
 from utils.file_utils import clean_temp_dir
 from core.foia_constants import STATE_CITATIONS, STATE_RESPONSE_TIMES
 
-
 # 🧹 Clean temp dir on startup
 clean_temp_dir()
 
@@ -52,16 +51,7 @@ def run_ui():
         recipient_address_1 = st.text_input("Recipient Address Line 1")
         recipient_address_2 = st.text_input("Recipient Address Line 2 (City, State, Zip)")
 
-        state = st.selectbox("State", [
-            "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
-            "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
-            "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan",
-            "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire",
-            "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio",
-            "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
-            "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia",
-            "Wisconsin", "Wyoming"
-            ])
+        state = st.selectbox("State", list(STATE_CITATIONS.keys()))
 
         st.subheader("📅 Incident Details")
         date_of_incident = st.date_input("Date of Incident")
@@ -107,7 +97,7 @@ def run_ui():
 
         try:
             data = {
-                "date": datetime.today().strftime("%B %d, %Y"),
+                "formatted_date": datetime.today().strftime("%B %d, %Y"),
                 "clientid": sanitize_text(client_id),
                 "recipientname": sanitize_text(recipient_name),
                 "recipientline1": sanitize_text(recipient_address_1),
@@ -126,10 +116,12 @@ def run_ui():
                 "stateresponsetime": STATE_RESPONSE_TIMES.get(state, ""),
             }
 
+            logger.debug(f"🧾 FOIA form data payload: {data}")
+
             fingerprint = "|".join([
-                data["client_id"],
-                data["recipient_abbrev"],
-                data["recipient_name"],
+                data["clientid"],
+                data["recipientabbrev"],
+                data["recipientname"],
                 data["synopsis"],
                 example_text.strip()[:100]
             ])
@@ -142,7 +134,7 @@ def run_ui():
                 with st.spinner("📄 Generating FOIA letter..."):
                     temp_dir = get_secure_temp_dir()
                     output_filename = sanitize_filename(
-                        f"FOIA_{data['recipient_abbrev']}_{datetime.today().strftime('%Y-%m-%d')}.docx"
+                        f"FOIA_{data['recipientabbrev']}_{datetime.today().strftime('%Y-%m-%d')}.docx"
                     )
                     file_path = os.path.join(temp_dir, output_filename)
 
@@ -173,7 +165,6 @@ def run_ui():
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
-            # Log usage
             try:
                 log_usage(
                     event_type="foia_generated",
@@ -185,7 +176,6 @@ def run_ui():
             except Exception as log_err:
                 logger.warning(f"⚠️ Failed to log FOIA usage: {log_err}")
 
-            # Audit log
             try:
                 log_audit_event("FOIA Letter Generated", {
                     "client_id": client_id,
