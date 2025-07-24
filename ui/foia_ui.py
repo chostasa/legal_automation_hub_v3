@@ -119,9 +119,9 @@ def run_ui():
             logger.debug(f"🧾 FOIA form data payload: {data}")
 
             fingerprint = "|".join([
-                data["clientid"],
-                data["recipientabbrev"],
-                data["recipientname"],
+                data["client_id"],
+                data["recipient_abbrev"],
+                data["recipient_name"],
                 data["synopsis"],
                 example_text.strip()[:100]
             ])
