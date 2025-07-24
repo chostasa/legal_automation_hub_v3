@@ -98,7 +98,10 @@ Summarize the following legal case background in 2 professional sentences explai
 
 {FULL_SAFETY_PROMPT}
 """
-    return run_in_thread(safe_generate, "You are a legal summarization assistant.", prompt)
+    summary = run_in_thread(safe_generate, prompt=prompt)
+    if "legal summarization assistant" in summary.lower():
+        summary = "[Synopsis failed to generate. Check input.]"
+    return summary
 
 # === MAIN GENERATOR ===
 def generate_foia_request(data: dict, template_path: str, output_path: str, example_text: str = "") -> tuple:
