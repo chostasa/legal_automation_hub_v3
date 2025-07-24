@@ -134,7 +134,7 @@ def run_ui():
                 with st.spinner("📄 Generating FOIA letter..."):
                     temp_dir = get_secure_temp_dir()
                     output_filename = sanitize_filename(
-                        f"FOIA_{data['recipient_abbrev']}_{datetime.today().strftime('%Y-%m-%d')}.docx"
+                        f"FOIA_{data['client_id']}_{datetime.today().strftime('%Y-%m-%d')}.docx"
                     )
                     file_path = os.path.join(temp_dir, output_filename)
 
