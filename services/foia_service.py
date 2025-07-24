@@ -129,6 +129,8 @@ Summarize the following legal case background in 2 professional sentences explai
             if line.strip()
         ]
 
+        bullet_text = "\n".join(f"• {line}" for line in bullet_lines)
+
         # 🧠 Generate FOIA body letter
         letter_prompt = build_letter_prompt(data, request_list, example_text)
         foia_body = run_in_thread(safe_generate, prompt=letter_prompt)
@@ -144,7 +146,7 @@ Summarize the following legal case background in 2 professional sentences explai
             "location": data.get("location", ""),
             "doi": data.get("doi", ""),
             "synopsis": data["synopsis"],
-            "foia_request_bullet_points": bullet_lines,
+            "foia_request_bullet_points": bullet_text,
             "Body": foia_body,
             "state_citation": data.get("state_citation", ""),
             "state_response_time": data.get("state_response_time", ""),
