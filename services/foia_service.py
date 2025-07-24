@@ -154,7 +154,7 @@ Summarize the following legal case background in 2 professional sentences explai
         # 🔎 DEBUG: Show keys and trimmed values
         print("\n🔍 FOIA Template Replacements:")
         for k, v in replacements.items():
-            print(f"  - {k}: {v[:100]!r}{'...' if len(v) > 100 else ''}
+            print(f"  - {k}: {v[:100]!r}{'...' if len(v) > 100 else ''}")
 
         run_in_thread(replace_text_in_docx_all, template_path, replacements, output_path)
 
