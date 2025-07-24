@@ -29,12 +29,12 @@ def generate_demand_letter(
             replace_text_in_docx_all,
             template_path,
             {
-                "Client_Name": client_name,
+                "ClientName": client_name,
                 "IncidentDate": incident_date,
-                "Brief_Synopsis": sanitize_text(sections["brief_synopsis"]),
+                "BriefSynopsis": sanitize_text(sections["brief_synopsis"]),
                 "Demand": sanitize_text(sections["demand"]),
                 "Damages": sanitize_text(sections["damages"]),
-                "Settlement_Demand": sanitize_text(sections["settlement"]),
+                "SettlementDemand": sanitize_text(sections["settlement"]),
             },
             output_path
         )
