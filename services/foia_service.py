@@ -138,18 +138,19 @@ Summarize the following legal case background in 2 professional sentences explai
 
         # 🧩 Replace into DOCX template
         replacements = {
-            "date": data.get("formatteddate", ""),
+            "date": data.get("formatted_date", ""),
             "clientid": data.get("clientid", ""),
             "defendantname": data.get("recipientname", ""),
             "defendantline1": data.get("recipientline1", ""),
             "defendantline2": data.get("recipientline2", ""),
             "location": data.get("location", ""),
             "doi": data.get("doi", ""),
-            "synopsis": data["synopsis"],
+            "synopsis": data.get("synopsis", ""),
             "foiarequestbulletpoints": bullet_text,
             "statecitation": data.get("statecitation", ""),
             "stateresponsetime": data.get("stateresponsetime", ""),
         }
+
 
         # 🔎 DEBUG: Show keys and trimmed values
         print("\n🔍 FOIA Template Replacements:")

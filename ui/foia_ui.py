@@ -107,23 +107,23 @@ def run_ui():
 
         try:
             data = {
-                "formatted_date": datetime.today().strftime("%B %d, %Y"),
-                "client_id": sanitize_text(client_id),
-                "recipient_name": sanitize_text(recipient_name),
-                "recipient_line1": sanitize_text(recipient_address_1),
-                "recipient_line2": sanitize_text(recipient_address_2),
-                "recipient_abbrev": sanitize_text(recipient_abbrev),
+                "date": datetime.today().strftime("%B %d, %Y"),
+                "clientid": sanitize_text(client_id),
+                "recipientname": sanitize_text(recipient_name),
+                "recipientline1": sanitize_text(recipient_address_1),
+                "recipientline2": sanitize_text(recipient_address_2),
+                "recipientabbrev": sanitize_text(recipient_abbrev),
                 "location": sanitize_text(location),
                 "doi": date_of_incident.strftime("%B %d, %Y"),
                 "synopsis": sanitize_text(case_synopsis),
                 "potential_requests": sanitize_text(potential_requests),
                 "explicit_instructions": sanitize_text(explicit_instructions),
-                "case_type": sanitize_text(case_type),
-                "facility_or_system": sanitize_text(facility_system),
-                "recipient_role": sanitize_text(recipient_role),
+                "casetype": sanitize_text(case_type),
+                "facilityorsystem": sanitize_text(facility_system),
+                "recipientrole": sanitize_text(recipient_role),
                 "state": sanitize_text(state),
-                "state_citation": STATE_CITATIONS.get(state, ""),
-                "state_response_time": STATE_RESPONSE_TIMES.get(state, ""),
+                "statecitation": STATE_CITATIONS.get(state, ""),
+                "stateresponsetime": STATE_RESPONSE_TIMES.get(state, ""),
             }
 
             fingerprint = "|".join([
