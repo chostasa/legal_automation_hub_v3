@@ -1,72 +1,55 @@
-import unicodedata
-import re
+from docxtpl import DocxTemplate
+import traceback
+import os
 
-# Example excerpt from your foia_constants.py for testing
-STATE_CITATIONS = {
-    "Alabama": "Pursuant to the provisions of the Alabama Public Records Law, Ala. Code §§ 36-12-40, 36-12-41.",
-    "Alaska": "Pursuant to the provisions of the Alaska Public Records Act, Alaska Stat. §§ 40.25.110–40.25.125, 40.25.151.",
-    # ... add the rest for full test ...
+TEMPLATE_PATH = "templates/foia_template.docx"
+
+# 🔧 Test values
+test_data = {
+    "date": "July 24, 2025",
+    "client_id": "JANE-ROE-001",
+    "defendant_name": "Records Custodian",
+    "defendant_line1": "123 Main St.",
+    "defendant_line2": "Chicago, IL 60601",
+    "location": "Chicago Juvenile Detention Center",
+    "doi": "June 1, 2023",
+    "synopsis": "Client was assaulted by staff in a secured wing. She suffered severe head trauma and permanent neurological damage.",
+    "foia_request_bullet_points": "• All internal reports\n• Surveillance video\n• Staff rosters\n• Communication logs",
+    "Body": "This FOIA request pertains to the incident involving Jane Roe on June 1, 2023. Please provide the requested materials below within the statutory time period.",
+    "state_citation": "Pursuant to the Illinois FOIA Act, 5 ILCS 140/1 et seq.",
+    "state_response_time": "We expect a response within 5 business days as required by Illinois law.",
 }
 
-STATE_RESPONSE_TIMES = {
-    "Alabama": "We expect an acknowledgment within 10 business days and a full response within 15 business days pursuant to the Alabama Open Records Act. (Agencies may extend in 15-day increments with written notice.)",
-    "Alaska": "I look forward to receiving your written response within 10 working days (i.e. business days) pursuant to the Alaska Public Records Act. (Alaska allows a one-time extension of up to 10 additional working days in unusual circumstances.)",
-    # ... add the rest for full test ...
-}
+# ✅ Step 1: Confirm template loads and placeholder integrity
+print(f"\n🔍 Checking template: {TEMPLATE_PATH}")
+try:
+    doc = DocxTemplate(TEMPLATE_PATH)
+    placeholders = doc.get_undeclared_template_variables()
+    print(f"✅ Found placeholders: {placeholders}")
+except Exception as e:
+    print(f"❌ Error loading template:")
+    traceback.print_exc()
+    exit(1)
 
-def sanitize_for_docx(text: str) -> str:
-    if not text:
-        return ""
-    normalized = unicodedata.normalize('NFKD', text)
-    cleaned = "".join(ch for ch in normalized if unicodedata.category(ch)[0] != 'C')
-    cleaned = cleaned.replace("–", "-").replace("—", "-").replace("“", '"').replace("”", '"').replace("’", "'")
-    return cleaned
+# ✅ Step 2: Try rendering with each variable individually
+print("\n🧪 Testing each variable in isolation:")
+for key in test_data:
+    print(f"\n🔹 Testing: {key}")
+    try:
+        doc = DocxTemplate(TEMPLATE_PATH)
+        partial_context = {key: test_data[key]}
+        doc.render(partial_context)
+        print(f"✅ Successfully rendered with only '{key}'")
+    except Exception as e:
+        print(f"❌ Rendering failed with only '{key}':")
+        traceback.print_exc()
 
-def find_problem_chars(text: str):
-    # Find control characters or suspicious unicode
-    problem_chars = []
-    for i, ch in enumerate(text):
-        cat = unicodedata.category(ch)
-        if cat[0] == 'C':  # Control characters
-            problem_chars.append((i, ch, f"Control char (category {cat})"))
-        elif ord(ch) > 127:
-            problem_chars.append((i, ch, f"Non-ASCII char (U+{ord(ch):04X})"))
-    return problem_chars
-
-def test_foia_constants():
-    for state in STATE_CITATIONS.keys():
-        citation = STATE_CITATIONS[state]
-        response_time = STATE_RESPONSE_TIMES.get(state, "")
-
-        print(f"\n=== {state} ===")
-
-        # Raw
-        print("Raw state_citation:", citation)
-        print("Raw state_response_time:", response_time)
-
-        # Sanitized
-        citation_clean = sanitize_for_docx(citation)
-        response_clean = sanitize_for_docx(response_time)
-        print("Cleaned state_citation:", citation_clean)
-        print("Cleaned state_response_time:", response_clean)
-
-        # Find problems
-        problems_citation = find_problem_chars(citation)
-        problems_response = find_problem_chars(response_time)
-
-        if problems_citation:
-            print("Problem chars in state_citation:")
-            for pos, ch, desc in problems_citation:
-                print(f"  Pos {pos}: '{ch}' - {desc}")
-        else:
-            print("No problem chars in state_citation.")
-
-        if problems_response:
-            print("Problem chars in state_response_time:")
-            for pos, ch, desc in problems_response:
-                print(f"  Pos {pos}: '{ch}' - {desc}")
-        else:
-            print("No problem chars in state_response_time.")
-
-if __name__ == "__main__":
-    test_foia_constants()
+# ✅ Step 3: Try rendering full context
+print("\n🧪 Testing full context render:")
+try:
+    doc = DocxTemplate(TEMPLATE_PATH)
+    doc.render(test_data)
+    print("✅ Full context render succeeded.")
+except Exception as e:
+    print("❌ Full context render failed:")
+    traceback.print_exc()
