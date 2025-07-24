@@ -129,6 +129,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
         replacements = {
             "date": data.get("formatted_date", ""),
             "clientid": data.get("client_id", ""),
+            "recipientabbrev": data.get("recipient_abbrev", ""),
             "defendantname": data.get("recipient_name", ""),
             "defendantline1": data.get("recipient_address_1", ""),
             "defendantline2": data.get("recipient_address_2", ""),
