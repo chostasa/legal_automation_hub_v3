@@ -45,8 +45,10 @@ def run_ui():
     # === Main Form ===
     with st.form("demand_form"):
         client_name = st.text_input("Client Name")
+        defendant = st.text_input("Defendant Name")
         incident_date = st.date_input("Incident Date")
-        summary = st.text_area("Incident Summary")
+        location = st.text_input("Location of Incident")
+        summary = st.text_area("Summary of Incident")
         damages = st.text_area("Damages Summary")
         submitted = st.form_submit_button("⚙️ Generate Demand Letter")
 
@@ -61,6 +63,10 @@ def run_ui():
             errors.append("Incident summary is required.")
         if not damages.strip():
             errors.append("Damages summary is required.")
+        if not defendant.strip():
+            errors.append("Defendant name is required.")
+        if not location.strip():
+            errors.append("Incident location is required.")
 
         if errors:
             for msg in errors:
@@ -73,7 +79,8 @@ def run_ui():
             formatted_date = incident_date.strftime("%B %d, %Y")
             summary = sanitize_text(summary)
             damages = sanitize_text(damages)
-            defendant = "[Defendant Placeholder]"
+            defendant = sanitize_text(defendant)
+            location = sanitize_text(location)
 
             fingerprint = "|".join([
                 full_name, formatted_date, summary, damages, example_text.strip()[:100]
@@ -97,6 +104,8 @@ def run_ui():
                     _, _ = generate_demand_letter(
                         client_name=full_name,
                         defendant=defendant,
+                        location=location,
+                        incident_date=formatted_date,
                         summary=summary,
                         damages=damages,
                         template_path=TEMPLATE_DEMAND,
