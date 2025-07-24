@@ -135,7 +135,6 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             "location": data.get("location", ""),
             "doi": data.get("doi", ""),
             "synopsis": data.get("synopsis_summary", ""),
-            "foiarequestbulletpoints": bullet_text,
             "statecitation": data.get("state_citation", ""),
             "stateresponsetime": data.get("state_response_time", ""),
         }
