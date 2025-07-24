@@ -1,46 +1,72 @@
-from docxtpl import DocxTemplate
-import traceback
-from core.security import sanitize_text
+import unicodedata
+import re
 
-def test_demand_template(template_path, sections):
-    context = {
-        "{{ClientName}}": "John Doe",
-        "{{Defendant}}": "ABC Corp.",
-        "{{Location}}": "Springfield, IL",
-        "{{IncidentDate}}": "2023-04-10",
-        "{{BriefSynopsis}}": sanitize_text(sections["brief_synopsis"]),
-        "{{Demand}}": sanitize_text(sections["demand"]),
-        "{{Damages}}": sanitize_text(sections["damages"]),
-        "{{SettlementDemand}}": sanitize_text(sections["settlement"]),
-    }
+# Example excerpt from your foia_constants.py for testing
+STATE_CITATIONS = {
+    "Alabama": "Pursuant to the provisions of the Alabama Public Records Law, Ala. Code §§ 36-12-40, 36-12-41.",
+    "Alaska": "Pursuant to the provisions of the Alaska Public Records Act, Alaska Stat. §§ 40.25.110–40.25.125, 40.25.151.",
+    # ... add the rest for full test ...
+}
 
-    try:
-        print("🔍 Loading template...")
-        doc = DocxTemplate(template_path)
+STATE_RESPONSE_TIMES = {
+    "Alabama": "We expect an acknowledgment within 10 business days and a full response within 15 business days pursuant to the Alabama Open Records Act. (Agencies may extend in 15-day increments with written notice.)",
+    "Alaska": "I look forward to receiving your written response within 10 working days (i.e. business days) pursuant to the Alaska Public Records Act. (Alaska allows a one-time extension of up to 10 additional working days in unusual circumstances.)",
+    # ... add the rest for full test ...
+}
 
-        print("🧪 Rendering context:")
-        for k, v in context.items():
-            print(f"   {k}: {repr(v)[:80]}")
+def sanitize_for_docx(text: str) -> str:
+    if not text:
+        return ""
+    normalized = unicodedata.normalize('NFKD', text)
+    cleaned = "".join(ch for ch in normalized if unicodedata.category(ch)[0] != 'C')
+    cleaned = cleaned.replace("–", "-").replace("—", "-").replace("“", '"').replace("”", '"').replace("’", "'")
+    return cleaned
 
-        doc.render(context)
-        print("✅ Template rendered successfully!")
+def find_problem_chars(text: str):
+    # Find control characters or suspicious unicode
+    problem_chars = []
+    for i, ch in enumerate(text):
+        cat = unicodedata.category(ch)
+        if cat[0] == 'C':  # Control characters
+            problem_chars.append((i, ch, f"Control char (category {cat})"))
+        elif ord(ch) > 127:
+            problem_chars.append((i, ch, f"Non-ASCII char (U+{ord(ch):04X})"))
+    return problem_chars
 
-    except Exception as e:
-        print("❌ Template rendering failed:", e)
-        traceback.print_exc()
-        try:
-            doc.dump("debug_template_error")
-            print("📄 Dumped to debug_template_error.xml")
-        except Exception as dump_error:
-            print("⚠️ Failed to dump:", dump_error)
+def test_foia_constants():
+    for state in STATE_CITATIONS.keys():
+        citation = STATE_CITATIONS[state]
+        response_time = STATE_RESPONSE_TIMES.get(state, "")
+
+        print(f"\n=== {state} ===")
+
+        # Raw
+        print("Raw state_citation:", citation)
+        print("Raw state_response_time:", response_time)
+
+        # Sanitized
+        citation_clean = sanitize_for_docx(citation)
+        response_clean = sanitize_for_docx(response_time)
+        print("Cleaned state_citation:", citation_clean)
+        print("Cleaned state_response_time:", response_clean)
+
+        # Find problems
+        problems_citation = find_problem_chars(citation)
+        problems_response = find_problem_chars(response_time)
+
+        if problems_citation:
+            print("Problem chars in state_citation:")
+            for pos, ch, desc in problems_citation:
+                print(f"  Pos {pos}: '{ch}' - {desc}")
+        else:
+            print("No problem chars in state_citation.")
+
+        if problems_response:
+            print("Problem chars in state_response_time:")
+            for pos, ch, desc in problems_response:
+                print(f"  Pos {pos}: '{ch}' - {desc}")
+        else:
+            print("No problem chars in state_response_time.")
 
 if __name__ == "__main__":
-    test_demand_template(
-        template_path="templates/demand_template.docx",
-        sections={
-            "brief_synopsis": "Client was struck while walking in the crosswalk...",
-            "demand": "Defendant failed to yield, causing substantial harm.",
-            "damages": "Client suffered a fractured pelvis, requiring surgery.",
-            "settlement": "We are demanding $750,000 to resolve this matter.",
-        }
-    )
+    test_foia_constants()
