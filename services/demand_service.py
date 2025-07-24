@@ -18,6 +18,8 @@ Use the tone and clarity of a senior litigator. Frame facts persuasively using l
 Do not restate the client’s injuries more than once. After the initial mention, refer to them only by category.
 """
 
+FULL_SAFETY_PROMPT = "\n\n".join([NO_HALLUCINATION_NOTE.strip(), LEGAL_FLUENCY_NOTE.strip()])
+
 # === OpenAI Completion Helper ===
 def generate_with_openai(prompt):
     response = client.chat.completions.create(
@@ -44,35 +46,33 @@ Summary of Incident:
     first_sentence = generate_with_openai(prompt).split(".")[0].strip() + "."
     return first_sentence
 
-def generate_demand(summary, first_name):
-    prompt = f"""
-{NO_HALLUCINATION_NOTE}
-{LEGAL_FLUENCY_NOTE}
+def generate_combined_facts(summary, first_name):
+    prompt = f"""{FULL_SAFETY_PROMPT}
 
-Frame the conduct in terms of:
-- Duty
-- Standard of Care
-- Breach
-- Causation
-- Harm
+Write a single, polished paragraph that incorporates:
+- duty,
+- standard of care,
+- breach,
+- causation,
+- and harm.
 
-Use assertive, formal language. Refer to the client as {first_name}. Do not repeat detailed injuries; refer to them categorically.
+This is for a legal demand letter for a client named {first_name}. Do not label the sections. Do not repeat injuries verbatim from the summary — reference them categorically instead (e.g., orthopedic trauma, psychological harm, etc.).
 
-Summary of Incident:
+Summary:
 {summary}
 """
     return generate_with_openai(prompt)
 
-def generate_damages(damages_text, first_name):
-    prompt = f"""
-{NO_HALLUCINATION_NOTE}
-{LEGAL_FLUENCY_NOTE}
+def generate_combined_damages(damages_text, first_name):
+    prompt = f"""{FULL_SAFETY_PROMPT}
 
-Draft a damages section for {first_name}. Focus on economic and non-economic harm, not repeating injury descriptions. Organize by:
-- Medical disruption
-- Treatment
-- Financial strain
-- Emotional hardship
+Write a single flowing paragraph describing the damages suffered by {first_name}. Include:
+- medical disruption,
+- treatment efforts,
+- financial strain,
+- and emotional hardship.
+
+Do not use section titles. Do not repeat injury descriptions. Keep the tone formal and persuasive.
 
 Damages Summary:
 {damages_text}
@@ -84,19 +84,34 @@ def generate_settlement_demand(summary, damages, first_name):
 {NO_HALLUCINATION_NOTE}
 {LEGAL_FLUENCY_NOTE}
 
-Draft a settlement paragraph that justifies a $100,000 demand for {first_name}. Base it on:
-- Injuries and treatment
-- Strength of evidence
-- Anticipated corroboration
-- Risk of litigation
+Use a professional, authoritative tone. Avoid casual or speculative phrasing. Do not invent any facts or sources of liability. Do not reference things like "bus footage" or "witnesses" unless explicitly provided.
 
-Incident Summary:
+Draft a closing settlement paragraph for {first_name} that justifies the demand based on the facts and injuries described below. Do not add any legal theories or damages not mentioned. Reference the strength of clients position based on factual consistency, corroborating sources, and the nature of their injuries.
+
+Refine tone to remove informality and literary phrasing.
+
+Where possible, preview anticipated evidence more confidently (e.g., “anticipated to show…” vs. “might show…”).
+
+Condense repetitive phrasing. 
+
+Make the transitions and flow fluent. 
+
+Trim redundancy.
+
+Avoid redundancy.
+
+Integrate a single strong sentence on why litigation risk is high if this isn’t resolved.
+
+End with a direct call to action: “We invite resolution of this matter without the need for formal litigation. Should you fail to respond by [insert date], we are prepared to proceed accordingly.”
+
+Summary:
 {summary}
 
 Damages:
-{damages}
+{damages_text}
 """
     return generate_with_openai(prompt)
+
 
 # === Template Replacement ===
 def replace_placeholders(doc, replacements):
@@ -138,13 +153,14 @@ def fill_template(data, template_path, output_dir):
     damages = data.get("Damages", "[No damages provided.]")
 
     replacements = {
-        "{{Client Name}}": full_name,
+        "{{RecipientName}}": data.get("RecipientName", "[Recipient Name]"),
+        "{{ClientName}}": full_name,
         "{{IncidentDate}}": incident_date,
-        "{{Brief Synopsis}}": generate_brief_synopsis(summary, full_name),
-        "{{Demand}}": generate_demand(summary, first_name),
-        "{{Damages}}": generate_damages(damages, first_name),
-        "{{Settlement Demand}}": generate_settlement_demand(summary, damages, first_name),
-    }
+        "{{BriefSynopsis}}": generate_brief_synopsis(summary, full_name),
+        "{{Demand}}": generate_combined_facts(summary, first_name),
+        "{{Damages}}": generate_combined_damages(damages, first_name),
+        "{{SettlementDemand}}": generate_settlement_demand(summary, damages, first_name),
+}
 
     replace_placeholders(doc, replacements)
 
@@ -185,8 +201,10 @@ def generate_demand_letter(
         "IncidentDate": incident_date,
         "Summary": summary,
         "Damages": damages,
+        "RecipientName": defendant,
         "Example Text": example_text or ""
     }
+
     return output_path, fill_template(data, template_path, os.path.dirname(output_path))
 
 # === Main Runner for Local Use ===
