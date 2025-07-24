@@ -95,6 +95,8 @@ def generate_synopsis(casesynopsis: str) -> str:
 Summarize the following legal case background in 2 professional sentences explaining what happened and the resulting harm or damages. Do not include any parties' names or personal identifiers:
 
 {casesynopsis}
+
+{FULL_SAFETY_PROMPT}
 """
     return run_in_thread(safe_generate, "You are a legal summarization assistant.", prompt)
 
@@ -107,7 +109,11 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
                 data[k] = sanitize_text(v)
 
         # ✂️ Generate synopsis and request bullets
-        data["synopsis_summary"] = generate_synopsis(data.get("synopsis", ""))
+        raw_synopsis = data.get("synopsis", "").strip()
+        if raw_synopsis:
+            data["synopsis_summary"] = generate_synopsis(raw_synopsis)
+        else:
+            data["synopsis_summary"] = "[No synopsis provided]"
 
         bullet_prompt = build_request_prompt(data)
         request_list = run_in_thread(safe_generate, prompt=bullet_prompt)
