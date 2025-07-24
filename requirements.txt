@@ -28,6 +28,7 @@ python-dotenv
 # OCR / Document Conversion (optional)
 PyMuPDF
 pytesseract
+docxtpl>=0.16.7
 
 #Azure Packages
 azure-identity
