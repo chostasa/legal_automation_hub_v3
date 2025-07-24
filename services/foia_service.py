@@ -73,6 +73,7 @@ Format output as Word-style bullet points using asterisks (*).
 • Any and all statements, testimony, or interviews with emergency responders related to the incident;
 • Any and all investigative reports or files related to incidents involving harm to minors, patients, or clients in the facility's custody or care.
 
+
 Only return the list.
 
 Do not include placeholder terms like “[Client Name]”, “[date]”, “[location]”, or similar.
@@ -152,6 +153,13 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
         bullet_prompt = build_request_prompt(data)
         request_list = run_in_thread(safe_generate, prompt=bullet_prompt)
 
+        # 🧹 Clean bullet list for copy/paste and Word doc
+        bullet_lines = [
+            re.sub(r"^\*\s+", "", line).strip()
+            for line in request_list.split("\n")
+            if line.strip()
+        ]
+
         # 🧠 Generate FOIA body letter
         letter_prompt = build_letter_prompt(data, request_list, example_text)
         foia_body = run_in_thread(safe_generate, prompt=letter_prompt)
@@ -167,11 +175,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             "location": data.get("location", ""),
             "doi": data.get("doi", ""),
             "synopsis": data["synopsis"],
-            "foia_request_bullet_points": [
-                re.sub(r"^\*\s+", "", line).strip()
-                for line in request_list.split("\n")
-                if line.strip()
-            ],
+            "foia_request_bullet_points": bullet_lines,
             "Body": foia_body,
         }
 
@@ -180,7 +184,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
         if not os.path.exists(output_path):
             raise RuntimeError("❌ FOIA DOCX file was not created.")
 
-        return output_path, foia_body
+        return output_path, foia_body, bullet_lines
 
     except Exception as e:
         logger.error(redact_log(f"❌ FOIA generation failed: {e}"))
