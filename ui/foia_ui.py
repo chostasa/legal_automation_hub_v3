@@ -120,7 +120,8 @@ def run_ui():
             form_key = hashlib.md5(fingerprint.encode()).hexdigest()
 
             if form_key in st.session_state.foia_cache:
-                file_path, _ = st.session_state.foia_cache[form_key]
+                file_path, metadata = st.session_state.foia_cache[form_key]
+                bullet_list = metadata.get("bullet_list", [])
             else:
                 with st.spinner("📄 Generating FOIA letter..."):
                     temp_dir = get_secure_temp_dir()
@@ -129,18 +130,25 @@ def run_ui():
                     )
                     file_path = os.path.join(temp_dir, output_filename)
 
-                    _, _ = generate_foia_request(
+                    _, _, bullet_list = generate_foia_request(
                         data=data,
                         template_path=TEMPLATE_FOIA,
                         output_path=file_path,
                         example_text=example_text
                     )
 
-                    st.session_state.foia_cache[form_key] = (file_path, {})
+                    st.session_state.foia_cache[form_key] = (file_path, {"bullet_list": bullet_list})
 
             st.success("✅ FOIA letter generated!")
             with open(file_path, "rb") as f:
                 docx_bytes = f.read()
+
+            st.subheader("📋 FOIA Request Bullet Points (Plain Text)")
+            st.text_area(
+                label="Copyable Bullet List",
+                value="\n".join(f"• {line}" for line in bullet_list),
+                height=300
+            )
 
             st.download_button(
                 label="⬇️ Download Letter (.docx)",
