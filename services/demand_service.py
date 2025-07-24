@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from services.demand import generate_demand_sections
+from core.generators.demand import generate_demand_sections
 from utils.docx_utils import replace_text_in_docx_all
 from utils.thread_utils import run_in_thread
 from core.security import sanitize_text
