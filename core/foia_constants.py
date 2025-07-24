@@ -1,6 +1,6 @@
 # core/foia_constants.py
 
-STATE_CITATIONS = {
+STATECITATIONS = {
     "Alabama": "Pursuant to the provisions of the Alabama Public Records Law, Ala. Code Section 36-12-40, 36-12-41.",
     "Alaska": "Pursuant to the provisions of the Alaska Public Records Act, Alaska Stat. Section 40.25.110-40.25.125, 40.25.151.",
     "Arizona": "Pursuant to the provisions of the Arizona Public Records Law, Ariz. Rev. Stat. Section 39-121.01 to 39-121.03.",
@@ -53,7 +53,7 @@ STATE_CITATIONS = {
     "Wyoming": "Pursuant to the provisions of the Wyoming Sunshine Law, Wyo. Stat. Ann. Section 16-4-201 to 16-4-205.",
 }
 
-STATE_RESPONSE_TIMES = {
+STATERESPONSETIMES = {
     "Alabama": "We expect an acknowledgment within 10 business days and a full response within 15 business days pursuant to the Alabama Open Records Act. (Agencies may extend in 15-day increments with written notice.)",
     "Alaska": "I look forward to receiving your written response within 10 working days (i.e. business days) pursuant to the Alaska Public Records Act. (Alaska allows a one-time extension of up to 10 additional working days in unusual circumstances.)",
     "Arizona": "We expect a prompt response pursuant to the Arizona Public Records Law, which requires records to be furnished “promptly” (quickly, without unreasonable delay).",

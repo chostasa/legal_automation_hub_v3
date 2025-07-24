@@ -63,13 +63,13 @@ Match the tone, structure, and legal phrasing of the following example letter:
     return f"""
 You are a legal assistant generating a formal FOIA request letter on behalf of a civil law firm.
 
-Client ID: {data['client_id']}
+Client ID: {data['clientid']}
 Recipient Agency: {data['recipient_name']}
 Date of Incident: {data['doi']}
 Location of Incident: {data['location']}
-Case Type: {data['case_type']}
-Facility/System: {data['facility_or_system']}
-Recipient Role: {data['recipient_role']}
+Case Type: {data['casetype']}
+Facility/System: {data['facilityorsystem']}
+Recipient Role: {data['recipientrole']}
 
 Case Summary:
 {data['synopsis']}
@@ -92,11 +92,11 @@ Avoid filler like “I can assist with…” or “Please provide…” and do n
 
 
 # === SYNOPSIS GENERATOR ===
-def generate_synopsis(case_synopsis: str) -> str:
+def generate_synopsis(casesynopsis: str) -> str:
     prompt = f"""
 Summarize the following legal case background in 2 professional sentences explaining what happened and the resulting harm or damages. Do not include any parties' names or personal identifiers:
 
-{case_synopsis}
+{casesynopsis}
 """
     return run_in_thread(safe_generate, "You are a legal summarization assistant.", prompt)
 
@@ -139,16 +139,16 @@ Summarize the following legal case background in 2 professional sentences explai
         # 🧩 Replace into DOCX template
         replacements = {
             "date": data.get("formatted_date", ""),
-            "client_id": data.get("client_id", ""),
-            "defendant_name": data.get("recipient_name", ""),
-            "defendant_line1": data.get("recipient_line1", ""),
-            "defendant_line2": data.get("recipient_line2", ""),
+            "clientid": data.get("client_id", ""),
+            "defendantname": data.get("recipient_name", ""),
+            "defendantline1": data.get("recipient_line1", ""),
+            "defendantline2": data.get("recipient_line2", ""),
             "location": data.get("location", ""),
             "doi": data.get("doi", ""),
             "synopsis": data["synopsis"],
-            "foia_request_bullet_points": bullet_text,
-            "state_citation": data.get("state_citation", ""),
-            "state_response_time": data.get("state_response_time", ""),
+            "foiarequestbulletpoints": bullet_text,
+            "statecitation": data.get("state_citation", ""),
+            "stateresponsetime": data.get("state_response_time", ""),
         }
 
         # 🔎 DEBUG: Show keys and trimmed values
