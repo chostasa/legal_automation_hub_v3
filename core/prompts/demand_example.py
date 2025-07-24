@@ -1,6 +1,7 @@
 EXAMPLE_DEMAND = """
-The snowplow operator owed a duty of care to nearby pedestrians and failed to exercise basic precautions while maneuvering in a populated area. This breach of duty was the direct and proximate cause of Jane’s orthopedic trauma and emotional harm. Accordingly, liability is clear.
+The snowplow operator owed a duty of care to nearby pedestrians and failed to exercise the required standard of care while maneuvering in a populated area. This breach was the direct and proximate cause of Jane’s orthopedic trauma and emotional harm. Accordingly, liability is established under applicable tort law.
 """
+
 
 SETTLEMENT_EXAMPLE = """
 This is not a complicated case, and a jury will easily be able to conclude that the snowplow operator acted negligently and, as a result, Jane was seriously injured. Jane, like many pedestrians, had no safe option but to walk in the street. Despite this, the operator failed to see her, ultimately running her over and leaving her pinned beneath the vehicle.

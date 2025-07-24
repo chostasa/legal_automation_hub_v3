@@ -11,6 +11,14 @@ Use the tone and clarity of a senior litigator. Frame facts persuasively using l
 Do not restate the client’s injuries more than once. After the initial mention, refer to them only by category (e.g., orthopedic trauma, neurological symptoms).
 """
 
+LEGAL_TRANSITION_NOTE = """
+Use clear legal transitions such as:
+- “This breach of duty was the direct and proximate cause of...”
+- “Accordingly, liability is established under...”
+- “Based on these facts, recovery is warranted under...”
+Frame arguments assertively and confidently, avoiding tentative language.
+"""
+
 NO_PASSIVE_LANGUAGE_NOTE = """
 Every sentence must use active voice. Eliminate passive constructions. Do not say “was struck” — say “The snowplow struck Jane.”
 """
@@ -23,6 +31,9 @@ Instead, use: “is,” “will show,” “depicts,” “demonstrates.”
 FULL_SAFETY_PROMPT = "\n\n".join([
     NO_HALLUCINATION_NOTE,
     LEGAL_FLUENCY_NOTE,
+    STRUCTURE_GUIDE_NOTE,
+    LEGAL_TRANSITION_NOTE,
     NO_PASSIVE_LANGUAGE_NOTE,
     BAN_PHRASES_NOTE
 ])
+
