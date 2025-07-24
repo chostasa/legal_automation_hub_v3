@@ -1,4 +1,26 @@
-# Core instructions for FOIA bullet points and synopsis generation
+NO_HALLUCINATION_NOTE = """
+Do not fabricate or assume any facts...
+"""
+
+LEGAL_FLUENCY_NOTE = """
+Use the tone and clarity of a senior litigator...
+"""
+
+NO_PASSIVE_LANGUAGE_NOTE = """
+Every sentence must use active voice...
+"""
+
+BAN_PHRASES_NOTE = """
+Avoid any speculative or weak language...
+"""
+
+FULL_SAFETY_PROMPT = "\n\n".join([
+    NO_HALLUCINATION_NOTE,
+    LEGAL_FLUENCY_NOTE,
+    NO_PASSIVE_LANGUAGE_NOTE,
+    BAN_PHRASES_NOTE,
+])
+
 
 FOIA_BULLET_POINTS_PROMPT_TEMPLATE = """
 You are drafting FOIA bullet points for a civil legal claim.
