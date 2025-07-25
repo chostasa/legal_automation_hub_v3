@@ -4,8 +4,9 @@ import config  # Forces early crash if .env is missing or misconfigured
 
 from core.auth import get_user_id, get_tenant_id
 from core.usage_tracker import get_usage_summary
-
 from utils.file_utils import clean_temp_dir
+
+# Clean up temp directories at startup
 clean_temp_dir()
 
 # === App Config ===
@@ -19,24 +20,19 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# === Page Mapping ===
-from ui import instructions_ui, mediation_ui, demand_ui, foia_ui, batch_ui, dashboard_ui, email_ui, style_transfer_ui, template_tester_ui
-
-PAGES = {
-    "📖 Instructions": instructions_ui,
-    "🧾 Mediation Memos": mediation_ui,
-    "📂 Demands": demand_ui,
-    "📬 FOIA Requests": foia_ui,
-    "📄 Batch Doc Generator": batch_ui,
-    "📊 Litigation Dashboard": dashboard_ui,
-    "📧 Welcome Email Sender": email_ui,
-    "🧠 Style Mimic Generator": style_transfer_ui,
-    "🧪 Template Tester": template_tester_ui
-}
-
 # === Sidebar: Navigation ===
 st.sidebar.title("🛠️ Tools")
-tool = st.sidebar.radio("Select a module:", list(PAGES.keys()))
+tool = st.sidebar.radio("Select a module:", [
+    "📖 Instructions",
+    "🧾 Mediation Memos",
+    "📂 Demands",
+    "📬 FOIA Requests",
+    "📄 Batch Doc Generator",
+    "📊 Litigation Dashboard",
+    "📧 Welcome Email Sender",
+    "🧠 Style Mimic Generator",
+    "🧪 Template Tester"
+])
 
 # === Sidebar: Usage Tracker ===
 with st.sidebar.expander("📊 Usage Summary"):
@@ -50,15 +46,45 @@ with st.sidebar.expander("📊 Usage Summary"):
 
 # === Route to Tool Modules ===
 try:
-    # Dynamically call the selected page's run_ui()
-    page_module = PAGES[tool]
-    if hasattr(page_module, "run_ui"):
-        page_module.run_ui()
-    elif hasattr(page_module, "run_style_transfer_ui"):
-        # Style Mimic uses a different function name
-        page_module.run_style_transfer_ui()
+    if tool == "📖 Instructions":
+        from ui.instructions_ui import run_ui
+        run_ui()
+
+    elif tool == "🧾 Mediation Memos":
+        from ui.mediation_ui import run_ui
+        run_ui()
+
+    elif tool == "📂 Demands":
+        from ui.demand_ui import run_ui
+        run_ui()
+
+    elif tool == "📬 FOIA Requests":
+        from ui.foia_ui import run_ui
+        run_ui()
+
+    elif tool == "📄 Batch Doc Generator":
+        from ui.batch_ui import run_ui
+        run_ui()
+
+    elif tool == "📊 Litigation Dashboard":
+        from ui.dashboard_ui import run_ui
+        run_ui()
+
+    elif tool == "📧 Welcome Email Sender":
+        from ui.email_ui import run_ui
+        run_ui()
+
+    elif tool == "🧠 Style Mimic Generator":
+        from ui.style_transfer_ui import run_style_transfer_ui
+        run_style_transfer_ui()
+
+    elif tool == "🧪 Template Tester":
+        from ui.template_tester_ui import run_ui
+        run_ui()
+
     else:
-        st.error("❌ Module does not have a run_ui() function.")
+        st.error("❌ Unknown module selected.")
+
 except Exception as e:
     import traceback
     st.error("❌ Failed to load selected module. See below.")
