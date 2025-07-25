@@ -10,13 +10,11 @@ from utils.docx_utils import replace_text_in_docx_all
 from utils.session_utils import get_session_temp_dir
 from utils.file_utils import clean_temp_dir
 from core.security import sanitize_text, sanitize_filename, redact_log
-from utils.stream_utils import stream_bytesio
 from logger import logger
-from core.auth import get_tenant_id
 from core.audit import log_audit_event
 
 clean_temp_dir()
-TEMPLATE_DIR = os.path.join("templates", "batch_docs", get_tenant_id())
+TEMPLATE_DIR = os.path.join("templates", "batch_docs", "local")
 os.makedirs(TEMPLATE_DIR, exist_ok=True)
 
 def run_ui():
@@ -214,10 +212,11 @@ def run_ui():
                         st.success(f"✅ {total_success} documents generated.")
                         st.download_button(
                             label="⬇️ Download ZIP of Letters",
-                            data=stream_bytesio(zip_buffer),
+                            data=zip_buffer.getvalue(),  # convert BytesIO → bytes
                             file_name="batch_output.zip",
                             mime="application/zip"
                         )
+
                         st.caption("⚠️ Files will be deleted after 1 hour. Please download promptly.")
                         log_audit_event("Batch Docs Generated", {
                             "rows_processed": len(df),
