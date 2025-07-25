@@ -41,7 +41,7 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
             inputs_df = pd.DataFrame({"Input": input_list})
 
     # === Generate Styled Outputs ===
-    if inputs_df is not None and not inputs_df.empty and example_list and st.button("🔄 Generate Styled Outputs"):
+    if inputs_df is not None and not inputs_df.empty and example_list and st.button("🔄 Generate Styled Outputs", key="generate_button_main"):
         with st.spinner("Generating styled outputs..."):
             result_df = run_batch_style_transfer(example_list, inputs_df, input_col="Input")
             st.success(f"✅ Successfully rewrote {len(result_df)} inputs.")
@@ -59,5 +59,5 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
-    elif st.button("🔄 Generate Styled Outputs"):
+    elif st.button("🔄 Generate Styled Outputs", key="generate_button_fallback"):
         st.warning("Please provide both example paragraphs and at least one input.")
