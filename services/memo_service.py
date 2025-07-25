@@ -121,10 +121,13 @@ def generate_memo_from_fields(data: dict, template_path: str, output_dir: str) -
         intro_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Write the Introduction for a mediation memo using **only** the facts in the 
-Complaint Narrative and Party Information from Complaint.
+You must draft the Introduction using **only** the following inputs:
+- Complaint Narrative: {data.get('complaint_narrative', '')}
+- Party Information from Complaint: {data.get('party_information_from_complaint', '')}
 
-If there is no relevant information, leave this section blank.
+❌ Do NOT fabricate any information.
+❌ Do NOT infer or guess facts that are not explicitly provided.
+❌ If there is not enough information, return an empty string.
 
 Example:
 {INTRO_EXAMPLE}
@@ -146,8 +149,12 @@ Draft the Introduction for a mediation memo:
         parties_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Draft the Parties section summarizing all plaintiffs and defendants using **only**
-Party Information from Complaint.
+You must draft the Parties section using **only**:
+- Complaint Narrative: {data.get('complaint_narrative', '')}
+- Party Information from Complaint: {data.get('party_information_from_complaint', '')}
+
+❌ Do NOT fabricate or guess facts.
+❌ If information is missing, return an empty string..
 
 Plaintiffs: {plaintiffs}
 Defendants: {defendants}
