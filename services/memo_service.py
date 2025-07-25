@@ -146,21 +146,69 @@ Draft the Introduction for a mediation memo:
         ))
 
         # === Parties Section ===
-        memo_data["Parties"] = data.get('party_information_from_complaint', '')
+        parties_prompt = f"""
+{FULL_SAFETY_PROMPT}
 
-        # === Individual Plaintiff Narratives (pull directly) ===
+Reformat the following Party Information into a narrative Parties section.
+Do not add facts or speculate — only rewrite and structure the text.
+
+Party Information from Complaint:
+{data.get('party_information_from_complaint', '')}
+
+Example for style:
+{PLAINTIFF_STATEMENT_EXAMPLE}
+"""
+        memo_data["Parties"] = run_in_thread(lambda: safe_generate(
+            prompt=trim_to_token_limit(parties_prompt, 3000),
+            model="gpt-3.5-turbo",
+            system_msg=PARTIES_MSG
+        ))
+
+        # === Individual Plaintiff Narratives ===
         for i in range(1, 4):
             name = data.get(f"plaintiff{i}", "").strip()
             if name:
-                memo_data[f"Plaintiff_{i}"] = data.get('party_information_from_complaint', '')
+                plaintiff_prompt = f"""
+{FULL_SAFETY_PROMPT}
+
+Reformat the following Party Information into a narrative paragraph for Plaintiff {name}.
+Do not add facts or speculate — only rewrite and structure the text.
+
+Party Information from Complaint:
+{data.get('party_information_from_complaint', '')}
+
+Example for style:
+{PLAINTIFF_STATEMENT_EXAMPLE}
+"""
+                memo_data[f"Plaintiff_{i}"] = run_in_thread(lambda: safe_generate(
+                    prompt=trim_to_token_limit(plaintiff_prompt, 2500),
+                    model="gpt-3.5-turbo",
+                    system_msg=PLAINTIFF_MSG
+                ))
             else:
                 memo_data[f"Plaintiff_{i}"] = ""
 
-        # === Individual Defendant Narratives (pull directly) ===
+        # === Individual Defendant Narratives ===
         for i in range(1, 8):
             name = data.get(f"defendant{i}", "").strip()
             if name:
-                memo_data[f"Defendant_{i}"] = data.get('complaint_narrative', '')
+                defendant_prompt = f"""
+{FULL_SAFETY_PROMPT}
+
+Reformat the following Complaint Narrative into a narrative paragraph for Defendant {name}.
+Do not add facts or speculate — only rewrite and structure the text.
+
+Complaint Narrative:
+{data.get('complaint_narrative', '')}
+
+Example for style:
+{DEFENDANT_STATEMENT_EXAMPLE}
+"""
+                memo_data[f"Defendant_{i}"] = run_in_thread(lambda: safe_generate(
+                    prompt=trim_to_token_limit(defendant_prompt, 2500),
+                    model="gpt-3.5-turbo",
+                    system_msg=DEFENDANT_MSG
+                ))
             else:
                 memo_data[f"Defendant_{i}"] = ""
 
