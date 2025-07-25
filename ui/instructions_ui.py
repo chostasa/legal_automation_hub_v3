@@ -1,5 +1,3 @@
-# ui/instructions_ui.py
-
 import streamlit as st
 
 def run_ui():
@@ -8,163 +6,189 @@ def run_ui():
     st.markdown("""
 # ⚡ Welcome to the Legal Automation Hub  
 
-This hub was built to make your litigation campaigns faster and easier.  
-Each section below explains **exactly what you need to do** with pictures (coming soon) and videos (coming soon).  
+The **Legal Automation Hub** is your **all-in-one powerhouse** for managing litigation campaigns at scale.  
+This isn’t just a collection of tools – it’s an **end-to-end automation engine** designed to eliminate the repetitive, time-consuming tasks that drag your team down.  
+
+## What this Hub will do for you:
+- 🚀 **Speed:** Turn hours of administrative work into minutes  
+- 🧠 **AI-Powered Drafting:** Generate professional-grade letters, memos, and FOIA requests in seconds  
+- 🔄 **Full Automation:** Update NEOS, send emails, log documents – all from one dashboard  
+- 📊 **Total Visibility:** Track every campaign live with filters, KPIs, and reports  
+- 🔒 **Accuracy:** Eliminate manual errors by merging directly with data and templates  
+- 📈 **Scale:** Handle **hundreds or thousands of clients at once** without breaking a sweat  
 
 ---
 
-## 📂 **Demand Letter Generator**
+## **How to Use This Guide**
 
+Each module has a **collapsible step-by-step guide** below.  
+**Click the arrow (▶) next to the module name** to expand its instructions.  
+
+""")
+
+    # === Litigation Dashboard ===
+    with st.expander("📊 Litigation Dashboard – Your Mission Control", expanded=False):
+        st.markdown("""
 **What this tool does:**  
-Generates fully formatted demand letters (.docx files) for clients, ready to send.  
+The Dashboard is your **central command center**. It pulls together **live data** on every client, case, and campaign in one place.  
+You can **filter, export, and take action** (like sending filtered lists to the Batch Document Generator) in just a few clicks.  
 
-### Step-by-Step:
-1. **Open the Demand Letter Generator** from the sidebar.  
-2. **Fill in the form:**  
-   - **Client Name:** Type the client's full name (e.g., *Jane Roe*).  
-   - **Defendant Name:** Who the letter is sent to (e.g., *City of Chicago*).  
-   - **Incident Date:** Use the calendar to select the exact date.  
-   - **Location of Incident:** Type the address or location name.  
-   - **Summary of Incident:** One paragraph summarizing what happened.  
-   - **Damages Summary:** One paragraph describing the impact/injuries.  
-3. *(Optional)* Click **Style/Tone Example** and upload a sample letter. This helps the AI match the firm’s voice.  
-4. **Click “⚙️ Generate Demand Letter”.**  
-   - It will take a few seconds.  
-   - When complete, a **green success message** will appear.  
-5. **Click the Download button** to save the Word file (.docx) to your computer.  
-6. The file is now ready to send or upload into NEOS.
+### **Step-by-Step:**
+1. Open the **Litigation Dashboard** from the sidebar.  
+2. Use the filters in the sidebar on the left:  
+   - **Campaign:** Select one or more campaigns to focus on.  
+   - **Referring Attorney:** Narrow down by attorney.  
+   - **Case Status:** Focus on specific workflow stages.  
+3. Watch the tables and charts **update instantly**.  
+4. Scroll down for the full table of cases.  
+5. Take action:  
+   - Click **Download Filtered Results as CSV** to export a clean list.  
+   - OR click **Send to Batch Generator** to instantly launch mail merges using this filtered data.
+""")
 
----
-
-## 📬 **FOIA Letter Generator**
-
+    # === Welcome Email Sender ===
+    with st.expander("📧 Welcome Email Sender – Automate Client Outreach", expanded=False):
+        st.markdown("""
 **What this tool does:**  
-Generates Freedom of Information Act letters asking for records.  
+The Email Sender makes **client communication painless**. In minutes, you can email hundreds of clients at once, using pre-approved templates, and automatically update their case statuses in NEOS.
 
-### Step-by-Step:
-1. **Open the FOIA Letter Generator** from the sidebar.  
-2. Fill in each box carefully:  
-   - **Client ID:** Enter the client’s full name or ID number.  
-   - **Recipient Name:** The agency or person you’re requesting records from.  
-   - **Recipient Address:** Enter the full mailing address.  
-   - **State:** Choose the state where the request will be sent.  
-   - **Date of Incident:** Select the date of the event.  
-   - **Location:** The exact address or place where it happened.  
-   - **Case Synopsis:** Short explanation (2–3 sentences) of what happened.  
-   - **Potential Requests:** List the records you expect (e.g., *police reports, body camera footage*).  
-   - **Explicit Instructions:** Any special notes.  
-   - **Case Type, Facility/System, Recipient Role:** Fill in based on the case context.  
-3. *(Optional)* Add a Style Example file.  
-4. **Click “⚙️ Generate FOIA Letter”.**  
-5. Review the **bullet list of records** that will appear on-screen.  
-6. **Download the FOIA Letter (.docx)** using the button.  
+### **Step-by-Step:**
+1. Click **Welcome Email Sender** from the sidebar.  
+2. The Hub will show you a list of clients ready for outreach (e.g., Intake Completed).  
+3. Narrow down the list using the filters:  
+   - **Class Code** (e.g., Intake Completed)  
+   - **Status** (optional, if your dashboard tracks it)  
+4. Choose the email template you want to send from the dropdown.  
+5. Decide how to send:  
+   - **Preview each email individually:** Click "Preview Emails" and check subject lines and body text. You can edit them on the fly.  
+   - **Batch send everything at once:** Once you're satisfied, click **Send All**.  
+6. The Hub will:  
+   - Email every client  
+   - Update their NEOS status  
+   - Log each email in the Email Log  
+7. Done! No more copying and pasting from spreadsheets.
+""")
 
----
-
-## 🗞 **Mediation Memo Generator**
-
+    # === Batch Document Generator ===
+    with st.expander("📄 Batch Document Generator – Bulk Document Creation", expanded=False):
+        st.markdown("""
 **What this tool does:**  
-Creates detailed mediation memos with deposition quotes built in.  
+This tool is a **mail merge on steroids**. It will take your Excel spreadsheet and one or more Word templates and produce **hundreds of personalized letters** in one batch.
 
-### Step-by-Step:
-1. **Open the Mediation Memo Generator**.  
-2. Fill in the **Case Details:**  
-   - Court name (e.g., *Cook County Circuit Court*)  
-   - Case Number  
-3. Fill in **Plaintiffs and Defendants:** Enter each name in its box.  
-4. Enter:  
-   - Complaint Narrative (summary of the complaint)  
-   - Party Information (optional)  
-   - Settlement Summary  
-   - Medical Summary  
-   - Future Medical Bills (optional)  
-5. *(Optional)* Paste deposition transcript text in the large box to pull out quotes.  
-6. Upload the **Mediation Memo Template (.docx)**.  
-7. Choose **Preview Party Paragraphs** (to edit summaries) OR **Generate Memo** (full memo).  
-8. **Download the .docx or Plain Text Preview.**  
+### **Step-by-Step:**
+1. Click **Batch Document Generator** in the sidebar.  
+2. Choose your data source:  
+   - Upload a **new Excel spreadsheet (.xlsx)**  
+   - Or use the filtered data you just exported from the Dashboard (automatically loaded if sent directly)  
+3. The Hub will show you the column headers from the Excel file. These must match the placeholders in your Word template (e.g., `{{Client Name}}`).  
+4. Next, choose your template:  
+   - Upload a **new Word template (.docx)** from your computer, or  
+   - Select a previously saved template from the library  
+5. (Optional) Remove any columns you don’t want to merge by unchecking them.  
+6. Click **Generate Documents**.  
+7. The Hub will:  
+   - Replace every placeholder with client-specific data  
+   - Save all letters in a clean ZIP file  
+8. Click the download button to save the ZIP to your computer.
+""")
 
----
-
-## 📊 **Litigation Dashboard**
-
+    # === Style Mimic Generator ===
+    with st.expander("🧠 Style Mimic Generator – Rewrite in Your Voice", expanded=False):
+        st.markdown("""
 **What this tool does:**  
-Shows a live view of all cases and campaigns.  
+Takes example paragraphs and rewrites any text inputs **to match the tone and structure** of those examples.  
+Great for maintaining consistent firm branding.
 
-### Step-by-Step:
-1. **Open the Dashboard**.  
-2. Use the filters on the **left-hand sidebar**:  
-   - Select by Campaign  
-   - Select by Referring Attorney  
-   - Select by Case Status  
-3. Scroll down to see the tables and charts update live.  
-4. **Download results** as CSV or send filtered data to **Batch Document Generator**.  
+### **Step-by-Step:**
+1. Click **Style Mimic Generator** from the sidebar.  
+2. Paste one or more example paragraphs into the box.  
+   - Separate each example with three dashes: `---`  
+3. Provide the text you want rewritten:  
+   - Upload an Excel sheet with text inputs in a column, or  
+   - Paste multiple text inputs directly into the box (separated with `---`)  
+4. Click **Generate Styled Outputs**.  
+5. Download the Excel file showing **Original Input** and **Styled Output**.
+""")
 
----
-
-## 📄 **Batch Document Generator**
-
+    # === FOIA Requests ===
+    with st.expander("📬 FOIA Requests – Get the Records You Need", expanded=False):
+        st.markdown("""
 **What this tool does:**  
-Takes a spreadsheet of client data + a Word template and generates personalized letters for everyone in one batch.  
+Generates fully compliant **Freedom of Information Act request letters** with AI assistance.
 
-### Step-by-Step:
-1. **Open the Batch Document Generator.**  
-2. Upload an **Excel file (.xlsx)** of client data OR use filtered data from the Dashboard.  
-3. Verify the column headers match the placeholders (e.g., `{{Client Name}}`).  
-4. Choose:  
-   - **Upload New Template:** Pick a Word template from your computer.  
-   - **Select Saved Template:** Pick from templates already stored in the Hub.  
-5. *(Optional)* Remove columns you don’t want to include.  
-6. **Click “⚙️ Generate Documents”.**  
-7. A ZIP file containing all the merged letters will be ready to **download**.  
+### **Step-by-Step:**
+1. Click **FOIA Requests** from the sidebar.  
+2. Fill in all required fields:  
+   - Client name or ID  
+   - Recipient agency name and address  
+   - State, date of incident, location  
+   - Case synopsis (2–3 sentences of what happened)  
+   - Potential records you’re requesting (e.g., police reports, body cam footage)  
+3. (Optional) Upload a style example to match previous FOIA letters.  
+4. Click **Generate FOIA Letter**.  
+5. Review the bullet-point list of records the Hub will request.  
+6. Download the Word (.docx) letter to send.
+""")
 
----
-
-## 📧 **Email Automation**
-
+    # === Demand Letters ===
+    with st.expander("📂 Demands – Attorney-Quality Demand Letters", expanded=False):
+        st.markdown("""
 **What this tool does:**  
-Sends intake/welcome emails to multiple clients and updates their NEOS status.  
+Generates fully formatted **Demand Letters** that look like they came straight from a partner’s desk.
 
-### Step-by-Step:
-1. **Open the Email Automation tool.**  
-2. Filter clients:  
-   - Only those with certain Class Codes (e.g., Intake Complete).  
-   - By status, email, or name.  
-3. **Select a template** from the dropdown.  
-4. Preview each email:  
-   - You can edit the Subject and Body before sending.  
-5. Send emails **one-by-one** or click **Send All**.  
-6. Each email is logged automatically.  
+### **Step-by-Step:**
+1. Click **Demands** from the sidebar.  
+2. Fill in all fields:  
+   - Client name  
+   - Defendant name  
+   - Date and location of incident  
+   - Incident summary (one paragraph)  
+   - Damages summary (one paragraph)  
+3. (Optional) Add a style/tone example to match the firm's voice.  
+4. Click **Generate Demand Letter**.  
+5. Wait for the confirmation message, then click the **Download** button to save the Word (.docx) file.
+""")
 
----
-
-## 🧠 **Style Mimic Generator**
-
+    # === Mediation Memos ===
+    with st.expander("🧾 Mediation Memos – Build a Case-Winning Narrative", expanded=False):
+        st.markdown("""
 **What this tool does:**  
-Takes example paragraphs and rewrites other text in the same style.  
+Creates detailed **Mediation Memos** that combine narratives, plaintiff/defendant summaries, and deposition quotes.
 
-### Step-by-Step:
-1. Paste example paragraphs in the box (separate with `---`).  
-2. Choose **Upload Excel** OR **Paste Text Inputs**.  
-3. Click **Generate Styled Outputs**.  
-4. Download results as an Excel file with side-by-side Original and Styled text.  
+### **Step-by-Step:**
+1. Click **Mediation Memos** from the sidebar.  
+2. Enter the case details:  
+   - Court  
+   - Case number  
+   - Plaintiff(s) and Defendant(s) names  
+3. Paste the complaint narrative, party information, settlement summary, and medical summary.  
+4. (Optional) Paste deposition transcript text to automatically extract quotes.  
+5. Upload your memo template (.docx).  
+6. Choose whether to:  
+   - Preview and edit party paragraphs first, or  
+   - Generate the full memo immediately  
+7. Download the memo as a Word (.docx) file or plain-text preview.
+""")
 
----
-
-## 🧪 **Template Tester**
-
+    # === Template Tester ===
+    with st.expander("🧪 Template Tester – Validate Before You Merge", expanded=False):
+        st.markdown("""
 **What this tool does:**  
-Shows you how a template will render before you use it.  
+Shows you how any Word template will render with sample data **before using it live**.  
+This prevents broken placeholders.
 
-### Step-by-Step:
-1. Upload the **Word template (.docx)** you want to test.  
-2. Paste sample data in JSON or YAML format (instructions are in the box).  
-3. Click **Generate Preview**.  
-4. Download the previewed template.  
+### **Step-by-Step:**
+1. Click **Template Tester** from the sidebar.  
+2. Upload the Word template (.docx) you want to test.  
+3. Paste sample data in the box using JSON or YAML format (examples are preloaded).  
+4. Click **Generate Preview**.  
+5. Download the rendered Word file to check the formatting and placeholders.
+""")
 
+    st.markdown("""
 ---
 
-## 🎥 Training Videos (Coming Soon)
+### 🎥 Training Videos (Coming Soon)
 
-Video tutorials will be added here for each section.  
-
+Step-by-step **video tutorials** and screenshots will be embedded here for each module.  
 """)
