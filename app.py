@@ -28,6 +28,7 @@ tool = st.sidebar.radio("Select a module:", [
     "📄 Batch Doc Generator",
     "📊 Litigation Dashboard",
     "📧 Welcome Email Sender"
+    "🧠 Style Mimic Generator"
 ])
 
 # === Sidebar: Usage Tracker ===
