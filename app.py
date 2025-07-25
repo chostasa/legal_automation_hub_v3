@@ -27,7 +27,7 @@ tool = st.sidebar.radio("Select a module:", [
     "📬 FOIA Requests",
     "📄 Batch Doc Generator",
     "📊 Litigation Dashboard",
-    "📧 Welcome Email Sender"
+    "📧 Welcome Email Sender",
     "🧠 Style Mimic Generator"
 ])
 
@@ -65,7 +65,8 @@ try:
 
     elif tool == "🧠 Style Mimic Generator":
         from ui.style_transfer_ui import run_style_transfer_ui
-        run_ui()
+        run_style_transfer_ui()
+
 
     elif tool == "📧 Welcome Email Sender":
         from ui.email_ui import run_ui
