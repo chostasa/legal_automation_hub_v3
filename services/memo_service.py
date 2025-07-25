@@ -146,66 +146,21 @@ Draft the Introduction for a mediation memo:
         ))
 
         # === Parties Section ===
-        parties_prompt = f"""
-{FULL_SAFETY_PROMPT}
+        memo_data["Parties"] = data.get('party_information_from_complaint', '')
 
-You must draft the Parties section using **only**:
-- Complaint Narrative: {data.get('complaint_narrative', '')}
-- Party Information from Complaint: {data.get('party_information_from_complaint', '')}
-
-❌ Do NOT fabricate or guess facts.
-❌ If information is missing, return an empty string..
-
-Plaintiffs: {plaintiffs}
-Defendants: {defendants}
-Party Info:
-{data.get('party_information_from_complaint', '')}
-"""
-        memo_data["Parties"] = run_in_thread(lambda: safe_generate(
-            prompt=trim_to_token_limit(parties_prompt, 3000),
-            model="gpt-3.5-turbo",
-            system_msg=PARTIES_MSG
-        ))
-
-        # === Individual Plaintiff Narratives ===
+        # === Individual Plaintiff Narratives (pull directly) ===
         for i in range(1, 4):
             name = data.get(f"plaintiff{i}", "").strip()
             if name:
-                plaintiff_prompt = f"""
-{FULL_SAFETY_PROMPT}
-
-Write a complete narrative paragraph for Plaintiff {name} using **only**
-Party Information from Complaint.
-
-Example:
-{PLAINTIFF_STATEMENT_EXAMPLE}
-"""
-                memo_data[f"Plaintiff_{i}"] = run_in_thread(lambda: safe_generate(
-                    prompt=trim_to_token_limit(plaintiff_prompt, 2500),
-                    model="gpt-3.5-turbo",
-                    system_msg=PLAINTIFF_MSG
-                ))
+                memo_data[f"Plaintiff_{i}"] = data.get('party_information_from_complaint', '')
             else:
                 memo_data[f"Plaintiff_{i}"] = ""
 
-        # === Individual Defendant Narratives ===
+        # === Individual Defendant Narratives (pull directly) ===
         for i in range(1, 8):
             name = data.get(f"defendant{i}", "").strip()
             if name:
-                defendant_prompt = f"""
-{FULL_SAFETY_PROMPT}
-
-Write a complete narrative paragraph for Defendant {name} using **only**
-Party Information from Complaint.
-
-Example:
-{DEFENDANT_STATEMENT_EXAMPLE}
-"""
-                memo_data[f"Defendant_{i}"] = run_in_thread(lambda: safe_generate(
-                    prompt=trim_to_token_limit(defendant_prompt, 2500),
-                    model="gpt-3.5-turbo",
-                    system_msg=DEFENDANT_MSG
-                ))
+                memo_data[f"Defendant_{i}"] = data.get('complaint_narrative', '')
             else:
                 memo_data[f"Defendant_{i}"] = ""
 
