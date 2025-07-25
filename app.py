@@ -62,6 +62,10 @@ try:
         from ui.dashboard_ui import run_ui
         run_ui()
 
+    elif tool == "🧠 Style Mimic Generator":
+        from ui.style_transfer_ui import run_style_transfer_ui
+        run_ui()
+
     elif tool == "📧 Welcome Email Sender":
         from ui.email_ui import run_ui
         run_ui()
