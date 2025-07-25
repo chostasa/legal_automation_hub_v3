@@ -24,13 +24,13 @@ st.markdown("""
 st.sidebar.title("🛠️ Tools")
 tool = st.sidebar.radio("Select a module:", [
     "📖 Instructions",
-    "🧾 Mediation Memos",
-    "📂 Demands",
-    "📬 FOIA Requests",
-    "📄 Batch Doc Generator",
     "📊 Litigation Dashboard",
     "📧 Welcome Email Sender",
+    "📄 Batch Doc Generator",
     "🧠 Style Mimic Generator",
+    "📬 FOIA Requests",
+    "📂 Demands",
+    "🧾 Mediation Memos",
     "🧪 Template Tester"
 ])
 
