@@ -1,4 +1,5 @@
 import os
+import html
 from core.security import sanitize_text, redact_log
 from utils.docx_utils import replace_text_in_docx_all
 from services.openai_client import safe_generate
@@ -38,7 +39,6 @@ DEFENDANT_MSG = "You are a senior legal writer drafting a defendant narrative pa
 
 # === Polishing Helpers ===
 def polish_text_for_legal_memo(text: str) -> str:
-    """Clean and polish each section for legal fluency."""
     if not text:
         return ""
     prompt = f"""
@@ -55,7 +55,6 @@ Section:
     return safe_generate(prompt=prompt, model="gpt-3.5-turbo")
 
 def polish_transitions(text: str) -> str:
-    """Smooth paragraph-to-paragraph transitions."""
     if not text:
         return ""
     prompt = f"""
@@ -67,7 +66,6 @@ Smooth the flow and transitions between paragraphs without removing facts or quo
 
 # === Quote Extraction ===
 def generate_quotes_from_raw_depo(raw_text: str, categories: list) -> dict:
-    """Extract categorized quotes from deposition transcript."""
     try:
         lines = normalize_deposition_lines(raw_text)
         qa_text = merge_multiline_qas(lines)
@@ -79,10 +77,8 @@ def generate_quotes_from_raw_depo(raw_text: str, categories: list) -> dict:
 
 # === Curate Quotes for Each Section ===
 def curate_quotes_for_section(section_name: str, quotes: str, context: str) -> str:
-    """Use GPT to select the most relevant quotes for a section."""
     if not quotes.strip():
         return ""
-
     prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -101,7 +97,6 @@ Context:
 
 # === Main Memo Generation ===
 def generate_memo_from_fields(data: dict, template_path: str, output_dir: str) -> tuple:
-    """Generate mediation memo sections and fill into DOCX template."""
     try:
         memo_data = {}
         plaintiffs = data.get("plaintiffs", "")
@@ -126,6 +121,11 @@ def generate_memo_from_fields(data: dict, template_path: str, output_dir: str) -
         intro_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
+Write the Introduction for a mediation memo using **only** the facts in the 
+Complaint Narrative and Party Information from Complaint.
+
+If there is no relevant information, leave this section blank.
+
 Example:
 {INTRO_EXAMPLE}
 
@@ -146,7 +146,9 @@ Draft the Introduction for a mediation memo:
         parties_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Draft the Parties section summarizing all plaintiffs and defendants.
+Draft the Parties section summarizing all plaintiffs and defendants using **only**
+Party Information from Complaint.
+
 Plaintiffs: {plaintiffs}
 Defendants: {defendants}
 Party Info:
@@ -165,10 +167,11 @@ Party Info:
                 plaintiff_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
+Write a complete narrative paragraph for Plaintiff {name} using **only**
+Party Information from Complaint.
+
 Example:
 {PLAINTIFF_STATEMENT_EXAMPLE}
-
-Write a complete narrative paragraph for Plaintiff {name}.
 """
                 memo_data[f"Plaintiff_{i}"] = run_in_thread(lambda: safe_generate(
                     prompt=trim_to_token_limit(plaintiff_prompt, 2500),
@@ -185,10 +188,11 @@ Write a complete narrative paragraph for Plaintiff {name}.
                 defendant_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
+Write a complete narrative paragraph for Defendant {name} using **only**
+Party Information from Complaint.
+
 Example:
 {DEFENDANT_STATEMENT_EXAMPLE}
-
-Write a complete narrative paragraph for Defendant {name}.
 """
                 memo_data[f"Defendant_{i}"] = run_in_thread(lambda: safe_generate(
                     prompt=trim_to_token_limit(defendant_prompt, 2500),
@@ -202,7 +206,7 @@ Write a complete narrative paragraph for Defendant {name}.
         facts_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Embed at least 3 liability quotes inline.
+Embed at least 3 liability quotes inline using **only** the Complaint Narrative.
 
 Complaint Narrative:
 {data.get('complaint_narrative', '')}
@@ -298,13 +302,16 @@ Settlement Summary:
             ))
         ))
 
+        # === Decode HTML entities for clean text ===
+        memo_data = {k: html.unescape(v) for k, v in memo_data.items()}
+
         # === Static Template Fields ===
         memo_data.update({
-            "Court": data.get("court", ""),
-            "Case_Number": data.get("case_number", ""),
-            "Plaintiffs": plaintiffs,
-            "Defendants": defendants,
-            "Demand": data.get("settlement_summary", "")
+            "Court": html.unescape(data.get("court", "")),
+            "Case_Number": html.unescape(data.get("case_number", "")),
+            "Plaintiffs": html.unescape(plaintiffs),
+            "Defendants": html.unescape(defendants),
+            "Demand": html.unescape(data.get("settlement_summary", ""))
         })
 
         # === Generate DOCX ===
@@ -321,7 +328,6 @@ Settlement Summary:
         raise RuntimeError("Memo generation failed.")
 
 def generate_plaintext_memo(data: dict) -> str:
-    """Return plaintext version of memo for quick preview."""
     try:
         sections = [
             "Introduction", "Parties", "Facts_Liability",
@@ -329,7 +335,7 @@ def generate_plaintext_memo(data: dict) -> str:
             "Future_Medical_Bills", "Conclusion"
         ]
         return "\n\n".join([
-            f"## {s.replace('_', ' ')}\n\n{data.get(s, '').strip()}" for s in sections
+            f"## {s.replace('_', ' ')}\n\n{html.unescape(data.get(s, '').strip())}" for s in sections
         ])
     except Exception as e:
         logger.error(redact_log(f"❌ Failed to generate plaintext memo: {e}"))

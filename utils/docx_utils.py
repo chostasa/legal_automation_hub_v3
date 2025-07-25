@@ -1,11 +1,10 @@
 import os
 import zipfile
 import shutil
+import html
 from lxml import etree
 from utils.template_engine import render_docx_placeholders
 from docx import Document
-from docx.oxml.ns import qn
-from docx.text.paragraph import Paragraph
 
 NAMESPACES = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 
@@ -24,6 +23,11 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
     """
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
+    # Ensure replacements are unescaped first
+    replacements = {k: html.unescape(str(v)) if not isinstance(v, list)
+                    else [html.unescape(str(x)) for x in v]
+                    for k, v in replacements.items()}
+
     # Step 1: Copy zip contents and modify XML
     with zipfile.ZipFile(docx_path, 'r') as zin:
         with zipfile.ZipFile(save_path, 'w') as zout:
@@ -37,7 +41,8 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
                         for node in xml.xpath('//w:t', namespaces=NAMESPACES):
                             if node.text:
                                 rendered = render_docx_placeholders(node.text, replacements)
-                                node.text = rendered
+                                # Unescape any HTML entities in rendered text
+                                node.text = html.unescape(rendered)
 
                         buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
                     except Exception as e:
