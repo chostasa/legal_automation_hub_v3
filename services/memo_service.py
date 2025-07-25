@@ -52,7 +52,7 @@ Polish the following mediation memo section:
 Section:
 {text}
 """
-    return safe_generate(lambda p: p, prompt)
+    return safe_generate(prompt=prompt, model="gpt-3.5-turbo")
 
 def polish_transitions(text: str) -> str:
     """Smooth paragraph-to-paragraph transitions."""
@@ -63,7 +63,7 @@ Smooth the flow and transitions between paragraphs without removing facts or quo
 
 {text}
 """
-    return safe_generate(lambda p: p, prompt)
+    return safe_generate(prompt=prompt, model="gpt-3.5-turbo")
 
 # === Quote Extraction ===
 def generate_quotes_from_raw_depo(raw_text: str, categories: list) -> dict:
@@ -96,7 +96,7 @@ of a mediation memo. Only return the exact quotes (do not rewrite).
 Context:
 {context}
 """
-    curated = safe_generate(lambda p: p, prompt)
+    curated = safe_generate(prompt=prompt, model="gpt-3.5-turbo")
     return curated.strip()
 
 # === Main Memo Generation ===
@@ -108,18 +108,6 @@ def generate_memo_from_fields(data: dict, template_path: str, output_dir: str) -
         defendants = data.get("defendants", "")
 
         # Deduplicate and select unique quotes for liability and damages
-        used_quotes = set()
-        def get_unique_quotes(quotes: str, count=3):
-            selected = []
-            for q in quotes.splitlines():
-                q = q.strip()
-                if q and q not in used_quotes:
-                    selected.append(q)
-                    used_quotes.add(q)
-                if len(selected) == count:
-                    break
-            return "\n".join(selected)
-
         raw_liability_quotes = data.get("liability_quotes", "")
         liability_quotes = curate_quotes_for_section(
             "Facts & Liability", 
