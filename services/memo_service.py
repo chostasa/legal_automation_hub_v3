@@ -29,13 +29,13 @@ from core.generators.quote_parser import (
 # === System Messages ===
 INTRO_MSG = "Draft a concise, persuasive Introduction."
 PARTIES_MSG = "Summarize parties' roles without redundancy."
+PLAINTIFF_MSG = "Write a single plaintiff's role-based paragraph."
+DEFENDANT_MSG = "Write a single defendant's role-based paragraph."
 FACTS_MSG = "Draft a forceful Facts & Liability section."
 CAUSATION_MSG = "Draft a clear Causation & Injuries section."
-HARMS_MSG = "Draft a strong Harms & Losses section with embedded quotes."
+HARMS_MSG = "Draft a persuasive Harms & Losses section showing impact."
 FUTURE_MSG = "Draft the Future Medical Expenses section."
-CONCLUSION_MSG = "Draft a strong Conclusion with a call to action."
-PLAINTIFF_MSG = "Write a single plaintiff's narrative paragraph."
-DEFENDANT_MSG = "Write a single defendant's narrative paragraph."
+CONCLUSION_MSG = "Draft a strong Conclusion with litigation readiness."
 
 # === Polishing Helpers ===
 def polish_section(text: str, context: str = "") -> str:
@@ -66,16 +66,17 @@ def final_polish_memo(memo_data: dict) -> dict:
 {FULL_SAFETY_PROMPT}
 
 Perform a full memo-wide polish:
-1. Remove duplicated facts between sections (Parties, Facts/Liability, Conclusion).
+1. Remove duplicated facts between sections (Intro, Parties, Facts, Harms, Conclusion).
 2. Ensure smooth transitions and logical flow between sections.
-3. Keep each section concise and impactful.
-4. Standardize all party names, titles, and citations.
+3. Shorten overly dense paragraphs. Use clear breaks.
+4. Persuasively connect damages and future care to the client’s life impact.
+5. Standardize citations (Ex. A, Name Dep. [Line]) and fix any special character issues.
 
 Memo:
 {joined}
 """
     cleaned = safe_generate(prompt=prompt, model="gpt-4")
-    # Split the cleaned text back into individual sections
+    # Split back into sections
     new_data = {}
     for section in memo_data.keys():
         marker = f"## {section}"
@@ -137,8 +138,12 @@ def generate_memo_from_fields(data: dict, template_path: str, output_dir: str) -
         intro_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Draft the Introduction (concise, persuasive, no duplicate facts):
-Complaint Narrative: {data.get('complaint_narrative', '')}
+Draft the Introduction:
+- Concise, persuasive, frame the case value
+- No repeated facts from Facts/Liability
+
+Complaint Narrative:
+{data.get('complaint_narrative', '')}
 
 Example:
 {INTRO_EXAMPLE}
@@ -149,14 +154,66 @@ Example:
         )))
 
         # === Parties ===
-        parties_prompt = f"""
+        # Generate individual Plaintiff and Defendant paragraphs
+        parties_block = []
+        for i in range(1, 4):
+            name = data.get(f"plaintiff{i}", "").strip()
+            if name:
+                plaintiff_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Summarize all Plaintiffs and Defendants (roles only, no accident facts):
-Party Info: {data.get('party_information_from_complaint', '')}
+Write a 1-2 sentence narrative paragraph for Plaintiff {name}:
+- Role in the case
+- Avoid accident or injury facts (covered elsewhere)
+
+Party Info:
+{data.get('party_information_from_complaint', '')}
 
 Example:
 {PLAINTIFF_STATEMENT_EXAMPLE}
+"""
+                memo_data[f"Plaintiff_{i}"] = polish_section(run_in_thread(lambda: safe_generate(
+                    prompt=trim_to_token_limit(plaintiff_prompt, 2500),
+                    model="gpt-4", system_msg=PLAINTIFF_MSG
+                )))
+                parties_block.append(memo_data[f"Plaintiff_{i}"])
+            else:
+                memo_data[f"Plaintiff_{i}"] = ""
+
+        for i in range(1, 8):
+            name = data.get(f"defendant{i}", "").strip()
+            if name:
+                defendant_prompt = f"""
+{FULL_SAFETY_PROMPT}
+
+Write a 1-2 sentence narrative paragraph for Defendant {name}:
+- Their role and responsibilities in the case
+- Avoid repeating facts from Facts/Liability
+
+Defendant Info:
+{data.get('party_information_from_complaint', '')}
+
+Example:
+{DEFENDANT_STATEMENT_EXAMPLE}
+"""
+                memo_data[f"Defendant_{i}"] = polish_section(run_in_thread(lambda: safe_generate(
+                    prompt=trim_to_token_limit(defendant_prompt, 2500),
+                    model="gpt-4", system_msg=DEFENDANT_MSG
+                )))
+                parties_block.append(memo_data[f"Defendant_{i}"])
+            else:
+                memo_data[f"Defendant_{i}"] = ""
+
+        # Summarized Parties block for full section
+        parties_prompt = f"""
+{FULL_SAFETY_PROMPT}
+
+Combine the following individual party paragraphs into a clean "Parties" section:
+{chr(10).join(parties_block)}
+
+Ensure:
+- Smooth transitions between parties
+- No redundancy
 """
         memo_data["Parties"] = polish_section(run_in_thread(lambda: safe_generate(
             prompt=trim_to_token_limit(parties_prompt, 3000),
@@ -168,11 +225,13 @@ Example:
 {FULL_SAFETY_PROMPT}
 
 Write the Facts & Liability section:
-- Show duty, breach, causation clearly
+- Establish duty, breach, causation clearly
 - Embed at least 3 liability quotes inline
 
-Narrative: {data.get('complaint_narrative', '')}
-Liability Quotes: {liability_quotes}
+Complaint Narrative:
+{data.get('complaint_narrative', '')}
+Liability Quotes:
+{liability_quotes}
 
 Example:
 {FACTS_LIABILITY_EXAMPLE}
@@ -187,6 +246,7 @@ Example:
 {FULL_SAFETY_PROMPT}
 
 Draft Causation/Injuries: link the accident to medical findings and treatment.
+Avoid repeating full facts already covered.
 
 Medical Summary:
 {data.get('medical_summary', '')}
@@ -204,7 +264,7 @@ Example:
 {FULL_SAFETY_PROMPT}
 
 Draft Harms & Losses:
-- Demonstrate functional and emotional impact
+- Show functional, professional, and emotional impact
 - Tie injuries, life impact, and earning capacity together
 - Embed at least 3 damages quotes inline
 
@@ -225,9 +285,11 @@ Example:
         future_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Draft Future Medical Bills section: outline future care and associated costs.
+Draft Future Medical Bills section:
+- Outline future care and associated costs
+- Show how these costs will impact quality of life
 
-Summary:
+Future Care Summary:
 {data.get('future_medical_bills', '')}
 
 Example:
@@ -242,7 +304,7 @@ Example:
         conclusion_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Draft a concise, strong Conclusion: 
+Draft a concise, strong Conclusion:
 - Restate settlement posture in 1-2 sentences
 - Finish with litigation readiness
 
