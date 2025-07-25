@@ -45,24 +45,39 @@ def polish_text_for_legal_memo(text: str) -> str:
 {FULL_SAFETY_PROMPT}
 
 Polish the following mediation memo section:
-- Eliminate redundancy and vague phrasing
-- Strengthen transitions and section flow
-- Maintain formal tone and active voice
+- Remove redundancy and filler
+- Keep each paragraph focused and persuasive
+- Standardize titles (Mr./Ms.), citations, and punctuation
+- Use active voice only
 
 Section:
 {text}
 """
-    return safe_generate(prompt=prompt, model="gpt-3.5-turbo")
+    return safe_generate(prompt=prompt, model="gpt-4-turbo")
 
-def polish_transitions(text: str) -> str:
-    if not text:
-        return ""
-    prompt = f"""
-Smooth the flow and transitions between paragraphs without removing facts or quotes:
+def final_polish_memo(memo_data: dict) -> dict:
+    joined = "\n\n".join([f"## {k}\n{v}" for k, v in memo_data.items()])
+    prompt = f"""{FULL_SAFETY_PROMPT}
+{FULL_SAFETY_PROMPT}
 
-{text}
+Perform a final polish on this full mediation memo:
+1. Remove any duplicated facts between Parties, Facts/Liability, and Conclusion.
+2. Ensure smooth transitions between sections with light connective phrasing.
+3. Standardize all names, titles, and citations.
+4. Keep each section concise and ensure it serves a unique purpose.
+
+Full Memo:
+{joined}
 """
-    return safe_generate(prompt=prompt, model="gpt-3.5-turbo")
+    cleaned = safe_generate(prompt=prompt, model="gpt-4-turbo")
+    # Split back into sections by markers
+    new_data = {}
+    for section in memo_data.keys():
+        if f"## {section}" in cleaned:
+            new_data[section] = cleaned.split(f"## {section}")[1].split("##")[0].strip()
+        else:
+            new_data[section] = memo_data[section]
+    return new_data
 
 # === Quote Extraction ===
 def generate_quotes_from_raw_depo(raw_text: str, categories: list) -> dict:
@@ -82,17 +97,17 @@ def curate_quotes_for_section(section_name: str, quotes: str, context: str) -> s
     prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-We have the following quotes from depositions and complaints:
+We have the following deposition and complaint quotes:
 
 {quotes}
 
-Select up to 3 quotes that are the most relevant for the **{section_name}** section 
-of a mediation memo. Only return the exact quotes (do not rewrite).
+Select up to 3 quotes that are most relevant for the **{section_name}** section. 
+Only return the exact quotes (no paraphrasing). 
 
 Context:
 {context}
 """
-    curated = safe_generate(prompt=prompt, model="gpt-3.5-turbo")
+    curated = safe_generate(prompt=prompt, model="gpt-4-turbo")
     return curated.strip()
 
 # === Main Memo Generation ===
@@ -103,17 +118,14 @@ def generate_memo_from_fields(data: dict, template_path: str, output_dir: str) -
         defendants = data.get("defendants", "")
 
         # Deduplicate and select unique quotes for liability and damages
-        raw_liability_quotes = data.get("liability_quotes", "")
         liability_quotes = curate_quotes_for_section(
             "Facts & Liability", 
-            raw_liability_quotes, 
+            data.get("liability_quotes", ""), 
             data.get('complaint_narrative', '')
         )
-
-        raw_damages_quotes = data.get("damages_quotes", "")
         damages_quotes = curate_quotes_for_section(
             "Harms & Losses", 
-            raw_damages_quotes, 
+            data.get("damages_quotes", ""), 
             data.get('medical_summary', '')
         )
 
@@ -121,48 +133,40 @@ def generate_memo_from_fields(data: dict, template_path: str, output_dir: str) -
         intro_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-You must draft the Introduction using **only** the following inputs:
+Draft a concise Introduction section. Do not repeat facts.
+Use this input:
 - Complaint Narrative: {data.get('complaint_narrative', '')}
-- Party Information from Complaint: {data.get('party_information_from_complaint', '')}
-
-❌ Do NOT fabricate any information.
-❌ Do NOT infer or guess facts that are not explicitly provided.
-❌ If there is not enough information, return an empty string.
+- Party Information: {data.get('party_information_from_complaint', '')}
 
 Example:
 {INTRO_EXAMPLE}
-
-Draft the Introduction for a mediation memo:
-- Plaintiffs: {plaintiffs}
-- Defendants: {defendants}
-- Court: {data.get('court')} (Case No: {data.get('case_number')})
 """
-        memo_data["Introduction"] = polish_transitions(polish_text_for_legal_memo(
-            run_in_thread(lambda: safe_generate(
-                prompt=trim_to_token_limit(intro_prompt, 3000),
-                model="gpt-3.5-turbo",
-                system_msg=INTRO_MSG
-            ))
-        ))
+        memo_data["Introduction"] = polish_text_for_legal_memo(run_in_thread(lambda: safe_generate(
+            prompt=trim_to_token_limit(intro_prompt, 3000),
+            model="gpt-4-turbo",
+            system_msg=INTRO_MSG
+        )))
 
         # === Parties Section ===
         parties_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Reformat the following Party Information into a narrative Parties section.
-Do not add facts or speculate — only rewrite and structure the text.
+Draft the Parties section:
+- Identify each Plaintiff and Defendant and their role
+- Do NOT repeat facts about the accident or injuries (keep this purely role-based)
+- Limit to 1-2 sentences per party
 
-Party Information from Complaint:
+Party Information:
 {data.get('party_information_from_complaint', '')}
 
-Example for style:
+Example:
 {PLAINTIFF_STATEMENT_EXAMPLE}
 """
-        memo_data["Parties"] = run_in_thread(lambda: safe_generate(
+        memo_data["Parties"] = polish_text_for_legal_memo(run_in_thread(lambda: safe_generate(
             prompt=trim_to_token_limit(parties_prompt, 3000),
-            model="gpt-3.5-turbo",
+            model="gpt-4-turbo",
             system_msg=PARTIES_MSG
-        ))
+        )))
 
         # === Individual Plaintiff Narratives ===
         for i in range(1, 4):
@@ -171,20 +175,20 @@ Example for style:
                 plaintiff_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Reformat the following Party Information into a narrative paragraph for Plaintiff {name}.
-Do not add facts or speculate — only rewrite and structure the text.
+Draft a narrative paragraph for Plaintiff {name}.
+Use only party information, do NOT restate accident facts or damages.
 
-Party Information from Complaint:
+Party Information:
 {data.get('party_information_from_complaint', '')}
 
-Example for style:
+Example:
 {PLAINTIFF_STATEMENT_EXAMPLE}
 """
-                memo_data[f"Plaintiff_{i}"] = run_in_thread(lambda: safe_generate(
+                memo_data[f"Plaintiff_{i}"] = polish_text_for_legal_memo(run_in_thread(lambda: safe_generate(
                     prompt=trim_to_token_limit(plaintiff_prompt, 2500),
-                    model="gpt-3.5-turbo",
+                    model="gpt-4-turbo",
                     system_msg=PLAINTIFF_MSG
-                ))
+                )))
             else:
                 memo_data[f"Plaintiff_{i}"] = ""
 
@@ -192,23 +196,27 @@ Example for style:
         for i in range(1, 8):
             name = data.get(f"defendant{i}", "").strip()
             if name:
+                all_party_info = data.get('party_information_from_complaint', '')
+                defendant_info = "\n".join([
+                    line for line in all_party_info.splitlines() if name.lower() in line.lower()
+                ]) or all_party_info
                 defendant_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Reformat the following Complaint Narrative into a narrative paragraph for Defendant {name}.
-Do not add facts or speculate — only rewrite and structure the text.
+Draft a narrative paragraph for Defendant {name}.
+Use only this defendant's information, avoid restating accident facts.
 
-Complaint Narrative:
-{data.get('complaint_narrative', '')}
+Defendant Info:
+{defendant_info}
 
-Example for style:
+Example:
 {DEFENDANT_STATEMENT_EXAMPLE}
 """
-                memo_data[f"Defendant_{i}"] = run_in_thread(lambda: safe_generate(
+                memo_data[f"Defendant_{i}"] = polish_text_for_legal_memo(run_in_thread(lambda: safe_generate(
                     prompt=trim_to_token_limit(defendant_prompt, 2500),
-                    model="gpt-3.5-turbo",
+                    model="gpt-4-turbo",
                     system_msg=DEFENDANT_MSG
-                ))
+                )))
             else:
                 memo_data[f"Defendant_{i}"] = ""
 
@@ -216,7 +224,10 @@ Example for style:
         facts_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Embed at least 3 liability quotes inline using **only** the Complaint Narrative.
+Write the Facts & Liability section:
+- Establish duty, breach, and causation
+- Embed at least 3 unique liability quotes with proper citations
+- Do NOT reintroduce party roles or injuries (covered elsewhere)
 
 Complaint Narrative:
 {data.get('complaint_narrative', '')}
@@ -227,39 +238,39 @@ Liability Quotes:
 Example:
 {FACTS_LIABILITY_EXAMPLE}
 """
-        memo_data["Facts_Liability"] = polish_transitions(polish_text_for_legal_memo(
-            run_in_thread(lambda: safe_generate(
-                prompt=trim_to_token_limit(facts_prompt, 3500),
-                model="gpt-3.5-turbo",
-                system_msg=FACTS_MSG
-            ))
-        ))
+        memo_data["Facts_Liability"] = polish_text_for_legal_memo(run_in_thread(lambda: safe_generate(
+            prompt=trim_to_token_limit(facts_prompt, 3500),
+            model="gpt-4-turbo",
+            system_msg=FACTS_MSG
+        )))
 
         # === Causation/Injuries ===
         causation_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Example:
-{CAUSATION_EXAMPLE}
+Draft the Causation/Injuries section. Connect accident facts to injuries and treatments.
 
 Medical Summary:
 {data.get('medical_summary', '')}
+
+Example:
+{CAUSATION_EXAMPLE}
 """
-        memo_data["Causation_Injuries_Treatment"] = polish_text_for_legal_memo(
-            run_in_thread(lambda: safe_generate(
-                prompt=trim_to_token_limit(causation_prompt, 3000),
-                model="gpt-3.5-turbo",
-                system_msg=CAUSATION_MSG
-            ))
-        )
+        memo_data["Causation_Injuries_Treatment"] = polish_text_for_legal_memo(run_in_thread(lambda: safe_generate(
+            prompt=trim_to_token_limit(causation_prompt, 3000),
+            model="gpt-4-turbo",
+            system_msg=CAUSATION_MSG
+        )))
 
         # === Harms & Losses ===
         harms_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Embed at least 3 damages quotes inline.
+Draft the Harms & Losses section:
+- Show functional, professional, and emotional impact
+- Embed at least 3 unique damages quotes inline
 
-Damages Summary:
+Medical Summary:
 {data.get('medical_summary', '')}
 
 Damages Quotes:
@@ -268,52 +279,55 @@ Damages Quotes:
 Example:
 {HARMS_EXAMPLE}
 """
-        memo_data["Additional_Harms_Losses"] = polish_text_for_legal_memo(
-            run_in_thread(lambda: safe_generate(
-                prompt=trim_to_token_limit(harms_prompt, 3000),
-                model="gpt-3.5-turbo",
-                system_msg=HARMS_MSG
-            ))
-        )
+        memo_data["Additional_Harms_Losses"] = polish_text_for_legal_memo(run_in_thread(lambda: safe_generate(
+            prompt=trim_to_token_limit(harms_prompt, 3000),
+            model="gpt-4-turbo",
+            system_msg=HARMS_MSG
+        )))
 
         # === Future Medical Bills ===
         future_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
+Draft the Future Medical Bills section:
+- Outline anticipated care and costs
+- Reference supporting testimony or records
+
+Future Care Summary:
+{data.get('future_medical_bills', '')}
+
 Example:
 {FUTURE_BILLS_EXAMPLE}
-
-Future Care:
-{data.get('future_medical_bills', '')}
 """
-        memo_data["Future_Medical_Bills"] = polish_text_for_legal_memo(
-            run_in_thread(lambda: safe_generate(
-                prompt=trim_to_token_limit(future_prompt, 2500),
-                model="gpt-3.5-turbo",
-                system_msg=FUTURE_MSG
-            ))
-        )
+        memo_data["Future_Medical_Bills"] = polish_text_for_legal_memo(run_in_thread(lambda: safe_generate(
+            prompt=trim_to_token_limit(future_prompt, 2500),
+            model="gpt-4-turbo",
+            system_msg=FUTURE_MSG
+        )))
 
         # === Conclusion ===
         conclusion_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
-Example:
-{CONCLUSION_EXAMPLE}
+Draft the Conclusion:
+- Summarize settlement posture in 1-2 sentences
+- End firmly with litigation readiness language
 
 Settlement Summary:
 {data.get('settlement_summary', '')}
-"""
-        memo_data["Conclusion"] = polish_transitions(polish_text_for_legal_memo(
-            run_in_thread(lambda: safe_generate(
-                prompt=trim_to_token_limit(conclusion_prompt, 2500),
-                model="gpt-3.5-turbo",
-                system_msg=CONCLUSION_MSG
-            ))
-        ))
 
-        # === Decode HTML entities for clean text ===
+Example:
+{CONCLUSION_EXAMPLE}
+"""
+        memo_data["Conclusion"] = polish_text_for_legal_memo(run_in_thread(lambda: safe_generate(
+            prompt=trim_to_token_limit(conclusion_prompt, 2500),
+            model="gpt-4-turbo",
+            system_msg=CONCLUSION_MSG
+        )))
+
+        # === Final Cross-Section Polish ===
         memo_data = {k: html.unescape(v) for k, v in memo_data.items()}
+        final_text = final_polish_memo(memo_data)
 
         # === Static Template Fields ===
         memo_data.update({
