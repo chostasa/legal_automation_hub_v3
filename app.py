@@ -19,17 +19,24 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# === Page Mapping ===
+from ui import instructions_ui, mediation_ui, demand_ui, foia_ui, batch_ui, dashboard_ui, email_ui, style_transfer_ui, template_tester_ui
+
+PAGES = {
+    "📖 Instructions": instructions_ui,
+    "🧾 Mediation Memos": mediation_ui,
+    "📂 Demands": demand_ui,
+    "📬 FOIA Requests": foia_ui,
+    "📄 Batch Doc Generator": batch_ui,
+    "📊 Litigation Dashboard": dashboard_ui,
+    "📧 Welcome Email Sender": email_ui,
+    "🧠 Style Mimic Generator": style_transfer_ui,
+    "🧪 Template Tester": template_tester_ui
+}
+
 # === Sidebar: Navigation ===
 st.sidebar.title("🛠️ Tools")
-tool = st.sidebar.radio("Select a module:", [
-    "🧾 Mediation Memos",
-    "📂 Demands",
-    "📬 FOIA Requests",
-    "📄 Batch Doc Generator",
-    "📊 Litigation Dashboard",
-    "📧 Welcome Email Sender",
-    "🧠 Style Mimic Generator"
-])
+tool = st.sidebar.radio("Select a module:", list(PAGES.keys()))
 
 # === Sidebar: Usage Tracker ===
 with st.sidebar.expander("📊 Usage Summary"):
@@ -43,42 +50,18 @@ with st.sidebar.expander("📊 Usage Summary"):
 
 # === Route to Tool Modules ===
 try:
-    if tool == "🧾 Mediation Memos":
-        from ui.mediation_ui import run_ui
-        run_ui()
-
-    elif tool == "📂 Demands":
-        from ui.demand_ui import run_ui
-        run_ui()
-
-    elif tool == "📬 FOIA Requests":
-        from ui.foia_ui import run_ui
-        run_ui()
-
-    elif tool == "📄 Batch Doc Generator":
-        from ui.batch_ui import run_ui
-        run_ui()
-
-    elif tool == "📊 Litigation Dashboard":
-        from ui.dashboard_ui import run_ui
-        run_ui()
-
-    elif tool == "🧠 Style Mimic Generator":
-        from ui.style_transfer_ui import run_style_transfer_ui
-        run_style_transfer_ui()
-
-
-    elif tool == "📧 Welcome Email Sender":
-        from ui.email_ui import run_ui
-        run_ui()
-
+    # Dynamically call the selected page's run_ui()
+    page_module = PAGES[tool]
+    if hasattr(page_module, "run_ui"):
+        page_module.run_ui()
+    elif hasattr(page_module, "run_style_transfer_ui"):
+        # Style Mimic uses a different function name
+        page_module.run_style_transfer_ui()
     else:
-        st.error("❌ Unknown module selected.")
-
+        st.error("❌ Module does not have a run_ui() function.")
 except Exception as e:
     import traceback
     st.error("❌ Failed to load selected module. See below.")
     st.exception(e)
     from core.security import redact_log
     st.code(redact_log(traceback.format_exc()))
-
