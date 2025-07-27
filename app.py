@@ -31,7 +31,9 @@ tool = st.sidebar.radio("Select a module:", [
     "📬 FOIA Requests",
     "📂 Demands",
     "🧾 Mediation Memos",
-    "🧪 Template Tester"
+    "📪 Template & Style Example Manager",       
+    "🧪 Template Tester",
+    "📜 Audit Log Viewer"
 ])
 
 # === Sidebar: Usage Tracker ===
@@ -78,8 +80,16 @@ try:
         from ui.style_transfer_ui import run_style_transfer_ui
         run_style_transfer_ui()
 
+    elif tool == "📪 Template & Style Example Manager":   
+        from ui.template_manager_ui import run_ui
+        run_ui()
+
     elif tool == "🧪 Template Tester":
         from ui.template_tester_ui import run_ui
+        run_ui()
+
+    elif tool == "📜 Audit Log Viewer":
+        from ui.audit_ui import run_ui
         run_ui()
 
     else:

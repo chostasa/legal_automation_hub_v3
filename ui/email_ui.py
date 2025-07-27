@@ -6,9 +6,11 @@ import glob
 from services.email_service import build_email, send_email_and_update
 from services.dropbox_client import download_dashboard_df
 from core.constants import STATUS_INTAKE_COMPLETED
-from core.security import redact_log
+from core.security import redact_log, mask_phi
 from core.usage_tracker import log_usage
 from core.auth import get_user_id, get_tenant_id
+from core.audit import log_audit_event
+from core.error_handling import handle_error
 from logger import logger
 
 from utils.file_utils import clean_temp_dir
@@ -18,17 +20,26 @@ clean_temp_dir()
 def run_ui():
     st.header("📧 Welcome Email Sender")
 
+    # === Load Dashboard Data ===
     try:
-        df = download_dashboard_df()
-        df = df[df["Class Code Title"] == STATUS_INTAKE_COMPLETED].copy()
+        with st.spinner("📥 Loading dashboard data..."):
+            df = download_dashboard_df()
+            df = df[df["Class Code Title"] == STATUS_INTAKE_COMPLETED].copy()
     except Exception as e:
-        logger.error(redact_log(f"❌ Failed to load dashboard data: {e}"))
-        st.error("❌ Failed to load dashboard data.")
+        msg = handle_error(e, code="EMAIL_UI_001")
+        st.error(msg)
         return
 
     # === Load Templates ===
-    template_dir = "email_automation/templates"
+    tenant_id = get_tenant_id()
+    template_dir = os.path.join("email_automation", tenant_id, "templates")
+    os.makedirs(template_dir, exist_ok=True)
+
     template_files = glob.glob(os.path.join(template_dir, "*.txt"))
+    if not template_files:
+        st.warning("⚠️ No email templates found. Please upload one in Template Manager.")
+        return
+
     template_keys = [os.path.splitext(os.path.basename(f))[0] for f in template_files]
     template_key = st.selectbox("Select Email Template", template_keys)
 
@@ -79,12 +90,21 @@ def run_ui():
 
                 if st.button(f"📧 Send to {client['ClientName']}", key=f"send_{i}"):
                     try:
-                        status = send_email_and_update(client, subject, body, cc, template_key)
-                        st.session_state.email_status[status_key] = status
-                        log_usage("email_sent", get_tenant_id(), get_user_id(), 1, {"template": template_key})
+                        with st.spinner(f"📧 Sending email to {client['ClientName']}..."):
+                            status = send_email_and_update(client, subject, body, cc, template_key)
+                            st.session_state.email_status[status_key] = status
+
+                            # Log usage and audit
+                            log_usage("email_sent", tenant_id, get_user_id(), 1, {"template": template_key})
+                            log_audit_event("Email Sent", {
+                                "client_name": client['ClientName'],
+                                "template": template_key,
+                                "tenant_id": tenant_id
+                            })
+
                     except Exception as send_err:
-                        st.session_state.email_status[status_key] = f"❌ Failed: {send_err}"
-                        logger.error(redact_log(f"❌ Email send failed for {client['ClientName']}: {send_err}"))
+                        err_msg = handle_error(send_err, code="EMAIL_UI_002")
+                        st.session_state.email_status[status_key] = err_msg
 
                 st.session_state.email_previews.append({
                     "client": client,
@@ -95,24 +115,33 @@ def run_ui():
                 })
 
             except Exception as e:
-                logger.error(redact_log(f"❌ Failed to build email preview for {row.get('Client Name', 'Unknown')}: {e}"))
-                st.error(f"❌ Error building email for {row.get('Client Name', 'Unknown')}")
+                msg = handle_error(e, code="EMAIL_UI_003")
+                st.error(f"❌ Error building email for {row.get('Client Name', 'Unknown')}: {msg}")
 
     # === Batch Send ===
     if st.session_state.email_previews and st.button("📤 Send All"):
-        for preview in st.session_state.email_previews:
-            if "✅" in st.session_state.email_status.get(preview["status_key"], ""):
-                continue
+        with st.spinner("📤 Sending all emails..."):
+            for preview in st.session_state.email_previews:
+                if "✅" in st.session_state.email_status.get(preview["status_key"], ""):
+                    continue
 
-            client = preview["client"]
-            subject = st.session_state.get(preview["subject_key"], "")
-            body = st.session_state.get(preview["body_key"], "")
-            cc = preview["cc"]
+                client = preview["client"]
+                subject = st.session_state.get(preview["subject_key"], "")
+                body = st.session_state.get(preview["body_key"], "")
+                cc = preview["cc"]
 
-            try:
-                status = send_email_and_update(client, subject, body, cc, template_key)
-                st.session_state.email_status[preview["status_key"]] = status
-                log_usage("email_sent", get_tenant_id(), get_user_id(), 1, {"template": template_key})
-            except Exception as e:
-                st.session_state.email_status[preview["status_key"]] = f"❌ Failed: {e}"
-                logger.error(redact_log(f"❌ Batch email failed for {client['ClientName']}: {e}"))
+                try:
+                    status = send_email_and_update(client, subject, body, cc, template_key)
+                    st.session_state.email_status[preview["status_key"]] = status
+
+                    # Log usage and audit
+                    log_usage("email_sent", tenant_id, get_user_id(), 1, {"template": template_key})
+                    log_audit_event("Batch Email Sent", {
+                        "client_name": client['ClientName'],
+                        "template": template_key,
+                        "tenant_id": tenant_id
+                    })
+
+                except Exception as e:
+                    err_msg = handle_error(e, code="EMAIL_UI_004")
+                    st.session_state.email_status[preview["status_key"]] = err_msg

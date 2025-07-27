@@ -5,6 +5,9 @@ import streamlit as st
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 from dotenv import load_dotenv
+from core.security import redact_log, mask_phi
+from logger import logger
+
 load_dotenv()
 
 # === Exception for Missing Required Configs ===
@@ -31,7 +34,8 @@ def get_from_secret_manager(var_name: str) -> str:
 
         secret = _keyvault_client.get_secret(var_name)
         return secret.value
-    except Exception:
+    except Exception as e:
+        logger.warning(redact_log(mask_phi(f"⚠️ Key Vault lookup failed for {var_name}: {e}")))
         return None  # Gracefully fallback to next layer
 
 def get_env(var_name: str, required: bool = True, default: str = None) -> str:
@@ -49,11 +53,8 @@ def get_env(var_name: str, required: bool = True, default: str = None) -> str:
 
     # 2. Streamlit secrets
     try:
-        import streamlit as st
         if value is None and hasattr(st, "secrets") and var_name in st.secrets:
             value = st.secrets[var_name]
-    except ImportError:
-        pass
     except Exception:
         pass
 
@@ -63,6 +64,7 @@ def get_env(var_name: str, required: bool = True, default: str = None) -> str:
 
     # 4. Enforce required
     if required and not value:
+        logger.error(redact_log(mask_phi(f"❌ Missing required environment variable: {var_name}")))
         raise ConfigError(f"Missing required environment variable: {var_name}")
 
     return value

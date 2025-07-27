@@ -3,117 +3,89 @@ import html
 from datetime import datetime
 from docx import Document
 from openpyxl import load_workbook
-from openai import OpenAI
 
-# === OpenAI Setup ===
-client = OpenAI()
+from core.security import mask_phi, redact_log, sanitize_text
+from core.error_handling import handle_error
+from utils.docx_utils import replace_text_in_docx_all
+from utils.file_utils import validate_file_size
+from logger import logger
 
-# === OpenAI Completion Helper ===
-def generate_with_openai(prompt):
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "You are a professional legal writer."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.5
-    )
-    return html.unescape(response.choices[0].message.content.strip())
-
-# === Section Generators with Style Examples Injected ===
-
-from core.prompts.demand_guidelines import FULL_SAFETY_PROMPT
+from prompts.prompt_factory import build_prompt
 from core.prompts.demand_example import EXAMPLE_DEMAND, SETTLEMENT_EXAMPLE
-from core.prompts.demand_guidelines import STRUCTURE_GUIDE_NOTE
 from services.openai_client import safe_generate
 
-def generate_brief_synopsis(summary, full_name, example_text=None):
-    prompt = f"""
-{FULL_SAFETY_PROMPT}
-{STRUCTURE_GUIDE_NOTE}
 
-Write a one-sentence introduction for a legal demand letter.
-Begin with: \"Our office represents {full_name}, who suffered...\"
-and describe the injuries factually and concisely. Do not repeat the client's name.
-Use clinical, direct phrasing.
+# === Section Generators with Style Examples Injected ===
+def generate_brief_synopsis(summary: str, full_name: str, example_text: str = None) -> str:
+    try:
+        if not summary:
+            raise ValueError("No summary text provided for brief synopsis.")
+        prompt = build_prompt(
+            "demand",
+            "Brief Synopsis",
+            summary,
+            client_name=full_name,
+            example=example_text,
+        )
+        result = safe_generate(prompt)
+        return result.split(".")[0].strip() + "." if result else "[Brief synopsis unavailable.]"
+    except Exception as e:
+        return handle_error(e, code="DEMAND_SYNOPSIS_001", user_message="Failed to generate brief synopsis.", raise_it=True)
 
-Summary of Incident:
-{summary}
-"""
-    return safe_generate(prompt).split(".")[0].strip() + "."
 
-def generate_combined_facts(summary, first_name, example_text=None):
-    prompt = f"""
-{FULL_SAFETY_PROMPT}
-{STRUCTURE_GUIDE_NOTE}
+def generate_combined_facts(summary: str, first_name: str, example_text: str = None) -> str:
+    try:
+        if not summary:
+            raise ValueError("No summary text provided for facts section.")
+        prompt = build_prompt(
+            "demand",
+            "Facts/Liability",
+            summary,
+            client_name=first_name,
+            example=example_text or EXAMPLE_DEMAND,
+        )
+        return safe_generate(prompt)
+    except Exception as e:
+        return handle_error(e, code="DEMAND_FACTS_001", user_message="Failed to generate facts section.", raise_it=True)
 
-Below is an example of a professionally written liability paragraph. Use it **only** to mirror tone, fluency, and structure:
----
-{(example_text or EXAMPLE_DEMAND).strip()}
----
 
-Now write a persuasive, fluent paragraph that presents liability for {first_name}, focusing on:
-- Duty of care
-- Breach of duty
-- Causation
-- Resulting harm
+def generate_combined_damages(damages_text: str, first_name: str, example_text: str = None) -> str:
+    try:
+        if not damages_text:
+            raise ValueError("No damages text provided for damages section.")
+        prompt = build_prompt(
+            "demand",
+            "Damages",
+            damages_text,
+            client_name=first_name,
+            example=example_text,
+        )
+        return safe_generate(prompt)
+    except Exception as e:
+        return handle_error(e, code="DEMAND_DAMAGES_001", user_message="Failed to generate damages section.", raise_it=True)
 
-Avoid headings. Do not re-list injuries. Assume summary below provides facts:
 
-Summary:
-{summary}
-"""
-    return safe_generate(prompt)
-
-def generate_combined_damages(damages_text, first_name, example_text=None):
-    prompt = f"""
-{FULL_SAFETY_PROMPT}
-{STRUCTURE_GUIDE_NOTE}
-
-Write a professional, medically grounded paragraph describing the aftermath of the injuries suffered by {first_name}.
-Focus on:
-- Disruption to care and recovery
-- Financial and occupational hardship
-- Emotional and psychological toll
-
-Avoid re-describing physical injuries. Frame all impacts in terms of ongoing consequences.
-Do not reference the incident again — focus only on aftermath.
-
-Damages Summary:
-{damages_text}
-"""
-    return safe_generate(prompt)
-
-def generate_settlement_demand(summary, damages, first_name, example_text=None):
-    prompt = f"""
-{FULL_SAFETY_PROMPT}
-{STRUCTURE_GUIDE_NOTE}
-
-Use the following paragraph ONLY as a tone/style guide — do not use any facts from it:
----
-{(example_text or SETTLEMENT_EXAMPLE).strip()}
----
-
-Write the final paragraph of a legal demand letter for {first_name}. Justify settlement based on the facts and harms described above.
-Include:
-- Clear, confident summary of liability
-- Anticipated discovery support
-- Litigation risk if unresolved
-- A formal call to resolve: “We invite resolution of this matter without the need for formal litigation...”
-
-Do not introduce new facts or speculative claims.
-
-Summary:
-{summary}
-
-Damages:
-{damages}
-"""
-    return safe_generate(prompt)
+def generate_settlement_demand(summary: str, damages: str, first_name: str, example_text: str = None) -> str:
+    try:
+        if not summary and not damages:
+            raise ValueError("Summary and damages text are missing for settlement demand.")
+        prompt = build_prompt(
+            "demand",
+            "Settlement Demand",
+            f"{summary}\n\n{damages}",
+            client_name=first_name,
+            example=example_text or SETTLEMENT_EXAMPLE,
+        )
+        return safe_generate(prompt)
+    except Exception as e:
+        return handle_error(e, code="DEMAND_SETTLEMENT_001", user_message="Failed to generate settlement demand.", raise_it=True)
 
 
 # === Template Replacement ===
-def replace_placeholders(doc, replacements):
+def replace_placeholders(doc: Document, replacements: dict):
+    """
+    Replace placeholders in both paragraphs and tables in the document.
+    """
     for paragraph in doc.paragraphs:
         text = paragraph.text
         for key, val in replacements.items():
@@ -135,80 +107,129 @@ def replace_placeholders(doc, replacements):
                         paragraph.clear()
                         paragraph.add_run(text)
 
+
 # === Template Filler ===
-def fill_template(data, template_path, output_dir):
-    doc = Document(template_path)
+def fill_template(data: dict, template_path: str, output_dir: str) -> str:
+    try:
+        if not data or not isinstance(data, dict):
+            raise ValueError("Input data for template filling is missing or invalid.")
+        # Validate template path and size
+        if not os.path.exists(template_path):
+            handle_error(
+                FileNotFoundError(f"Template not found: {template_path}"),
+                code="DEMAND_TEMPLATE_001",
+                user_message="Demand template not found.",
+                raise_it=True,
+            )
+        validate_file_size(template_path)
 
-    full_name = data.get("Client Name", "").strip()
-    first_name = full_name.strip().split()[0] if full_name.strip() else "Client"
+        # Load Word template
+        doc = Document(template_path)
 
-    incident_date = data.get("IncidentDate", "")
-    if isinstance(incident_date, datetime):
-        incident_date = incident_date.strftime("%B %d, %Y")
-    elif not incident_date:
-        incident_date = "[Date not provided]"
+        # Extract and sanitize data
+        full_name = sanitize_text(data.get("Client Name", "")).strip()
+        first_name = full_name.strip().split()[0] if full_name else "Client"
 
-    summary = data.get("Summary", "[No summary provided.]")
-    damages = data.get("Damages", "[No damages provided.]")
+        incident_date = data.get("IncidentDate", "")
+        if isinstance(incident_date, datetime):
+            incident_date = incident_date.strftime("%B %d, %Y")
+        elif not incident_date:
+            incident_date = "[Date not provided]"
 
-    replacements = {
-        "{{RecipientName}}": data.get("RecipientName", "[Recipient Name]"),
-        "{{ClientName}}": full_name,
-        "{{IncidentDate}}": incident_date,
-        "{{BriefSynopsis}}": generate_brief_synopsis(summary, full_name),
-        "{{Demand}}": generate_combined_facts(summary, first_name),
-        "{{Damages}}": generate_combined_damages(damages, first_name),
-        "{{SettlementDemand}}": generate_settlement_demand(summary, damages, first_name),
-}
+        summary = sanitize_text(data.get("Summary", "[No summary provided.]"))
+        damages = sanitize_text(data.get("Damages", "[No damages provided.]"))
 
-    replace_placeholders(doc, replacements)
+        # Generate AI sections
+        replacements = {
+            "{{RecipientName}}": sanitize_text(data.get("RecipientName", "[Recipient Name]")),
+            "{{ClientName}}": full_name or "[Client Name]",
+            "{{IncidentDate}}": incident_date,
+            "{{BriefSynopsis}}": generate_brief_synopsis(summary, full_name, data.get("Example Text")),
+            "{{Demand}}": generate_combined_facts(summary, first_name, data.get("Example Text")),
+            "{{Damages}}": generate_combined_damages(damages, first_name, data.get("Example Text")),
+            "{{SettlementDemand}}": generate_settlement_demand(summary, damages, first_name, data.get("Example Text")),
+        }
 
-    output_filename = f"Demand_{full_name.replace(' ', '_')}_{datetime.today().strftime('%Y-%m-%d')}.docx"
-    output_path = os.path.join(output_dir, output_filename)
-    doc.save(output_path)
-    return output_path
+        replace_placeholders(doc, replacements)
+
+        # Save output document
+        os.makedirs(output_dir, exist_ok=True)
+        output_filename = f"Demand_{full_name.replace(' ', '_') if full_name else 'Client'}_{datetime.today().strftime('%Y-%m-%d')}.docx"
+        output_path = os.path.join(output_dir, output_filename)
+        doc.save(output_path)
+        return output_path
+
+    except Exception as e:
+        handle_error(e, code="DEMAND_FILL_001", user_message="Failed to fill demand template.", raise_it=True)
+
 
 # === Excel Integration ===
-def generate_all_demands(template_path, excel_path, output_dir):
-    wb = load_workbook(excel_path)
-    sheet = wb.active
-    headers = [str(cell.value).strip() for cell in sheet[1]]
-    os.makedirs(output_dir, exist_ok=True)
+def generate_all_demands(template_path: str, excel_path: str, output_dir: str):
+    try:
+        if not os.path.exists(excel_path):
+            handle_error(
+                FileNotFoundError(f"Excel file not found: {excel_path}"),
+                code="DEMAND_EXCEL_001",
+                user_message="Excel input file not found.",
+                raise_it=True,
+            )
 
-    for row in sheet.iter_rows(min_row=2, values_only=True):
-        data = dict(zip(headers, row))
-        if not data.get("Client Name", "").strip():
-            continue
-        fill_template(data, template_path, output_dir)
+        wb = load_workbook(excel_path)
+        sheet = wb.active
+        headers = [str(cell.value).strip() for cell in sheet[1] if cell.value]
+
+        os.makedirs(output_dir, exist_ok=True)
+
+        for idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+            data = dict(zip(headers, row))
+            if not data.get("Client Name", "").strip():
+                logger.warning(redact_log(mask_phi(f"[DEMAND_BATCH_SKIP] Row {idx} skipped: missing Client Name")))
+                continue
+            fill_template(data, template_path, output_dir)
+
+    except Exception as e:
+        handle_error(e, code="DEMAND_BATCH_001", user_message="Failed to generate demand letters from Excel.", raise_it=True)
+
 
 # === UI-compatible wrapper ===
 def generate_demand_letter(
-    client_name,
-    defendant,
-    location,
-    incident_date,
-    summary,
-    damages,
-    template_path,
-    output_path,
-    example_text=None
+    client_name: str,
+    defendant: str,
+    location: str,
+    incident_date: str,
+    summary: str,
+    damages: str,
+    template_path: str,
+    output_path: str,
+    example_text: str = None,
 ):
-    data = {
-        "Client Name": client_name,
-        "Defendant": defendant,
-        "Location": location,
-        "IncidentDate": incident_date,
-        "Summary": summary,
-        "Damages": damages,
-        "RecipientName": defendant,
-        "Example Text": example_text or ""
-    }
+    """
+    Generate a single demand letter and return the output path.
+    """
+    try:
+        data = {
+            "Client Name": client_name,
+            "Defendant": defendant,
+            "Location": location,
+            "IncidentDate": incident_date,
+            "Summary": summary,
+            "Damages": damages,
+            "RecipientName": defendant,
+            "Example Text": example_text or "",
+        }
 
-    return output_path, fill_template(data, template_path, os.path.dirname(output_path))
+        return output_path, fill_template(data, template_path, os.path.dirname(output_path))
+
+    except Exception as e:
+        handle_error(e, code="DEMAND_GEN_001", user_message="Failed to generate demand letter.", raise_it=True)
+
 
 # === Main Runner for Local Use ===
 if __name__ == "__main__":
-    TEMPLATE_PATH = "templates/demand_template.docx"
-    EXCEL_PATH = "data_demand_requests.xlsx"
-    OUTPUT_DIR = "output_requests"
-    generate_all_demands(TEMPLATE_PATH, EXCEL_PATH, OUTPUT_DIR)
+    try:
+        TEMPLATE_PATH = "templates/demand_template.docx"
+        EXCEL_PATH = "data_demand_requests.xlsx"
+        OUTPUT_DIR = "output_requests"
+        generate_all_demands(TEMPLATE_PATH, EXCEL_PATH, OUTPUT_DIR)
+    except Exception as e:
+        handle_error(e, code="DEMAND_MAIN_001", user_message="Error in main demand generator run.")

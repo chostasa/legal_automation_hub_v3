@@ -1,6 +1,16 @@
 # core/auth.py
+from core.error_handling import handle_error
+
 def get_user_id():
-    return "test-user"
+    try:
+        return "test-user"
+    except Exception as e:
+        handle_error(e, "AUTH_USER_001")
+        return None
 
 def get_tenant_id():
-    return "test-tenant"
+    try:
+        return "test-tenant"
+    except Exception as e:
+        handle_error(e, "AUTH_TENANT_001")
+        return None

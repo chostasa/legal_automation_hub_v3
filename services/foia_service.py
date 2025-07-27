@@ -1,132 +1,76 @@
 import os
-import re
 from services.openai_client import safe_generate
 from utils.docx_utils import replace_text_in_docx_all
-from utils.token_utils import trim_to_token_limit
 from utils.thread_utils import run_in_thread
-from core.security import sanitize_text, redact_log
+from core.security import sanitize_text, redact_log, mask_phi
+from core.error_handling import handle_error
 from logger import logger
+from core.prompts.prompt_factory import build_prompt
 
-from core.banned_phrases import (
-    NO_HALLUCINATION_NOTE,
-    LEGAL_FLUENCY_NOTE,
-    BAN_PHRASES_NOTE,
-    NO_PASSIVE_LANGUAGE_NOTE,
-)
-from core.prompts.foia_guidelines import FULL_SAFETY_PROMPT
-from core.prompts.foia_example import FOIA_BULLET_POINTS_EXAMPLES
-
-DEFAULT_SAFETY = "\n\n".join([
-    NO_HALLUCINATION_NOTE,
-    LEGAL_FLUENCY_NOTE,
-    BAN_PHRASES_NOTE,
-    NO_PASSIVE_LANGUAGE_NOTE,
-])
-
-# === PROMPT BUILDING ===
-def build_request_prompt(data: dict) -> str:
-    return f"""
-You are drafting FOIA bullet points for a civil legal claim.
-
-Case synopsis:
-{data['synopsis']}
-
-Case type: {data['case_type']}
-Facility or system involved: {data['facility_system']}
-Defendant role: {data['recipient_role']}
-
-Explicit instructions:
-{data.get('explicit_instructions') or "None provided"}
-
-Common requests or priorities:
-{data.get('potential_requests') or "None provided"}
-
-Please return a detailed and **role-specific** list of records, documents, media, and internal communications that a skilled civil attorney would request from this type of facility or entity. 
-Only include items that would reasonably be within the possession, custody, or control of a {data['recipient_role']} operating within a {data['facility_system']}. Do not include irrelevant medical, financial, or third-party institutional records if they would not be held by this entity.
-
-Format output as Word-style bullet points using asterisks (*).
-
-=== EXAMPLES ===
-{FOIA_BULLET_POINTS_EXAMPLES}
-
-{DEFAULT_SAFETY}
-""".strip()
-
-def build_letter_prompt(data: dict, request_list: str, example_text: str = "") -> str:
-    style_snippet = f"""
-Match the tone, structure, and legal phrasing of the following example letter:
-
-{trim_to_token_limit(example_text, 1200)}
-""" if example_text else ""
-
-    return f"""
-You are a legal assistant generating a formal FOIA request letter on behalf of a civil law firm.
-
-Client ID: {data['client_id']}
-Recipient Agency: {data['recipient_name']}
-Date of Incident: {data['doi']}
-Location of Incident: {data['location']}
-Case Type: {data['case_type']}
-Facility/System: {data['facility_system']}
-Recipient Role: {data['recipient_role']}
-
-Case Summary:
-{data['synopsis_summary']}
-
-Records Requested:
-{request_list}
-
-{style_snippet}
-
-Write a clear, formal FOIA request letter that:
-- References the incident and the client’s injuries or harm
-- Includes the requested records (summarized or embedded)
-- Uses active voice and professional tone
-- Closes with a formal response deadline and contact info
-
-Avoid filler like “I can assist with…” or “Please provide…” and do not refer to yourself.
-
-{DEFAULT_SAFETY}
-""".strip()
-
-# === SYNOPSIS GENERATOR ===
 def generate_synopsis(casesynopsis: str) -> str:
-    prompt = f"""
-Summarize the following legal case background in 2 professional sentences explaining what happened and the resulting harm or damages. Do not include any parties' names or personal identifiers:
-
-{casesynopsis}
-
-{FULL_SAFETY_PROMPT}
-"""
-    summary = run_in_thread(safe_generate, prompt=prompt)
-    if "legal summarization assistant" in summary.lower():
-        summary = "[Synopsis failed to generate. Check input.]"
-    return summary
-
-# === MAIN GENERATOR ===
-def generate_foia_request(data: dict, template_path: str, output_path: str, example_text: str = "") -> tuple:
+    """
+    Generate a summary synopsis from the provided case synopsis text.
+    """
     try:
-        # 🔐 Sanitize all input fields
+        if not casesynopsis or not isinstance(casesynopsis, str):
+            raise ValueError("Case synopsis is missing or invalid.")
+
+        prompt = build_prompt("foia", "Synopsis", casesynopsis)
+        summary = run_in_thread(safe_generate, prompt=prompt)
+        if not summary or "legal summarization assistant" in summary.lower():
+            return "[Synopsis failed to generate. Check input.]"
+        return summary
+    except Exception as e:
+        handle_error(
+            e,
+            code="FOIA_SYNOPSIS_001",
+            user_message="Failed to generate case synopsis.",
+            raise_it=True,
+        )
+
+def generate_foia_request(data: dict, template_path: str, output_path: str, example_text: str = "") -> tuple:
+    """
+    Generates a FOIA request letter (.docx) and returns the file path, body text, and bullet list.
+    """
+    try:
+        if not isinstance(data, dict):
+            raise ValueError("FOIA input data is invalid.")
+        if not template_path or not os.path.exists(template_path):
+            raise FileNotFoundError(f"Template path is invalid: {template_path}")
+        if not output_path:
+            raise ValueError("Output path is required for FOIA letter generation.")
+
         for k, v in data.items():
             if isinstance(v, str):
                 data[k] = sanitize_text(v)
 
-        # ✂️ Generate synopsis and request bullets
         raw_synopsis = data.get("synopsis", "").strip()
-        if raw_synopsis:
-            data["synopsis_summary"] = generate_synopsis(raw_synopsis)
-        else:
-            data["synopsis_summary"] = "[No synopsis provided]"
+        data["synopsis_summary"] = generate_synopsis(raw_synopsis) if raw_synopsis else "[No synopsis provided]"
 
-        bullet_prompt = build_request_prompt(data)
+        bullet_prompt = build_prompt(
+            "foia",
+            data.get("case_type", "FOIA Request"),
+            data.get("synopsis_summary", ""),
+            client_name=data.get("client_id", ""),
+            extra_instructions=data.get("explicit_instructions", ""),
+        )
         request_list = run_in_thread(safe_generate, prompt=bullet_prompt)
+        if not request_list:
+            raise ValueError("Failed to generate FOIA request list.")
 
-        # 🧠 Generate FOIA body letter
-        letter_prompt = build_letter_prompt(data, request_list, example_text)
+        letter_prompt = build_prompt(
+            "foia",
+            "FOIA Letter",
+            data.get("synopsis_summary", ""),
+            client_name=data.get("client_id", ""),
+            extra_instructions=data.get("explicit_instructions", ""),
+            example=example_text
+        )
         foia_body = run_in_thread(safe_generate, prompt=letter_prompt)
         foia_body = sanitize_text(foia_body)
+        if not foia_body:
+            raise ValueError("Failed to generate FOIA letter body text.")
 
-        # 🧩 Replace into DOCX template
         replacements = {
             "date": data.get("formatted_date", ""),
             "clientid": data.get("client_id", ""),
@@ -140,32 +84,47 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             "stateresponsetime": data.get("state_response_time", ""),
         }
 
-        # 🧼 Escape accidental template braces
         for k, v in replacements.items():
             if isinstance(v, str):
                 replacements[k] = v.replace("{{", "{ {").replace("}}", "} }")
 
-        # 🔎 DEBUG
-        print("\n🔍 FOIA Template Replacements:")
+        logger.info("[FOIA_GEN_000] Rendering FOIA template with replacements:")
         for k, v in replacements.items():
-            print(f"  - {k}: {v[:100]!r}{'...' if len(v) > 100 else ''}")
+            logger.debug(f"  - {k}: {v[:100]!r}{'...' if len(v) > 100 else ''}")
 
         try:
             run_in_thread(replace_text_in_docx_all, template_path, replacements, output_path)
         except Exception as docx_error:
-            logger.warning(f"⚠️ DOCX rendering error: {docx_error}")
-            # Try writing a backup template with only the plain text FOIA body for inspection
+            logger.warning(redact_log(mask_phi(f"[FOIA_GEN_002] ⚠️ DOCX rendering error: {docx_error}")))
             with open(output_path.replace(".docx", "_FAILED.txt"), "w", encoding="utf-8") as f:
                 f.write("⚠️ Failed to render DOCX — inspect the following:\n\n")
                 for k, v in replacements.items():
                     f.write(f"<<{k}>>: {v}\n\n")
-            raise RuntimeError("⚠️ Template render failed — fallback .txt file created.")
+            handle_error(
+                docx_error,
+                code="FOIA_GEN_003",
+                user_message="Template render failed. A fallback debug file has been created.",
+                raise_it=True
+            )
 
         if not os.path.exists(output_path):
-            raise RuntimeError("❌ FOIA DOCX file was not created.")
+            handle_error(
+                FileNotFoundError(f"Output file not found at {output_path}"),
+                code="FOIA_GEN_004",
+                user_message="FOIA letter generation failed (no file was created).",
+                raise_it=True,
+            )
 
-        return output_path, foia_body, request_list.splitlines()
+        bullet_lines = request_list.splitlines() if isinstance(request_list, str) else []
+        if not bullet_lines:
+            logger.warning(redact_log("[FOIA_GEN_005] FOIA request list is empty after generation."))
+
+        return output_path, foia_body, bullet_lines
 
     except Exception as e:
-        logger.error(redact_log(f"❌ FOIA generation failed: {e}"))
-        raise RuntimeError("FOIA request generation failed.")
+        handle_error(
+            e,
+            code="FOIA_GEN_001",
+            user_message="FOIA request generation failed. Please try again or contact support.",
+            raise_it=True,
+        )

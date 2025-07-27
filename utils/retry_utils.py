@@ -1,19 +1,32 @@
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import requests
-from openai import OpenAIError  
+from openai import OpenAIError
+from core.error_handling import handle_error
 
-# === Retry for OpenAI API errors (rate limits, unavailability) ===
-openai_retry = retry(
+
+@retry(
     reraise=True,
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=2, min=2, max=10),
     retry=retry_if_exception_type(OpenAIError)
 )
+def openai_retry(func, *args, **kwargs):
+    try:
+        return func(*args, **kwargs)
+    except OpenAIError as e:
+        handle_error(e, "OPENAI_RETRY_FAIL")
+        raise
 
-# === Retry for HTTP API errors (Graph, NEOS, Dropbox, etc.) ===
-http_retry = retry(
+
+@retry(
     reraise=True,
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=2, min=2, max=10),
     retry=retry_if_exception_type(requests.exceptions.RequestException)
 )
+def http_retry(func, *args, **kwargs):
+    try:
+        return func(*args, **kwargs)
+    except requests.exceptions.RequestException as e:
+        handle_error(e, "HTTP_RETRY_FAIL")
+        raise

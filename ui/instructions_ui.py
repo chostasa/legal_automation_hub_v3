@@ -1,9 +1,11 @@
 import streamlit as st
+from core.error_handling import handle_error
 
 def run_ui():
-    st.title("📖 Legal Automation Hub: Full Instructions & Training")
+    try:
+        st.title("📖 Legal Automation Hub: Full Instructions & Training")
 
-    st.markdown("""
+        st.markdown("""
 # ⚡ Welcome to the Legal Automation Hub  
 
 The **Legal Automation Hub** is your **all-in-one powerhouse** for managing litigation campaigns at scale.  
@@ -26,9 +28,8 @@ Each module has a **collapsible step-by-step guide** below.
 
 """)
 
-    # === Litigation Dashboard ===
-    with st.expander("📊 Litigation Dashboard – Your Mission Control", expanded=False):
-        st.markdown("""
+        with st.expander("📊 Litigation Dashboard – Your Mission Control", expanded=False):
+            st.markdown("""
 **What this tool does:**  
 The Dashboard is your **central command center**. It pulls together **live data** on every client, case, and campaign in one place.  
 You can **filter, export, and take action** (like sending filtered lists to the Batch Document Generator) in just a few clicks.  
@@ -46,9 +47,8 @@ You can **filter, export, and take action** (like sending filtered lists to the 
    - OR click **Send to Batch Generator** to instantly launch mail merges using this filtered data.
 """)
 
-    # === Welcome Email Sender ===
-    with st.expander("📧 Welcome Email Sender – Automate Client Outreach", expanded=False):
-        st.markdown("""
+        with st.expander("📧 Welcome Email Sender – Automate Client Outreach", expanded=False):
+            st.markdown("""
 **What this tool does:**  
 The Email Sender makes **client communication painless**. In minutes, you can email hundreds of clients at once, using pre-approved templates, and automatically update their case statuses in NEOS.
 
@@ -69,9 +69,8 @@ The Email Sender makes **client communication painless**. In minutes, you can em
 7. Done! No more copying and pasting from spreadsheets.
 """)
 
-    # === Batch Document Generator ===
-    with st.expander("📄 Batch Document Generator – Bulk Document Creation", expanded=False):
-        st.markdown("""
+        with st.expander("📄 Batch Document Generator – Bulk Document Creation", expanded=False):
+            st.markdown("""
 **What this tool does:**  
 This tool is a **mail merge on steroids**. It will take your Excel spreadsheet and one or more Word templates and produce **hundreds of personalized letters** in one batch.
 
@@ -92,9 +91,8 @@ This tool is a **mail merge on steroids**. It will take your Excel spreadsheet a
 8. Click the download button to save the ZIP to your computer.
 """)
 
-    # === Style Mimic Generator ===
-    with st.expander("🧠 Style Mimic Generator – Rewrite in Your Voice", expanded=False):
-        st.markdown("""
+        with st.expander("🧠 Style Mimic Generator – Rewrite in Your Voice", expanded=False):
+            st.markdown("""
 **What this tool does:**  
 Takes example paragraphs and rewrites any text inputs **to match the tone and structure** of those examples.  
 Great for maintaining consistent firm branding.
@@ -110,9 +108,8 @@ Great for maintaining consistent firm branding.
 5. Download the Excel file showing **Original Input** and **Styled Output**.
 """)
 
-    # === FOIA Requests ===
-    with st.expander("📬 FOIA Requests – Get the Records You Need", expanded=False):
-        st.markdown("""
+        with st.expander("📬 FOIA Requests – Get the Records You Need", expanded=False):
+            st.markdown("""
 **What this tool does:**  
 Generates fully compliant **Freedom of Information Act request letters** with AI assistance.
 
@@ -130,9 +127,8 @@ Generates fully compliant **Freedom of Information Act request letters** with AI
 6. Download the Word (.docx) letter to send.
 """)
 
-    # === Demand Letters ===
-    with st.expander("📂 Demands – Attorney-Quality Demand Letters", expanded=False):
-        st.markdown("""
+        with st.expander("📂 Demands – Attorney-Quality Demand Letters", expanded=False):
+            st.markdown("""
 **What this tool does:**  
 Generates fully formatted **Demand Letters** that look like they came straight from a partner’s desk.
 
@@ -149,9 +145,8 @@ Generates fully formatted **Demand Letters** that look like they came straight f
 5. Wait for the confirmation message, then click the **Download** button to save the Word (.docx) file.
 """)
 
-    # === Mediation Memos ===
-    with st.expander("🧾 Mediation Memos – Build a Case-Winning Narrative", expanded=False):
-        st.markdown("""
+        with st.expander("🧾 Mediation Memos – Build a Case-Winning Narrative", expanded=False):
+            st.markdown("""
 **What this tool does:**  
 Creates detailed **Mediation Memos** that combine narratives, plaintiff/defendant summaries, and deposition quotes.
 
@@ -170,9 +165,8 @@ Creates detailed **Mediation Memos** that combine narratives, plaintiff/defendan
 7. Download the memo as a Word (.docx) file or plain-text preview.
 """)
 
-    # === Template Tester ===
-    with st.expander("🧪 Template Tester – Validate Before You Merge", expanded=False):
-        st.markdown("""
+        with st.expander("🧪 Template Tester – Validate Before You Merge", expanded=False):
+            st.markdown("""
 **What this tool does:**  
 Shows you how any Word template will render with sample data **before using it live**.  
 This prevents broken placeholders.
@@ -185,10 +179,13 @@ This prevents broken placeholders.
 5. Download the rendered Word file to check the formatting and placeholders.
 """)
 
-    st.markdown("""
+        st.markdown("""
 ---
 
 ### 🎥 Training Videos (Coming Soon)
 
 Step-by-step **video tutorials** and screenshots will be embedded here for each module.  
 """)
+    except Exception as e:
+        msg = handle_error(e, code="INSTRUCTIONS_UI_001")
+        st.error(msg)

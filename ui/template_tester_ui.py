@@ -7,24 +7,27 @@ from io import BytesIO
 from utils.docx_utils import replace_text_in_docx_all
 from utils.session_utils import get_session_temp_dir
 from utils.file_utils import clean_temp_dir
-from core.security import redact_log
+from core.security import redact_log, mask_phi, sanitize_filename
+from core.auth import get_tenant_id
+from core.error_handling import handle_error
+from core.audit import log_audit_event
 from logger import logger
 
 clean_temp_dir()
 
+TENANT_ID = get_tenant_id()
+TEMPLATE_DIR = os.path.join("templates", "tester_docs", TENANT_ID)
+os.makedirs(TEMPLATE_DIR, exist_ok=True)
+
 
 def parse_input_replacements(input_str: str) -> dict:
-    """
-    Safely parse JSON or YAML input into a dictionary.
-    Raises ValueError if invalid or unsafe.
-    """
     try:
         return json.loads(input_str)
     except json.JSONDecodeError:
         try:
             return yaml.safe_load(input_str)
         except yaml.YAMLError as e:
-            raise ValueError("Input must be valid JSON or YAML.") from e
+            handle_error(e, code="TEMPLATE_TESTER_001", user_message="Invalid JSON or YAML format.", raise_it=True)
 
 
 def stream_file(path: str):
@@ -55,14 +58,22 @@ def run_ui():
             return
 
         try:
+            saved_template_path = os.path.join(
+                TEMPLATE_DIR, sanitize_filename(uploaded_template.name)
+            )
+            with open(saved_template_path, "wb") as f:
+                f.write(uploaded_template.read())
+
             replacements = parse_input_replacements(key_value_input.strip())
             if not isinstance(replacements, dict):
-                raise ValueError("Parsed input must be a dictionary.")
+                st.error("❌ Parsed input must be a dictionary.")
+                return
 
             temp_dir = get_session_temp_dir()
             output_path = os.path.join(temp_dir, "preview_output.docx")
 
-            replace_text_in_docx_all(uploaded_template, replacements, output_path)
+            with st.spinner("🔄 Generating preview..."):
+                replace_text_in_docx_all(saved_template_path, replacements, output_path)
 
             st.success("✅ Preview generated!")
             st.download_button(
@@ -72,6 +83,15 @@ def run_ui():
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
+            log_audit_event("Template Preview Generated", {
+                "tenant_id": TENANT_ID,
+                "template": uploaded_template.name
+            })
+
         except Exception as e:
-            logger.error(redact_log(f"❌ Template preview generation failed: {e}"))
-            st.error("❌ Failed to generate preview. Please check your inputs.")
+            msg = handle_error(
+                e,
+                code="TEMPLATE_TESTER_002",
+                user_message="Failed to generate preview.",
+            )
+            st.error(msg)
