@@ -1,13 +1,15 @@
 import re
 from string import Template
 from core.error_handling import handle_error
-from core.security import mask_phi, redact_log, sanitize_text
 
 def render_docx_placeholders(text: str, context: dict) -> str:
     """
     Safely replace placeholders in text using Python's Template.
     Example: "Hello {{ClientName}}" → "Hello Jane"
     """
+    # Lazy import to break circular import
+    from core.security import mask_phi, redact_log, sanitize_text
+
     try:
         if not isinstance(context, dict):
             raise ValueError("Context for placeholder rendering must be a dictionary.")
