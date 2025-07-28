@@ -7,39 +7,61 @@ from core.session_utils import get_session_temp_dir
 from core.security import sanitize_text, sanitize_filename, redact_log, mask_phi
 from services.foia_service import generate_foia_request
 from core.usage_tracker import log_usage, check_quota, decrement_quota
-from core.auth import get_user_id, get_tenant_id
+from core.auth import get_user_id, get_tenant_id, get_user_role
 from core.audit import log_audit_event
 from logger import logger
 from utils.file_utils import clean_temp_dir
 from core.foia_constants import STATE_CITATIONS, STATE_RESPONSE_TIMES
 from core.cache_utils import clear_caches
 from core.error_handling import handle_error
-from utils.thread_utils import run_async  # NEW: async helper
+from utils.thread_utils import run_async  # async helper
 
 # Clean global temp dir at startup, each user will use isolated dirs
 clean_temp_dir()
+
 
 def stream_file(path: str):
     with open(path, "rb") as f:
         while chunk := f.read(8192):
             yield chunk
 
+
 def run_ui():
     st.header("📬 FOIA Letter Generator")
 
     try:
-        st.subheader("🎨 Optional Style Example")
-        example_text = ""
         tenant_id = get_tenant_id()
         user_id = get_user_id()
+
+        # ==================== STYLE EXAMPLES ==================== #
+        st.subheader("🎨 Optional Style Example")
+        example_text = ""
 
         EXAMPLE_DIR = os.path.join("examples", tenant_id, "foia")
         os.makedirs(EXAMPLE_DIR, exist_ok=True)
 
+        # Upload new example
+        uploaded_example = st.file_uploader("Upload New Style Example (.txt)", type=["txt"], key="example_upload")
+        if uploaded_example:
+            try:
+                example_path = os.path.join(EXAMPLE_DIR, sanitize_filename(uploaded_example.name))
+                with open(example_path, "wb") as f:
+                    f.write(uploaded_example.read())
+
+                log_audit_event("FOIA Example Uploaded", {
+                    "filename": uploaded_example.name,
+                    "tenant_id": tenant_id,
+                    "module": "foia"
+                })
+                st.success(f"✅ Uploaded new style example: {uploaded_example.name}")
+            except Exception as e:
+                msg = handle_error(e, code="FOIA_UI_003")
+                st.error(msg)
+
         example_files = sorted([f for f in os.listdir(EXAMPLE_DIR) if f.endswith(".txt")])
         selected_example = "None"
         if example_files:
-            selected_example = st.selectbox("Choose Style Example", ["None"] + example_files)
+            selected_example = st.selectbox("Choose Existing Style Example", ["None"] + example_files)
             if selected_example != "None":
                 path = os.path.join(EXAMPLE_DIR, selected_example)
                 with open(path, "r", encoding="utf-8") as f:
@@ -47,19 +69,39 @@ def run_ui():
                 with st.expander("🧠 Preview Example Text"):
                     st.code(example_text[:3000])
         else:
-            st.info(f"No style examples found for FOIA in `{EXAMPLE_DIR}`")
+            st.info(f"No style examples found in `{EXAMPLE_DIR}`")
 
+        # ==================== TEMPLATES ==================== #
         TEMPLATE_DIR = os.path.join("templates", tenant_id, "foia")
         os.makedirs(TEMPLATE_DIR, exist_ok=True)
 
+        # Upload new template
+        uploaded_template = st.file_uploader("Upload New FOIA Template (.docx)", type=["docx"], key="template_upload")
+        if uploaded_template:
+            try:
+                template_path = os.path.join(TEMPLATE_DIR, sanitize_filename(uploaded_template.name))
+                with open(template_path, "wb") as f:
+                    f.write(uploaded_template.read())
+
+                log_audit_event("FOIA Template Uploaded", {
+                    "filename": uploaded_template.name,
+                    "tenant_id": tenant_id,
+                    "module": "foia"
+                })
+                st.success(f"✅ Uploaded new template: {uploaded_template.name}")
+            except Exception as e:
+                msg = handle_error(e, code="FOIA_UI_004")
+                st.error(msg)
+
         available_templates = [f for f in os.listdir(TEMPLATE_DIR) if f.endswith(".docx")]
         if available_templates:
-            selected_template = st.selectbox("📂 Choose FOIA Template", available_templates)
+            selected_template = st.selectbox("📂 Choose Existing FOIA Template", available_templates)
             TEMPLATE_FOIA = os.path.join(TEMPLATE_DIR, selected_template)
         else:
-            st.warning("⚠️ No FOIA templates found. Please upload one in Template Manager.")
+            st.warning("⚠️ No FOIA templates found. Please upload one.")
             TEMPLATE_FOIA = None
 
+        # ==================== FOIA FORM ==================== #
         with st.form("foia_form"):
             st.subheader("📌 Basic Info")
             client_id = st.text_input("Client ID")
@@ -86,11 +128,12 @@ def run_ui():
 
             submitted = st.form_submit_button("⚙️ Generate FOIA Letter")
 
+        # ==================== FOIA GENERATION ==================== #
         if submitted:
             clear_caches()
 
             if not TEMPLATE_FOIA:
-                st.error("❌ You must select or upload a FOIA template in Template Manager before generating letters.")
+                st.error("❌ You must select or upload a FOIA template before generating letters.")
                 return
 
             required_fields = {
@@ -144,7 +187,6 @@ def run_ui():
                     data["synopsis"],
                     example_text.strip()[:100]
                 ])
-                # Cache key includes tenant + user
                 form_key = f"{tenant_id}|{user_id}|" + hashlib.md5(fingerprint.encode()).hexdigest()
 
                 if "foia_cache" not in st.session_state:
@@ -156,13 +198,12 @@ def run_ui():
                 else:
                     with st.spinner("📄 Generating FOIA letter..."):
                         check_quota("foia_letters", amount=1)
-                        temp_dir = get_session_temp_dir()  # Isolated per tenant/user
+                        temp_dir = get_session_temp_dir()
                         output_filename = sanitize_filename(
                             f"FOIA_{data['client_id']}_{datetime.today().strftime('%Y-%m-%d')}.docx"
                         )
                         file_path = os.path.join(temp_dir, output_filename)
 
-                        # Async non-blocking FOIA generation
                         _, _, bullet_list = run_async(
                             generate_foia_request,
                             data=data,
@@ -192,6 +233,7 @@ def run_ui():
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
 
+                # ==================== LOGGING ==================== #
                 try:
                     log_usage(
                         event_type="foia_generated",

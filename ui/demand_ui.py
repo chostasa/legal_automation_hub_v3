@@ -29,15 +29,39 @@ os.makedirs(EXAMPLE_DIR, exist_ok=True)
 TEMPLATE_DIR = os.path.join("templates", tenant_id, "demand")
 os.makedirs(TEMPLATE_DIR, exist_ok=True)
 
+
 def load_binary_file(path: str) -> bytes:
     with open(path, "rb") as f:
         return f.read()
 
+
 def run_ui():
     st.header("📂 Demand Letter Generator")
 
-    # Style/tone example selection
+    # === STYLE EXAMPLES ===
     st.markdown("### 🎨 Optional: Style / Tone Example")
+
+    # Upload new example
+    uploaded_example = st.file_uploader("Upload New Style Example (.txt)", type=["txt"], key="upload_example")
+    if uploaded_example:
+        try:
+            example_filename = sanitize_filename(uploaded_example.name)
+            example_path = os.path.join(EXAMPLE_DIR, example_filename)
+            with open(example_path, "wb") as f:
+                f.write(uploaded_example.read())
+            st.success(f"✅ Uploaded example: {example_filename}")
+
+            clear_caches()
+            log_audit_event("Demand Style Example Uploaded", {
+                "filename": example_filename,
+                "tenant_id": tenant_id,
+                "user_id": user_id,
+                "module": "demand"
+            })
+        except Exception as e:
+            msg = handle_error(e, code="DEMAND_UI_004")
+            st.error(msg)
+
     example_text = ""
     selected_example = None
     example_files = sorted([f for f in os.listdir(EXAMPLE_DIR) if f.endswith(".txt")])
@@ -56,20 +80,42 @@ def run_ui():
     else:
         st.info(f"No style examples found in {EXAMPLE_DIR}")
 
-    # Template selection
+    # === TEMPLATES ===
     st.markdown("### 📄 Select Demand Template")
+
+    # Upload new template
+    uploaded_template = st.file_uploader("Upload New Demand Template (.docx)", type=["docx"], key="upload_template")
+    if uploaded_template:
+        try:
+            template_filename = sanitize_filename(uploaded_template.name)
+            template_path = os.path.join(TEMPLATE_DIR, template_filename)
+            with open(template_path, "wb") as f:
+                f.write(uploaded_template.read())
+            st.success(f"✅ Uploaded template: {template_filename}")
+
+            clear_caches()
+            log_audit_event("Demand Template Uploaded", {
+                "filename": template_filename,
+                "tenant_id": tenant_id,
+                "user_id": user_id,
+                "module": "demand"
+            })
+        except Exception as e:
+            msg = handle_error(e, code="DEMAND_UI_005")
+            st.error(msg)
+
     selected_template = None
     try:
         template_files = [f for f in os.listdir(TEMPLATE_DIR) if f.endswith(".docx")]
         if template_files:
             selected_template = st.selectbox("Choose Template to Use", template_files)
         else:
-            st.warning(f"No templates found in {TEMPLATE_DIR}. Please upload one in the Template Manager.")
+            st.warning(f"No templates found in {TEMPLATE_DIR}. Please upload one above.")
     except Exception as e:
         msg = handle_error(e, code="DEMAND_UI_002")
         st.error(msg)
 
-    # Form input
+    # === FORM ===
     with st.form("demand_form"):
         client_name = st.text_input("Client Name")
         defendant = st.text_input("Defendant Name")
@@ -96,7 +142,7 @@ def run_ui():
         if not location.strip():
             errors.append("Incident location is required.")
         if not selected_template:
-            errors.append("You must select a demand template from the Template Manager.")
+            errors.append("You must select a demand template.")
 
         if errors:
             for msg in errors:

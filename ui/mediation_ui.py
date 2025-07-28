@@ -3,8 +3,9 @@ import os
 import hashlib
 import json
 import asyncio
+from datetime import datetime
 
-from utils.file_utils import clean_temp_dir, get_session_temp_dir
+from utils.file_utils import clean_temp_dir, get_session_temp_dir, sanitize_filename
 from core.session_utils import get_session_temp_dir as legacy_get_session_temp_dir
 from core.security import sanitize_text, redact_log, mask_phi
 from core.cache_utils import clear_caches
@@ -19,6 +20,9 @@ from services.memo_service import (
     generate_memo_from_fields,
     generate_plaintext_memo
 )
+from services.dropbox_client import DropboxClient
+from core.constants import DROPBOX_TEMPLATES_ROOT
+from dropbox.files import WriteMode
 
 # Clean only base tmp dir once
 clean_temp_dir()
@@ -45,15 +49,14 @@ def run_ui():
         tenant_id = get_tenant_id()
         user_id = get_user_id()
         role = get_user_role()
+        client = DropboxClient()
 
-        # Tenant & user isolated directories
-        template_dir = os.path.join("templates", tenant_id, "mediation")
-        os.makedirs(template_dir, exist_ok=True)
-        available_templates = [f for f in os.listdir(template_dir) if f.endswith(".docx")]
+        # Get list of saved templates/examples from Dropbox
+        template_folder = f"{DROPBOX_TEMPLATES_ROOT}/mediation"
+        available_templates = client.list_files(template_folder)
 
-        example_dir = os.path.join("examples", tenant_id, "mediation")
-        os.makedirs(example_dir, exist_ok=True)
-        available_examples = [f for f in os.listdir(example_dir) if f.endswith(".txt")]
+        example_folder = f"{DROPBOX_TEMPLATES_ROOT}/examples/mediation"
+        available_examples = client.list_files(example_folder)
 
         with st.form("mediation_form"):
             st.subheader("Case Details")
@@ -81,6 +84,7 @@ def run_ui():
                 default=["Liability", "Damages"]
             )
 
+            # Template management: upload or use existing
             st.subheader("Template")
             template_choice = st.radio(
                 "Select Template Source", ["Upload New Template", "Use Saved Template"]
@@ -94,18 +98,24 @@ def run_ui():
             else:
                 if available_templates:
                     selected_template_name = st.selectbox("Select Saved Template", available_templates)
-                    selected_template_path = os.path.join(template_dir, selected_template_name)
+                    selected_template_path = client.download_file(
+                        f"{template_folder}/{selected_template_name}", "templates_preview"
+                    )
                 else:
                     st.info("⚠️ No saved templates found for your firm. Please upload one.")
                     uploaded_template = st.file_uploader("Upload Mediation Memo Template (.docx)", type=["docx"])
 
+            # Style example management
             st.subheader("🧠 Optional Style Example")
             example_text = ""
             selected_example_name = "None"
+
             if available_examples:
                 selected_example_name = st.selectbox("Choose Style Example", ["None"] + available_examples)
                 if selected_example_name != "None":
-                    example_path = os.path.join(example_dir, selected_example_name)
+                    example_path = client.download_file(
+                        f"{example_folder}/{selected_example_name}", "examples_preview"
+                    )
                     with open(example_path, "r", encoding="utf-8") as f:
                         example_text = f.read()
                     with st.expander("🧠 Preview Example Text"):
@@ -157,12 +167,24 @@ def run_ui():
                 st.error(f"❌ {msg}")
             return
 
-        # Save uploaded template to user/tenant isolated temp dir
+        # Save uploaded template to Dropbox
         if template_choice == "Upload New Template" and uploaded_template:
-            temp_dir = get_session_temp_dir()
-            template_path = os.path.join(temp_dir, uploaded_template.name)
-            with open(template_path, "wb") as f:
-                f.write(uploaded_template.read())
+            timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+            versioned_name = f"{timestamp}_{sanitize_filename(uploaded_template.name)}"
+            dropbox_path = f"{template_folder}/{versioned_name}"
+
+            client.dbx.files_upload(
+                uploaded_template.getvalue(), dropbox_path, mode=WriteMode.overwrite
+            )
+
+            log_audit_event("Mediation Template Uploaded", {
+                "tenant_id": tenant_id,
+                "template": versioned_name,
+                "module": "mediation"
+            })
+
+            # Download to temp for generation
+            template_path = client.download_file(dropbox_path, "templates_preview")
             clear_caches()
         else:
             template_path = selected_template_path
@@ -299,7 +321,7 @@ def run_ui():
                 "module": "mediation",
             })
 
-            template_name = os.path.basename(selected_template_path) if selected_template_path else (
+            template_name = selected_template_name if template_choice == "Use Saved Template" else (
                 uploaded_template.name if uploaded_template else "Unknown"
             )
 

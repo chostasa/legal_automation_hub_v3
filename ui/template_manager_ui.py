@@ -3,14 +3,14 @@ import os
 import json
 from datetime import datetime
 
-from core.auth import get_tenant_id, get_user_id, get_user_role, get_tenant_branding
+from core.auth import get_tenant_id, get_user_role, get_tenant_branding
 from utils.file_utils import sanitize_filename
 from core.security import redact_log, mask_phi
 from core.audit import log_audit_event
 from core.cache_utils import clear_caches
 from core.error_handling import handle_error
 from logger import logger
-from core.db import get_templates, insert_audit_event
+from core.db import get_templates
 from utils.docx_utils import replace_text_in_docx_all
 from services.dropbox_client import DropboxClient
 from core.constants import DROPBOX_TEMPLATES_ROOT
@@ -78,18 +78,13 @@ def run_ui():
                     st.success(f"✅ Uploaded template: {versioned_name}")
                     clear_caches()
 
-                    insert_audit_event(
-                        tenant_id=tenant_id,
-                        user_id=get_user_id(),
-                        action="Template Uploaded",
-                        metadata={
-                            "filename": versioned_name,
-                            "tags": tags,
-                            "category": selected_category,
-                            "version": timestamp,
-                            "module": "template_manager"
-                        }
-                    )
+                    log_audit_event("Template Uploaded", {
+                        "filename": versioned_name,
+                        "tags": tags,
+                        "category": selected_category,
+                        "version": timestamp,
+                        "module": "template_manager"
+                    })
 
                     # Generate preview only for Word docs
                     if selected_category != "email":
@@ -120,14 +115,18 @@ def run_ui():
 
             if matched_templates:
                 for t in matched_templates:
-                    tags_list = json.loads(t.get("tags", "[]"))
+                    tags_raw = t.get("tags", "[]")
+                    tags_list = json.loads(tags_raw) if tags_raw else []
+
                     col1, col2, col3 = st.columns([5, 2, 2])
                     with col1:
                         st.write(f"**{t['name']}**")
                         if tags_list:
                             st.caption(f"🏷️ Tags: {', '.join(tags_list)}")
-                        if t["uploaded_at"]:
-                            st.caption(f"📅 Uploaded: {t['uploaded_at'].split('T')[0]}")
+
+                        uploaded_at = t.get("uploaded_at")
+                        if uploaded_at:
+                            st.caption(f"📅 Uploaded: {uploaded_at.split('T')[0]}")
 
                     with col2:
                         new_name = st.text_input(
@@ -143,12 +142,10 @@ def run_ui():
                                 st.success(f"✅ Renamed to {new_name}.docx")
 
                                 clear_caches()
-                                insert_audit_event(
-                                    tenant_id=tenant_id,
-                                    user_id=get_user_id(),
-                                    action="Template Renamed",
-                                    metadata={"from": t["name"], "to": new_name + ".docx"}
-                                )
+                                log_audit_event("Template Renamed", {
+                                    "from": t["name"],
+                                    "to": f"{new_name}.docx"
+                                })
                                 st.rerun()
                             except Exception as e:
                                 msg = handle_error(e, code="TEMPLATE_UI_004")
@@ -162,12 +159,10 @@ def run_ui():
                                 st.success(f"✅ Deleted {t['name']}")
 
                                 clear_caches()
-                                insert_audit_event(
-                                    tenant_id=tenant_id,
-                                    user_id=get_user_id(),
-                                    action="Template Deleted",
-                                    metadata={"filename": t["name"], "category": selected_category}
-                                )
+                                log_audit_event("Template Deleted", {
+                                    "filename": t["name"],
+                                    "category": selected_category
+                                })
                                 st.rerun()
                             except Exception as e:
                                 msg = handle_error(e, code="TEMPLATE_UI_005")
@@ -241,7 +236,7 @@ def run_ui():
                     matched_examples.append((e, meta.get("uploaded_at")))
 
             if matched_examples:
-                for filename, uploaded_at in matched_examples:
+                for filename, uploaded_at in matched_templates:
                     col1, col2, col3 = st.columns([5, 2, 2])
                     with col1:
                         st.write(f"🖋️ **{filename}**")
@@ -273,7 +268,7 @@ def run_ui():
                                     clear_caches()
                                     log_audit_event("Style Example Renamed", {
                                         "from": filename,
-                                        "to": new_name + ".txt",
+                                        "to": f"{new_name}.txt",
                                         "tenant_id": tenant_id,
                                         "category": example_category,
                                         "module": "template_manager",

@@ -29,15 +29,17 @@ def log_audit_event(action: str, metadata: dict = None):
             for k, v in metadata.items():
                 clean_metadata[sanitize_text(str(k))] = sanitize_text(str(v))
 
+        # Include user role inside metadata for traceability
+        clean_metadata["role"] = user_role
+
         audit_hash = _hash_audit_entry(tenant_id, user_id, action, clean_metadata)
 
-        # Write to DB
+        # Write to DB with metadata JSON stored as a string
         insert_audit_event(
             tenant_id=tenant_id,
             user_id=user_id,
             action=sanitize_text(action),
-            metadata=clean_metadata,
-            role=user_role,
+            metadata=clean_metadata,     # ✅ Pass metadata properly
             hash=audit_hash
         )
 
