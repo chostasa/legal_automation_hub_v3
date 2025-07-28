@@ -50,13 +50,62 @@ def run_ui():
         role = get_user_role()
         client = DropboxClient()
 
-        # Get list of saved templates/examples from Dropbox
+        # ==================== TEMPLATE MANAGEMENT ==================== #
         template_folder = f"{DROPBOX_TEMPLATES_ROOT}/mediation"
         available_templates = client.list_files(template_folder)
 
+        st.subheader("Template Management")
+        template_choice = st.radio(
+            "Select Template Source", ["Upload New Template", "Use Saved Template"]
+        )
+
+        uploaded_template = None
+        selected_template_path = None
+        selected_template_name = None
+
+        if template_choice == "Upload New Template":
+            uploaded_template = st.file_uploader(
+                "Upload Mediation Memo Template (.docx)", type=["docx"]
+            )
+        else:
+            if available_templates:
+                selected_template_name = st.selectbox(
+                    "Select Saved Template", available_templates
+                )
+                if selected_template_name:
+                    selected_template_path = client.download_file(
+                        f"{template_folder}/{selected_template_name}", "templates_preview"
+                    )
+            else:
+                st.info("⚠️ No saved templates found for your firm. Please upload one.")
+                uploaded_template = st.file_uploader(
+                    "Upload Mediation Memo Template (.docx)", type=["docx"]
+                )
+
+        # ==================== STYLE EXAMPLES ==================== #
         example_folder = f"{DROPBOX_TEMPLATES_ROOT}/examples/mediation"
         available_examples = client.list_files(example_folder)
 
+        st.subheader("🧠 Optional Style Example")
+        example_text = ""
+        selected_example_name = "None"
+
+        if available_examples:
+            selected_example_name = st.selectbox(
+                "Choose Style Example", ["None"] + available_examples
+            )
+            if selected_example_name != "None":
+                example_path = client.download_file(
+                    f"{example_folder}/{selected_example_name}", "examples_preview"
+                )
+                with open(example_path, "r", encoding="utf-8") as f:
+                    example_text = f.read()
+                with st.expander("🧠 Preview Example Text"):
+                    st.code(example_text[:3000], language="markdown")
+        else:
+            st.info("No style examples available. Upload examples in Template Manager.")
+
+        # ==================== FORM ==================== #
         with st.form("mediation_form"):
             st.subheader("Case Details")
             court = st.text_input("Court", value="Circuit Court of Cook County, Illinois")
@@ -83,52 +132,12 @@ def run_ui():
                 default=["Liability", "Damages"]
             )
 
-            # Template management: upload or use existing
-            st.subheader("Template")
-            template_choice = st.radio(
-                "Select Template Source", ["Upload New Template", "Use Saved Template"]
-            )
-
-            uploaded_template = None
-            selected_template_path = None
-            selected_template_name = None
-
-            if template_choice == "Upload New Template":
-                uploaded_template = st.file_uploader("Upload Mediation Memo Template (.docx)", type=["docx"])
-            else:
-                if available_templates:
-                    selected_template_name = st.selectbox("Select Saved Template", available_templates)
-                    selected_template_path = client.download_file(
-                        f"{template_folder}/{selected_template_name}", "templates_preview"
-                    )
-                else:
-                    st.info("⚠️ No saved templates found for your firm. Please upload one.")
-                    uploaded_template = st.file_uploader("Upload Mediation Memo Template (.docx)", type=["docx"])
-
-            # Style example management
-            st.subheader("🧠 Optional Style Example")
-            example_text = ""
-            selected_example_name = "None"
-
-            if available_examples:
-                selected_example_name = st.selectbox("Choose Style Example", ["None"] + available_examples)
-                if selected_example_name != "None":
-                    example_path = client.download_file(
-                        f"{example_folder}/{selected_example_name}", "examples_preview"
-                    )
-                    with open(example_path, "r", encoding="utf-8") as f:
-                        example_text = f.read()
-                    with st.expander("🧠 Preview Example Text"):
-                        st.code(example_text[:3000], language="markdown")
-            else:
-                st.info("No style examples available. Upload examples in Template Manager.")
-
             action = st.radio(
                 "Choose Action", ["🔍 Preview Party Paragraphs", "📂 Generate Memo"]
             )
-
             submitted = st.form_submit_button("⚙️ Run")
 
+        # ==================== VALIDATIONS ==================== #
         if "memo_cache" not in st.session_state:
             st.session_state.memo_cache = {}
 
@@ -137,6 +146,7 @@ def run_ui():
 
         errors = []
         template_path = None
+
         if template_choice == "Upload New Template":
             if not uploaded_template or not uploaded_template.name.endswith(".docx"):
                 errors.append("Uploaded template must be a .docx file.")
@@ -167,7 +177,7 @@ def run_ui():
                 st.error(f"❌ {msg}")
             return
 
-        # Save uploaded template to Dropbox
+        # ==================== TEMPLATE UPLOAD/SAVE ==================== #
         if template_choice == "Upload New Template" and uploaded_template:
             timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
             versioned_name = f"{timestamp}_{sanitize_filename(uploaded_template.name)}"
@@ -183,13 +193,12 @@ def run_ui():
                 "module": "mediation"
             })
 
-            # Download to temp for generation
             template_path = client.download_file(dropbox_path, "templates_preview")
             clear_caches()
         else:
             template_path = selected_template_path
 
-        # Cache key isolation includes tenant and user
+        # ==================== GENERATE ==================== #
         input_fingerprint = "|".join([
             tenant_id, user_id, court, case_number, complaint_narrative, party_info,
             settlement_summary, medical_summary, future_medical_bills, raw_depo,
@@ -204,7 +213,6 @@ def run_ui():
             with st.spinner("🔄 Processing..."):
                 try:
                     check_quota("memo_generation", amount=1)
-
                     raw_quotes = generate_quotes_from_raw_depo(raw_depo, quote_categories) if raw_depo else {}
 
                     data = {
@@ -239,7 +247,7 @@ def run_ui():
                     st.error(msg)
                     return
 
-        # Party paragraph preview
+        # ==================== PREVIEW/OUTPUT ==================== #
         if action == "🔍 Preview Party Paragraphs":
             st.subheader("✏️ Review & Edit Party Paragraphs")
             if "party_edits" not in st.session_state:
@@ -262,7 +270,6 @@ def run_ui():
             st.info("💾 Your edits will be included when you select '📂 Generate Memo'.")
             return
 
-        # Apply edits if preview was used
         if "party_edits" in st.session_state:
             for key, val in st.session_state.party_edits.items():
                 memo_data[key] = val
