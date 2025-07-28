@@ -17,6 +17,9 @@ from utils.file_utils import clean_temp_dir
 
 clean_temp_dir()
 
+# Column name for client name in dashboard data
+NAME_COLUMN = "Case Details First Party Name (Full - Last, First)"
+
 
 def run_ui():
     tenant_id = get_tenant_id()
@@ -32,6 +35,11 @@ def run_ui():
     except Exception as e:
         msg = handle_error(e, code="EMAIL_UI_001")
         st.error(msg)
+        return
+
+    # Ensure name column exists
+    if NAME_COLUMN not in df.columns:
+        st.error(f"❌ Expected column '{NAME_COLUMN}' not found in dashboard data.")
         return
 
     # Pull email templates from DB
@@ -77,11 +85,14 @@ def run_ui():
     search = st.text_input("🔍 Search client name or email").strip().lower()
     if search:
         filtered_df = filtered_df[
-            filtered_df["Client Name"].str.lower().str.contains(search)
+            filtered_df[NAME_COLUMN].str.lower().str.contains(search)
             | filtered_df["Email"].str.lower().str.contains(search)
         ]
 
-    selected_clients = st.multiselect("Select Clients to Email", filtered_df["Client Name"].tolist())
+    # Multi-select client list
+    selected_clients = st.multiselect(
+        "Select Clients to Email", filtered_df[NAME_COLUMN].tolist()
+    )
 
     # Session state setup
     if "email_previews" not in st.session_state:
@@ -95,10 +106,14 @@ def run_ui():
         st.session_state.email_status = {}
 
         for i, (_, row) in enumerate(
-            filtered_df[filtered_df["Client Name"].isin(selected_clients)].iterrows()
+            filtered_df[filtered_df[NAME_COLUMN].isin(selected_clients)].iterrows()
         ):
             try:
-                subject, body, cc, client = asyncio.run(build_email(row, template_path))
+                # Normalize the name column for build_email
+                row_data = row.to_dict()
+                row_data["Client Name"] = row_data.get(NAME_COLUMN, "")
+
+                subject, body, cc, client = asyncio.run(build_email(row_data, template_path))
                 subject_key = f"subject_{i}"
                 body_key = f"body_{i}"
                 status_key = f"status_{i}"
@@ -136,7 +151,7 @@ def run_ui():
 
             except Exception as e:
                 msg = handle_error(e, code="EMAIL_UI_003")
-                st.error(f"❌ Error building email for {row.get('Client Name', 'Unknown')}: {msg}")
+                st.error(f"❌ Error building email for {row.get(NAME_COLUMN, 'Unknown')}: {msg}")
 
     # Send All
     if st.session_state.email_previews and st.button("📤 Send All"):
