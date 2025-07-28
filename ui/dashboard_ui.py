@@ -23,7 +23,7 @@ def run_ui():
     """
     Main Litigation Dashboard UI for internal firm use.
     """
-    st.title("📊 Litigation Campaign Dashboard")
+    st.title("📊 Litigation Dashboard")
 
     error_code = "DASH_001"
     try:
