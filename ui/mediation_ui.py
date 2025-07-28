@@ -23,7 +23,7 @@ from services.dropbox_client import DropboxClient
 from core.constants import DROPBOX_TEMPLATES_ROOT
 from dropbox.files import WriteMode
 
-# Clean only base tmp dir once
+# Clean temp dir only once
 clean_temp_dir()
 
 ERROR_CODE = "MEMO_GEN_001"
@@ -50,43 +50,66 @@ def run_ui():
         role = get_user_role()
         client = DropboxClient()
 
-        # ==================== TEMPLATE MANAGEMENT ==================== #
+        # === TEMPLATES (Dropbox) ===
+        st.markdown("### 📄 Select Mediation Memo Template")
         template_folder = f"{DROPBOX_TEMPLATES_ROOT}/mediation"
-        available_templates = client.list_files(template_folder)
 
-        st.subheader("Template Management")
-        template_choice = st.radio(
-            "Select Template Source", ["Upload New Template", "Use Saved Template"]
+        # Upload a new template to Dropbox
+        uploaded_template = st.file_uploader(
+            "Upload New Mediation Memo Template (.docx)", type=["docx"], key="upload_template"
         )
-
-        uploaded_template = None
-        selected_template_path = None
+        template_path = None
         selected_template_name = None
 
-        if template_choice == "Upload New Template":
-            uploaded_template = st.file_uploader(
-                "Upload Mediation Memo Template (.docx)", type=["docx"]
-            )
-        else:
-            if available_templates:
-                selected_template_name = st.selectbox(
-                    "Select Saved Template", available_templates
-                )
-                if selected_template_name:
-                    selected_template_path = client.download_file(
-                        f"{template_folder}/{selected_template_name}", "templates_preview"
-                    )
-            else:
-                st.info("⚠️ No saved templates found for your firm. Please upload one.")
-                uploaded_template = st.file_uploader(
-                    "Upload Mediation Memo Template (.docx)", type=["docx"]
-                )
+        if uploaded_template:
+            try:
+                timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+                template_filename = f"{timestamp}_{sanitize_filename(uploaded_template.name)}"
+                dropbox_path = f"{template_folder}/{template_filename}"
 
-        # ==================== STYLE EXAMPLES ==================== #
+                client.dbx.files_upload(
+                    uploaded_template.getvalue(),
+                    dropbox_path,
+                    mode=WriteMode.overwrite
+                )
+                st.success(f"✅ Uploaded template: {template_filename}")
+
+                clear_caches()
+                log_audit_event("Mediation Template Uploaded", {
+                    "filename": template_filename,
+                    "tenant_id": tenant_id,
+                    "user_id": user_id,
+                    "module": "mediation"
+                })
+
+                template_path = client.download_file(dropbox_path, "templates_preview")
+
+            except Exception as e:
+                msg = handle_error(e, code="MEMO_UI_005")
+                st.error(msg)
+
+        # List templates from Dropbox
+        if not template_path:
+            selected_template = None
+            try:
+                template_files = client.list_files(template_folder)
+                if template_files:
+                    selected_template_name = st.selectbox("Choose Template to Use", template_files)
+                    if selected_template_name:
+                        template_path = client.download_file(
+                            f"{template_folder}/{selected_template_name}", "templates_preview"
+                        )
+                else:
+                    st.warning("⚠️ No templates found. Please upload one above.")
+            except Exception as e:
+                msg = handle_error(e, code="MEMO_UI_002")
+                st.error(msg)
+
+        # === STYLE EXAMPLES (Dropbox) ===
+        st.subheader("🧠 Optional Style Example")
         example_folder = f"{DROPBOX_TEMPLATES_ROOT}/examples/mediation"
         available_examples = client.list_files(example_folder)
 
-        st.subheader("🧠 Optional Style Example")
         example_text = ""
         selected_example_name = "None"
 
@@ -105,7 +128,7 @@ def run_ui():
         else:
             st.info("No style examples available. Upload examples in Template Manager.")
 
-        # ==================== FORM ==================== #
+        # === FORM ===
         with st.form("mediation_form"):
             st.subheader("Case Details")
             court = st.text_input("Court", value="Circuit Court of Cook County, Illinois")
@@ -132,28 +155,19 @@ def run_ui():
                 default=["Liability", "Damages"]
             )
 
-            action = st.radio(
-                "Choose Action", ["🔍 Preview Party Paragraphs", "📂 Generate Memo"]
-            )
+            action = st.radio("Choose Action", ["🔍 Preview Party Paragraphs", "📂 Generate Memo"])
             submitted = st.form_submit_button("⚙️ Run")
 
-        # ==================== VALIDATIONS ==================== #
         if "memo_cache" not in st.session_state:
             st.session_state.memo_cache = {}
 
         if not submitted:
             return
 
+        # === VALIDATIONS ===
         errors = []
-        template_path = None
-
-        if template_choice == "Upload New Template":
-            if not uploaded_template or not uploaded_template.name.endswith(".docx"):
-                errors.append("Uploaded template must be a .docx file.")
-        else:
-            if not selected_template_path or not selected_template_path.endswith(".docx"):
-                errors.append("You must select a saved template.")
-
+        if not template_path or not template_path.endswith(".docx"):
+            errors.append("You must select or upload a valid .docx template.")
         if not court.strip():
             errors.append("Court name is required.")
         if not case_number.strip():
@@ -177,28 +191,7 @@ def run_ui():
                 st.error(f"❌ {msg}")
             return
 
-        # ==================== TEMPLATE UPLOAD/SAVE ==================== #
-        if template_choice == "Upload New Template" and uploaded_template:
-            timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-            versioned_name = f"{timestamp}_{sanitize_filename(uploaded_template.name)}"
-            dropbox_path = f"{template_folder}/{versioned_name}"
-
-            client.dbx.files_upload(
-                uploaded_template.getvalue(), dropbox_path, mode=WriteMode.overwrite
-            )
-
-            log_audit_event("Mediation Template Uploaded", {
-                "tenant_id": tenant_id,
-                "template": versioned_name,
-                "module": "mediation"
-            })
-
-            template_path = client.download_file(dropbox_path, "templates_preview")
-            clear_caches()
-        else:
-            template_path = selected_template_path
-
-        # ==================== GENERATE ==================== #
+        # === GENERATE MEMO ===
         input_fingerprint = "|".join([
             tenant_id, user_id, court, case_number, complaint_narrative, party_info,
             settlement_summary, medical_summary, future_medical_bills, raw_depo,
@@ -237,7 +230,9 @@ def run_ui():
                         data[f"defendant{i}"] = sanitize_text(name)
 
                     temp_dir = get_session_temp_dir()
-                    file_path, memo_data = asyncio.run(run_async_memo_generation(data, template_path, temp_dir))
+                    file_path, memo_data = asyncio.run(
+                        run_async_memo_generation(data, template_path, temp_dir)
+                    )
 
                     st.session_state.memo_cache[form_key] = (file_path, memo_data, raw_quotes)
                     decrement_quota("memo_generation", amount=1)
@@ -247,7 +242,7 @@ def run_ui():
                     st.error(msg)
                     return
 
-        # ==================== PREVIEW/OUTPUT ==================== #
+        # === PREVIEW/OUTPUT ===
         if action == "🔍 Preview Party Paragraphs":
             st.subheader("✏️ Review & Edit Party Paragraphs")
             if "party_edits" not in st.session_state:
@@ -316,7 +311,9 @@ def run_ui():
                 },
             )
         except Exception as log_err:
-            logger.warning(redact_log(mask_phi(f"[{ERROR_CODE}] ⚠️ Failed to log memo usage: {log_err}")))
+            logger.warning(
+                redact_log(mask_phi(f"[{ERROR_CODE}] ⚠️ Failed to log memo usage: {log_err}"))
+            )
 
         try:
             log_audit_event("Mediation Memo Generated", {
@@ -328,9 +325,7 @@ def run_ui():
                 "module": "mediation",
             })
 
-            template_name = selected_template_name if template_choice == "Use Saved Template" else (
-                uploaded_template.name if uploaded_template else "Unknown"
-            )
+            template_name = selected_template_name if not uploaded_template else uploaded_template.name
 
             log_audit_event("Mediation Template Used", {
                 "template": template_name,
@@ -340,7 +335,9 @@ def run_ui():
             })
 
         except Exception as audit_err:
-            logger.warning(redact_log(mask_phi(f"[{ERROR_CODE}] ⚠️ Failed to write audit log: {audit_err}")))
+            logger.warning(
+                redact_log(mask_phi(f"[{ERROR_CODE}] ⚠️ Failed to write audit log: {audit_err}"))
+            )
 
     except Exception as outer_e:
         msg = handle_error(outer_e, code="MEMO_UI_001")
