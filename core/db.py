@@ -247,3 +247,7 @@ def increment_quota_usage(tenant_id: str, key: str, amount: int = 1):
         conn.close()
     except Exception as e:
         handle_error(e, code="DB_QUOTA_INCREMENT_001", raise_it=True)
+
+# Initialize DB and ensure tables exist
+init_db()
+
