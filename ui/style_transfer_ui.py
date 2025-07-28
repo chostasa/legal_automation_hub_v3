@@ -12,6 +12,7 @@ from core.error_handling import handle_error
 from core.usage_tracker import check_quota, decrement_quota
 from logger import logger
 
+
 def run_style_transfer_ui():
     st.title("🧠 Style Mimic Generator")
     st.markdown("""
@@ -29,6 +30,7 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
 
     st.subheader("🎨 Choose or Add Example Paragraph(s)")
 
+    # Load saved examples
     try:
         available_examples = [f for f in os.listdir(EXAMPLE_DIR) if f.endswith(".txt")]
     except Exception as e:
@@ -49,12 +51,17 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
             msg = handle_error(e, code="STYLE_UI_002")
             st.error(msg)
 
-    example_input = st.text_area("✍️ Paste Example Paragraph(s) (separate with '---')", height=250, value=example_text)
+    example_input = st.text_area(
+        "✍️ Paste Example Paragraph(s) (separate with '---')",
+        height=250,
+        value=example_text
+    )
     example_list = [p.strip() for p in example_input.split("---") if p.strip()]
 
+    # Save example if admin
     if example_input.strip() and st.button("💾 Save as Example"):
         try:
-            if user_role != "Admin":
+            if user_role.lower() != "admin":
                 st.error("❌ Only Admins can save style examples.")
             else:
                 filename = sanitize_filename(f"example_{len(available_examples)+1}.txt")
@@ -72,6 +79,7 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
             msg = handle_error(e, code="STYLE_UI_003")
             st.error(msg)
 
+    # Input method: Excel or pasted text
     input_method = st.radio("📥 Select Input Method", ["Upload Excel", "Paste Text Inputs"])
     inputs_df = None
 
@@ -95,6 +103,7 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
             input_list = [x.strip() for x in pasted_text.split('---') if x.strip()]
             inputs_df = pd.DataFrame({"Input": input_list})
 
+    # Generate outputs
     if inputs_df is not None and not inputs_df.empty and example_list and st.button("🔄 Generate Styled Outputs", key="generate_button_main"):
         with st.spinner("Generating styled outputs..."):
             try:

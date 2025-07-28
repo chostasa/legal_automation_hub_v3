@@ -88,3 +88,10 @@ def rate_limit(key: str):
         raise RuntimeError("Rate limit exceeded")
     requests.append(now)
     _rate_limit_cache[key] = requests
+
+def sanitize_filename(filename: str) -> str:
+    """
+    Remove invalid characters from filenames and ensure a safe output.
+    """
+    cleaned = re.sub(r'[<>:"/\\|?*]', '', filename)  # remove illegal characters
+    return cleaned.strip() or "untitled"
