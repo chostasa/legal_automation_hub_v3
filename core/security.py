@@ -1,14 +1,19 @@
 import re
 import html
+import functools
+import time
 from core.error_handling import handle_error
+from core.usage_tracker import check_quota, increment_quota
 
 SAFE_FILENAME_CHARS = r"[^a-zA-Z0-9_\-\.]"
 SAFE_TEXT_CHARS = r"[^a-zA-Z0-9\s,\.\-_'\"\(\)\[\]@:]"
+RATE_LIMIT_WINDOW = 60
+RATE_LIMIT_REQUESTS = 100
+
+_rate_limit_cache = {}
+
 
 def sanitize_filename(value: str) -> str:
-    """
-    Sanitize a filename by replacing unsafe characters with underscores.
-    """
     try:
         if not isinstance(value, str):
             raise ValueError("sanitize_filename expects a string")
@@ -18,10 +23,8 @@ def sanitize_filename(value: str) -> str:
         handle_error(e, code="SECURITY_SANITIZE_FILENAME_ERR")
         return "invalid_filename"
 
+
 def sanitize_email(email: str) -> str:
-    """
-    Validate and sanitize email addresses. Return placeholder if invalid.
-    """
     try:
         if not isinstance(email, str):
             raise ValueError("sanitize_email expects a string")
@@ -33,10 +36,8 @@ def sanitize_email(email: str) -> str:
         handle_error(e, code="SECURITY_SANITIZE_EMAIL_ERR")
         return "invalid@example.com"
 
+
 def sanitize_text(text: str) -> str:
-    """
-    Escape HTML and remove unsafe characters from text fields.
-    """
     try:
         if not isinstance(text, str):
             raise ValueError("sanitize_text expects a string")
@@ -46,10 +47,8 @@ def sanitize_text(text: str) -> str:
         handle_error(e, code="SECURITY_SANITIZE_TEXT_ERR")
         return ""
 
+
 def redact_log(text: str) -> str:
-    """
-    Redact sensitive keywords (api keys, tokens, secrets) from log output.
-    """
     try:
         if not isinstance(text, str):
             raise ValueError("redact_log expects a string")
@@ -60,12 +59,11 @@ def redact_log(text: str) -> str:
         handle_error(e, code="SECURITY_REDACT_LOG_ERR")
         return "***REDACTED***"
 
+
 PHI_FIELDS = ["client", "email", "phone", "narrative", "summary"]
 
+
 def mask_phi(text: str) -> str:
-    """
-    Redact likely PHI fields (names, emails, etc.) from log text.
-    """
     try:
         if not isinstance(text, str):
             raise ValueError("mask_phi expects a string")
@@ -77,3 +75,26 @@ def mask_phi(text: str) -> str:
     except Exception as e:
         handle_error(e, code="SECURITY_MASK_PHI_ERR")
         return "[REDACTED]"
+
+
+def enforce_quota(event_type: str):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            if not check_quota(event_type):
+                raise RuntimeError(f"Quota exceeded for {event_type}")
+            result = func(*args, **kwargs)
+            increment_quota(event_type)
+            return result
+        return wrapper
+    return decorator
+
+
+def rate_limit(key: str):
+    now = time.time()
+    requests = _rate_limit_cache.get(key, [])
+    requests = [req for req in requests if now - req < RATE_LIMIT_WINDOW]
+    if len(requests) >= RATE_LIMIT_REQUESTS:
+        raise RuntimeError("Rate limit exceeded")
+    requests.append(now)
+    _rate_limit_cache[key] = requests

@@ -1,9 +1,11 @@
 import os
+import asyncio
 from services.openai_client import safe_generate
 from utils.docx_utils import replace_text_in_docx_all
-from utils.thread_utils import run_in_thread
 from core.security import sanitize_text, redact_log, mask_phi
 from core.error_handling import handle_error
+from core.usage_tracker import check_and_decrement_quota
+from core.auth import get_tenant_id
 from logger import logger
 from core.prompts.prompt_factory import build_prompt
 
@@ -16,7 +18,7 @@ def generate_synopsis(casesynopsis: str) -> str:
             raise ValueError("Case synopsis is missing or invalid.")
 
         prompt = build_prompt("foia", "Synopsis", casesynopsis)
-        summary = run_in_thread(safe_generate, prompt=prompt)
+        summary = asyncio.run(safe_generate(prompt=prompt))
         if not summary or "legal summarization assistant" in summary.lower():
             return "[Synopsis failed to generate. Check input.]"
         return summary
@@ -40,6 +42,9 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
         if not output_path:
             raise ValueError("Output path is required for FOIA letter generation.")
 
+        tenant_id = get_tenant_id()
+        check_and_decrement_quota(tenant_id, "foia_requests")
+
         for k, v in data.items():
             if isinstance(v, str):
                 data[k] = sanitize_text(v)
@@ -54,7 +59,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             client_name=data.get("client_id", ""),
             extra_instructions=data.get("explicit_instructions", ""),
         )
-        request_list = run_in_thread(safe_generate, prompt=bullet_prompt)
+        request_list = asyncio.run(safe_generate(prompt=bullet_prompt))
         if not request_list:
             raise ValueError("Failed to generate FOIA request list.")
 
@@ -66,7 +71,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             extra_instructions=data.get("explicit_instructions", ""),
             example=example_text
         )
-        foia_body = run_in_thread(safe_generate, prompt=letter_prompt)
+        foia_body = asyncio.run(safe_generate(prompt=letter_prompt))
         foia_body = sanitize_text(foia_body)
         if not foia_body:
             raise ValueError("Failed to generate FOIA letter body text.")
@@ -93,7 +98,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             logger.debug(f"  - {k}: {v[:100]!r}{'...' if len(v) > 100 else ''}")
 
         try:
-            run_in_thread(replace_text_in_docx_all, template_path, replacements, output_path)
+            replace_text_in_docx_all(template_path, replacements, output_path)
         except Exception as docx_error:
             logger.warning(redact_log(mask_phi(f"[FOIA_GEN_002] ⚠️ DOCX rendering error: {docx_error}")))
             with open(output_path.replace(".docx", "_FAILED.txt"), "w", encoding="utf-8") as f:

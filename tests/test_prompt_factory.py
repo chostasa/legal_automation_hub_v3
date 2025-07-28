@@ -7,7 +7,6 @@ def test_build_prompt_includes_safety_notes():
     assert "Jane Roe" in prompt
     assert "Plaintiff was injured" in prompt
 
-    # Core safety notes
     assert "Do not fabricate or assume any facts." in prompt
     assert "Use the tone and clarity of a senior litigator." in prompt
     assert "Ban any phrasing that introduces speculation" in prompt

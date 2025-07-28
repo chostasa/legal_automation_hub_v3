@@ -1,21 +1,21 @@
 import streamlit as st
 import os
 import hashlib
+import asyncio
 from datetime import datetime
 
 from utils.session_utils import get_session_temp_dir
 from core.security import sanitize_text, sanitize_filename, redact_log, mask_phi
 from services.foia_service import generate_foia_request
-from core.usage_tracker import log_usage
-from core.auth import get_user_id, get_tenant_id
+from core.usage_tracker import log_usage, check_quota, decrement_quota
+from core.auth import get_user_id, get_tenant_id, get_user_role
 from core.audit import log_audit_event
 from logger import logger
 from utils.file_utils import clean_temp_dir
 from core.foia_constants import STATE_CITATIONS, STATE_RESPONSE_TIMES
 from core.cache_utils import clear_caches
-from core.error_handling import handle_error  # Phase 4
+from core.error_handling import handle_error
 
-# 🧹 Clean temp dir on startup
 clean_temp_dir()
 
 def stream_file(path: str):
@@ -27,7 +27,6 @@ def run_ui():
     st.header("📬 FOIA Letter Generator")
 
     try:
-        # === Optional: Style Example (Centralized) ===
         st.subheader("🎨 Optional Style Example")
         example_text = ""
         tenant_id = get_tenant_id()
@@ -47,7 +46,6 @@ def run_ui():
         else:
             st.info(f"No style examples found for FOIA in `{EXAMPLE_DIR}`")
 
-        # === Select Template from Template Manager ===
         TEMPLATE_DIR = os.path.join("templates", tenant_id, "foia")
         os.makedirs(TEMPLATE_DIR, exist_ok=True)
 
@@ -86,14 +84,12 @@ def run_ui():
             submitted = st.form_submit_button("⚙️ Generate FOIA Letter")
 
         if submitted:
-            # Clear caches on each run
             clear_caches()
 
             if not TEMPLATE_FOIA:
                 st.error("❌ You must select or upload a FOIA template in Template Manager before generating letters.")
                 return
 
-            # ✅ Validate fields
             required_fields = {
                 "Client ID": client_id,
                 "Recipient Name": recipient_name,
@@ -116,7 +112,6 @@ def run_ui():
                 return
 
             try:
-                # Prepare sanitized data
                 data = {
                     "formatted_date": datetime.today().strftime("%B %d, %Y"),
                     "client_id": sanitize_text(client_id),
@@ -156,22 +151,23 @@ def run_ui():
                     bullet_list = metadata.get("bullet_list", [])
                 else:
                     with st.spinner("📄 Generating FOIA letter..."):
+                        check_quota("foia_letters", amount=1)
                         temp_dir = get_session_temp_dir()
                         output_filename = sanitize_filename(
                             f"FOIA_{data['client_id']}_{datetime.today().strftime('%Y-%m-%d')}.docx"
                         )
                         file_path = os.path.join(temp_dir, output_filename)
 
-                        _, _, bullet_list = generate_foia_request(
+                        bullet_list = asyncio.run(generate_foia_request(
                             data=data,
                             template_path=TEMPLATE_FOIA,
                             output_path=file_path,
                             example_text=example_text
-                        )
+                        ))[2]
 
+                        decrement_quota("foia_letters", amount=1)
                         st.session_state.foia_cache[form_key] = (file_path, {"bullet_list": bullet_list})
 
-                # Display success and allow downloads
                 st.success("✅ FOIA letter generated!")
                 with open(file_path, "rb") as f:
                     docx_bytes = f.read()
@@ -190,7 +186,6 @@ def run_ui():
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
 
-                # Log usage and audit events
                 try:
                     log_usage(
                         event_type="foia_generated",
@@ -226,11 +221,9 @@ def run_ui():
                     )
 
             except Exception as e:
-                # Surface friendly error to user
                 msg = handle_error(e, code="FOIA_UI_001")
                 st.error(msg)
 
-                # Fallback debug if exists
                 fallback_path = file_path.replace(".docx", "_FAILED.txt") if 'file_path' in locals() else None
                 if fallback_path and os.path.exists(fallback_path):
                     with open(fallback_path, "r", encoding="utf-8") as f:
@@ -247,6 +240,5 @@ def run_ui():
                     )
 
     except Exception as outer_e:
-        # Catch any unexpected top-level errors
         msg = handle_error(outer_e, code="FOIA_UI_002")
         st.error(msg)

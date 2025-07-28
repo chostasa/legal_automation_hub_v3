@@ -3,14 +3,14 @@ import os
 import json
 from datetime import datetime
 
-from core.auth import get_tenant_id, get_user_id
+from core.auth import get_tenant_id, get_user_id, get_user_role, get_tenant_branding
 from core.security import sanitize_filename, redact_log, mask_phi
 from core.audit import log_audit_event
 from core.cache_utils import clear_caches
 from core.error_handling import handle_error
 from logger import logger
 from core.db import insert_template, get_templates, soft_delete_template, update_template_name, insert_audit_event
-
+from utils.docx_utils import replace_text_in_docx_all
 
 CATEGORIES = {
     "Mediation Memo": "mediation",
@@ -18,7 +18,6 @@ CATEGORIES = {
     "FOIA Letter": "foia",
     "Batch Documents": "batch_docs"
 }
-
 
 def get_dir(base_dir: str, tenant_id: str, category: str) -> str:
     try:
@@ -30,19 +29,25 @@ def get_dir(base_dir: str, tenant_id: str, category: str) -> str:
         st.error(msg)
         return ""
 
-
 def run_ui():
     st.header("📪 Template & Style Example Manager")
 
     try:
         tenant_id = get_tenant_id()
+        branding = get_tenant_branding(tenant_id)
+        st.caption(f"Tenant: {branding.get('firm_name', tenant_id)}")
     except Exception as e:
         msg = handle_error(e, code="TEMPLATE_UI_002")
         st.error(msg)
         return
 
-    tab1, tab2 = st.tabs(["📂 Templates", "🖋️ Style Examples"])
+    if get_user_role() != "admin":
+        st.warning("⚠️ Only Admins can manage templates.")
+        return
 
+    tab1, tab2, tab3 = st.tabs(["📂 Templates", "🖋️ Style Examples", "🎨 Branding"])
+
+    # ---------------- Tab 1 ----------------
     with tab1:
         try:
             selected_category_label = st.selectbox(
@@ -59,11 +64,12 @@ def run_ui():
             tags = st.text_input("🏷️ Add tags (comma-separated)", key="template_tags")
             if uploaded_template:
                 try:
-                    template_path = os.path.join(template_dir, sanitize_filename(uploaded_template.name))
+                    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+                    versioned_name = f"{timestamp}_{sanitize_filename(uploaded_template.name)}"
+                    template_path = os.path.join(template_dir, versioned_name)
                     with open(template_path, "wb") as f:
                         f.write(uploaded_template.read())
 
-                    # DB Insert
                     insert_template(
                         tenant_id=tenant_id,
                         name=os.path.basename(template_path),
@@ -76,7 +82,6 @@ def run_ui():
 
                     clear_caches()
 
-                    # DB Audit
                     insert_audit_event(
                         tenant_id=tenant_id,
                         user_id=get_user_id(),
@@ -85,9 +90,16 @@ def run_ui():
                             "filename": os.path.basename(template_path),
                             "tags": tags,
                             "category": selected_category,
+                            "version": timestamp,
                             "module": "template_manager"
                         }
                     )
+
+                    with open(template_path, "rb") as f:
+                        preview_path = template_path.replace(".docx", "_preview.docx")
+                        replace_text_in_docx_all(template_path, {"Preview": "Sample"}, preview_path)
+                        st.download_button("⬇️ Download Preview", open(preview_path, "rb"), file_name=os.path.basename(preview_path))
+
                 except Exception as e:
                     msg = handle_error(e, code="TEMPLATE_UI_003")
                     st.error(msg)
@@ -97,11 +109,10 @@ def run_ui():
                 "🔍 Search by name or tag", key="search_templates"
             ).lower()
 
-            # DB fetch
             templates = get_templates(tenant_id=tenant_id, category=selected_category)
             matched_templates = [
                 t for t in templates
-                if search_filter in t["name"].lower() or search_filter in (",".join(json.loads(t.get("tags", "[]")))).lower()
+                if search_filter in t["name"].lower() or search_filter in ("".join(json.loads(t.get("tags", "[]")))).lower()
             ]
 
             if matched_templates:
@@ -128,7 +139,6 @@ def run_ui():
                                     st.warning("⚠️ File with that name already exists.")
                                 else:
                                     os.rename(t["path"], new_path)
-                                    # DB Update
                                     update_template_name(t["id"], tenant_id, new_name + ".docx", new_path)
                                     st.success(f"✅ Renamed to {new_name}.docx")
 
@@ -148,7 +158,6 @@ def run_ui():
                     with col3:
                         if st.button("🗑️ Delete", key=f"delete_{t['id']}"):
                             try:
-                                # DB Soft Delete
                                 soft_delete_template(t["id"], tenant_id)
                                 if os.path.exists(t["path"]):
                                     os.remove(t["path"])
@@ -173,7 +182,7 @@ def run_ui():
             msg = handle_error(e, code="TEMPLATE_UI_006")
             st.error(msg)
 
-    # Style Examples Tab (still uses file system for now)
+    # ---------------- Tab 2 ----------------
     with tab2:
         try:
             selected_example_label = st.selectbox(
@@ -307,4 +316,29 @@ def run_ui():
 
         except Exception as e:
             msg = handle_error(e, code="TEMPLATE_UI_010")
+            st.error(msg)
+
+    # ---------------- Tab 3 ----------------
+    with tab3:
+        try:
+            st.subheader("🎨 Tenant Branding Assets")
+            logo_upload = st.file_uploader("Upload Firm Logo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="branding_logo")
+            primary_color = st.color_picker("Pick Primary Color", value=branding.get("primary_color", "#0A1D3B"))
+
+            branding_dir = get_dir("branding", tenant_id, "assets")
+            branding_config_path = os.path.join(branding_dir, "branding.json")
+
+            if logo_upload:
+                logo_path = os.path.join(branding_dir, sanitize_filename(logo_upload.name))
+                with open(logo_path, "wb") as f:
+                    f.write(logo_upload.read())
+                branding["logo"] = logo_path
+                branding["primary_color"] = primary_color
+                with open(branding_config_path, "w") as f:
+                    json.dump(branding, f, indent=2)
+                st.success("✅ Branding updated successfully.")
+                log_audit_event("Branding Updated", {"tenant_id": tenant_id, "logo": logo_path, "color": primary_color})
+
+        except Exception as e:
+            msg = handle_error(e, code="TEMPLATE_UI_011")
             st.error(msg)

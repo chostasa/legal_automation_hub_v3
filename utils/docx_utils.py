@@ -1,12 +1,16 @@
 import os
 import zipfile
 import html
+import datetime
+import hashlib
 from lxml import etree
 from utils.template_engine import render_docx_placeholders
 from docx import Document
 from core.security import mask_phi, redact_log
 from core.error_handling import handle_error
 from utils.file_utils import validate_file_size
+from core.audit import log_audit_event
+from logger import logger
 
 NAMESPACES = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 
@@ -15,14 +19,14 @@ TARGET_XML_FILES = [
     "word/header1.xml", "word/header2.xml", "word/header3.xml",
     "word/footer1.xml", "word/footer2.xml", "word/footer3.xml",
     "word/comments.xml",
-    "word/vbaProject.bin"  # suspicious macro storage
+    "word/vbaProject.bin"
 ]
 
+def _hash_template_version(file_path: str) -> str:
+    with open(file_path, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
 
 def _scan_for_macros(docx_path: str):
-    """
-    Scan the .docx file for suspicious macro/VBA files.
-    """
     try:
         if not os.path.exists(docx_path):
             raise FileNotFoundError(f"File does not exist: {docx_path}")
@@ -30,18 +34,14 @@ def _scan_for_macros(docx_path: str):
         with zipfile.ZipFile(docx_path, 'r') as zin:
             for item in zin.infolist():
                 if "vbaProject" in item.filename.lower() or item.filename.endswith(".bin"):
+                    log_audit_event("Macro Detected", {"file": docx_path, "item": item.filename})
+                    logger.error(redact_log(mask_phi(f"⚠️ Macro detected in {docx_path}:{item.filename}")))
                     raise ValueError(f"Macros detected in template: {item.filename}")
     except Exception as e:
         handle_error(e, code="DOCX_MACRO_001", raise_it=True)
 
-
 def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str) -> str:
-    """
-    Replaces placeholders in all major parts of a Word .docx file and saves it to `save_path`.
-    Also validates the file size and scans for macros before processing.
-    """
     try:
-        # === Pre-validation for testability and correctness ===
         if not isinstance(replacements, dict):
             raise ValueError("Replacements must be provided as a dictionary.")
         if not replacements:
@@ -49,13 +49,11 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
         if not os.path.isfile(docx_path):
             raise FileNotFoundError(f"Input DOCX file does not exist: {docx_path}")
 
-        # Validate file size and scan for macros before processing
         validate_file_size(docx_path)
         _scan_for_macros(docx_path)
 
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-        # Ensure replacements are unescaped first
         replacements = {
             k: html.unescape(str(v)) if not isinstance(v, list)
             else [html.unescape(str(x)) for x in v]
@@ -80,7 +78,6 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
 
                     zout.writestr(item, buffer)
 
-        # Insert bullet points for list replacements
         doc = Document(save_path)
         for para in doc.paragraphs:
             for key, val in replacements.items():
@@ -95,11 +92,17 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
                     else:
                         para.text = para.text.replace(placeholder, str(val))
 
-        # Validate output file existence for test assertions
         if not os.path.isfile(save_path):
             raise FileNotFoundError(f"Output DOCX was not created: {save_path}")
 
         doc.save(save_path)
+        version_hash = _hash_template_version(save_path)
+        log_audit_event("DOCX Replace Completed", {
+            "file": save_path,
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "version_hash": version_hash
+        })
+        logger.info(redact_log(mask_phi(f"✅ DOCX replace completed for {save_path}, version: {version_hash}")))
         return save_path
 
     except Exception as e:

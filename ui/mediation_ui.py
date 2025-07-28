@@ -8,8 +8,9 @@ from utils.session_utils import get_session_temp_dir
 from core.security import sanitize_text, redact_log, mask_phi
 from core.cache_utils import clear_caches
 from core.audit import log_audit_event
-from core.auth import get_tenant_id
+from core.auth import get_tenant_id, get_user_role
 from core.error_handling import handle_error
+from core.usage_tracker import check_quota, decrement_quota
 from logger import logger
 from services.memo_service import (
     generate_quotes_from_raw_depo,
@@ -17,23 +18,21 @@ from services.memo_service import (
     generate_plaintext_memo
 )
 
-# Clean temp dir at startup
 clean_temp_dir()
 
 ERROR_CODE = "MEMO_GEN_001"
-
 
 def stream_file(path: str):
     with open(path, "rb") as f:
         while chunk := f.read(8192):
             yield chunk
 
-
 def run_ui():
     st.header("🗞 Mediation Memo Generator")
 
     try:
         tenant_id = get_tenant_id()
+        role = get_user_role()
         template_dir = os.path.join("templates", tenant_id, "mediation")
         os.makedirs(template_dir, exist_ok=True)
         available_templates = [f for f in os.listdir(template_dir) if f.endswith(".docx")]
@@ -166,6 +165,7 @@ def run_ui():
         else:
             with st.spinner("🔄 Processing..."):
                 try:
+                    check_quota("memo_generation", amount=1)
                     raw_quotes = generate_quotes_from_raw_depo(raw_depo, quote_categories) if raw_depo else {}
 
                     data = {
@@ -192,6 +192,7 @@ def run_ui():
                     temp_dir = get_session_temp_dir()
                     file_path, memo_data = generate_memo_from_fields(data, template_path, temp_dir)
                     st.session_state.memo_cache[form_key] = (file_path, memo_data, raw_quotes)
+                    decrement_quota("memo_generation", amount=1)
 
                 except Exception as e:
                     msg = handle_error(e, code=ERROR_CODE)

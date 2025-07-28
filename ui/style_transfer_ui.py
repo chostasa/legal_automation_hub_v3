@@ -1,13 +1,15 @@
 import streamlit as st
 import pandas as pd
 import os
+import asyncio
 from io import BytesIO
 
 from services.style_transfer_service import run_batch_style_transfer
 from core.security import mask_phi, redact_log, sanitize_filename
-from core.auth import get_tenant_id
+from core.auth import get_tenant_id, get_user_role
 from core.audit import log_audit_event
 from core.error_handling import handle_error
+from core.usage_tracker import check_quota, decrement_quota
 from logger import logger
 
 def run_style_transfer_ui():
@@ -21,6 +23,7 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
 """)
 
     tenant_id = get_tenant_id()
+    user_role = get_user_role()
     EXAMPLE_DIR = os.path.join("examples", tenant_id, "style_transfer")
     os.makedirs(EXAMPLE_DIR, exist_ok=True)
 
@@ -51,17 +54,20 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
 
     if example_input.strip() and st.button("💾 Save as Example"):
         try:
-            filename = sanitize_filename(f"example_{len(available_examples)+1}.txt")
-            path = os.path.join(EXAMPLE_DIR, filename)
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(example_input)
-            st.success(f"✅ Saved example as {filename}")
-            log_audit_event("Style Example Uploaded", {
-                "filename": filename,
-                "tenant_id": tenant_id,
-                "module": "style_transfer"
-            })
-            st.rerun()
+            if user_role != "Admin":
+                st.error("❌ Only Admins can save style examples.")
+            else:
+                filename = sanitize_filename(f"example_{len(available_examples)+1}.txt")
+                path = os.path.join(EXAMPLE_DIR, filename)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(example_input)
+                st.success(f"✅ Saved example as {filename}")
+                log_audit_event("Style Example Uploaded", {
+                    "filename": filename,
+                    "tenant_id": tenant_id,
+                    "module": "style_transfer"
+                })
+                st.rerun()
         except Exception as e:
             msg = handle_error(e, code="STYLE_UI_003")
             st.error(msg)
@@ -92,7 +98,9 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
     if inputs_df is not None and not inputs_df.empty and example_list and st.button("🔄 Generate Styled Outputs", key="generate_button_main"):
         with st.spinner("Generating styled outputs..."):
             try:
-                result_df = run_batch_style_transfer(example_list, inputs_df, input_col="Input")
+                check_quota("openai_tokens", amount=len(inputs_df))
+                result_df = asyncio.run(run_batch_style_transfer(example_list, inputs_df, input_col="Input"))
+                decrement_quota("openai_tokens", amount=len(result_df))
                 st.success(f"✅ Successfully rewrote {len(result_df)} inputs.")
                 st.dataframe(result_df)
 

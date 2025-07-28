@@ -1,10 +1,12 @@
-from openai import OpenAI, OpenAIError
+import asyncio
+import time
+from openai import AsyncOpenAI, OpenAIError
 from config_loader import AppConfig, get_config
 from utils.retry_utils import openai_retry
 from utils.token_utils import trim_to_token_limit
 from core.security import redact_log, mask_phi
-from core.usage_tracker import log_usage
-from core.auth import get_user_id, get_tenant_id
+from core.usage_tracker import log_usage, check_quota
+from core.auth import get_user_id, get_tenant_id, get_user_role
 from core.error_handling import handle_error, AppError
 from logger import logger
 
@@ -15,11 +17,11 @@ DEFAULT_SYSTEM_MSG = "You are a professional legal writer. Stay concise and lega
 class OpenAIClient:
     def __init__(self, config: AppConfig = None):
         self.config = config or get_config()
-        self.client = OpenAI(api_key=self.config.OPENAI_API_KEY)
+        self.client = AsyncOpenAI(api_key=self.config.OPENAI_API_KEY)
         self.model = getattr(self.config, "OPENAI_MODEL", DEFAULT_MODEL)
 
     @openai_retry
-    def safe_generate(
+    async def safe_generate(
         self,
         prompt: str,
         model: str = None,
@@ -27,18 +29,13 @@ class OpenAIClient:
         temperature: float = 0.4,
         test_mode: bool = False,
     ) -> str:
-        """
-        Generate text using the OpenAI API with safety checks, error codes, and usage logging.
-        Includes test hooks and optional deterministic mode.
-        """
         try:
             tenant_id = get_tenant_id()
             user_id = get_user_id()
+            user_role = get_user_role()
 
-            # Trim prompt to avoid token overflows
             trimmed = trim_to_token_limit(prompt)
 
-            # Validate model
             used_model = model or self.model or DEFAULT_MODEL
             if used_model not in ["gpt-3.5-turbo", "gpt-4"]:
                 logger.warning(
@@ -50,13 +47,19 @@ class OpenAIClient:
                 )
                 used_model = DEFAULT_MODEL
 
-            # Optional test mode returns deterministic output for integration tests
             if test_mode:
                 logger.info("[OPENAI_GEN_TEST] Returning deterministic test output.")
                 return f"[TEST MODE] Prompt length={len(trimmed)} Model={used_model}"
 
-            # Call OpenAI API
-            response = self.client.chat.completions.create(
+            if not check_quota(tenant_id=tenant_id, event_type="openai_tokens"):
+                raise AppError(
+                    code="OPENAI_GEN_000",
+                    message="Quota exceeded for tenant.",
+                    details=f"Tenant={tenant_id}"
+                )
+
+            start_time = time.time()
+            response = await self.client.chat.completions.create(
                 model=used_model,
                 messages=[
                     {"role": "system", "content": system_msg},
@@ -64,8 +67,9 @@ class OpenAIClient:
                 ],
                 temperature=temperature,
             )
+            latency = time.time() - start_time
+            logger.info(redact_log(mask_phi(f"[METRIC] OpenAI latency: {latency:.2f}s for tenant={tenant_id}")))
 
-            # Validate response
             choices = getattr(response, "choices", [])
             if not choices or not hasattr(choices[0], "message"):
                 raise AppError(
@@ -74,10 +78,8 @@ class OpenAIClient:
                     details=f"Model={used_model}, Prompt length={len(trimmed)}",
                 )
 
-            # Extract content
             content = choices[0].message.content.strip()
 
-            # Log usage tokens
             usage = getattr(response, "usage", None)
             if usage:
                 log_usage(
@@ -89,13 +91,14 @@ class OpenAIClient:
                         "model": used_model,
                         "prompt_tokens": usage.prompt_tokens,
                         "completion_tokens": usage.completion_tokens,
+                        "role": user_role,
+                        "latency": latency
                     },
                 )
 
             return content
 
         except OpenAIError as e:
-            # API-specific errors
             handle_error(
                 e,
                 code="OPENAI_GEN_002",
@@ -104,11 +107,9 @@ class OpenAIClient:
             )
 
         except AppError:
-            # Already wrapped errors
             raise
 
         except Exception as e:
-            # Catch-all
             handle_error(
                 e,
                 code="OPENAI_GEN_003",
@@ -117,7 +118,6 @@ class OpenAIClient:
             )
 
 
-# === Singleton Instance ===
 openai_client_instance = OpenAIClient()
 
 
@@ -129,14 +129,12 @@ def safe_generate(
     temperature: float = 0.4,
     test_mode: bool = False,
 ) -> str:
-    """
-    Wrapper function for modules that want to call OpenAI without importing the class.
-    Supports test_mode for Phase 5 test hooks.
-    """
-    return openai_client_instance.safe_generate(
-        prompt=prompt,
-        model=model,
-        system_msg=system_msg,
-        temperature=temperature,
-        test_mode=test_mode,
+    return asyncio.run(
+        openai_client_instance.safe_generate(
+            prompt=prompt,
+            model=model,
+            system_msg=system_msg,
+            temperature=temperature,
+            test_mode=test_mode,
+        )
     )

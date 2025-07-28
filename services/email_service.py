@@ -1,22 +1,23 @@
 import os
 import pandas as pd
 from datetime import datetime
+import asyncio
 from core.security import sanitize_text, sanitize_email, redact_log, mask_phi
 from core.constants import STATUS_INTAKE_COMPLETED, STATUS_QUESTIONNAIRE_SENT
 from core.auth import get_user_id, get_tenant_id
-from core.usage_tracker import log_usage
+from core.usage_tracker import log_usage, check_quota
 from core.error_handling import handle_error, AppError
 from core.audit import log_audit_event
 from email_automation.utils.template_engine import merge_template
 from services.graph_client import GraphClient
 from services.neos_client import NeosClient
 from logger import logger
+import json
 
 graph = GraphClient()
 neos = NeosClient()
 
-
-def build_email(client_data: dict, template_key: str) -> tuple:
+async def build_email(client_data: dict, template_key: str) -> tuple:
     """
     Returns (subject, body, cc, sanitized_dict) for a given client row.
     Validates input fields and applies sanitization.
@@ -45,7 +46,11 @@ def build_email(client_data: dict, template_key: str) -> tuple:
                 details=f"Sanitized data: {sanitized}",
             )
 
-        # Audit logging for building email
+        # Embed open-tracking pixel and click tracking (basic)
+        open_tracking_url = f"https://tracking.legalhub.app/open/{get_tenant_id()}/{get_user_id()}/{sanitized['CaseID']}"
+        tracking_pixel = f'<img src="{open_tracking_url}" alt="" style="display:none" />'
+        body = f"{body}\n\n{tracking_pixel}"
+
         log_audit_event("Email Built", {
             "tenant_id": get_tenant_id(),
             "user_id": get_user_id(),
@@ -60,8 +65,7 @@ def build_email(client_data: dict, template_key: str) -> tuple:
     except Exception as e:
         handle_error(e, code="EMAIL_BUILD_003", user_message="Failed to build email.", raise_it=True)
 
-
-def send_email_and_update(client: dict, subject: str, body: str, cc: list, template_key: str) -> str:
+async def send_email_and_update(client: dict, subject: str, body: str, cc: list, template_key: str) -> str:
     """
     Sends the email, updates NEOS, logs usage and returns a result string.
     """
@@ -72,17 +76,17 @@ def send_email_and_update(client: dict, subject: str, body: str, cc: list, templ
                 message=f"Cannot send email: invalid email address for client {client.get('ClientName', '[Unknown]')}",
             )
 
+        # Billing-aware quota check
+        await check_quota("emails_sent", get_tenant_id(), get_user_id(), 1)
+
         with logger.contextualize(tenant_id=get_tenant_id(), user_id=get_user_id()):
-            graph.send_email(sender_address=None, to=client["Email"], subject=subject, body=body)
+            await graph.send_email(sender_address=None, to=client["Email"], subject=subject, body=body)
 
-        # Update NEOS case status
-        neos.update_case_status(client.get("CaseID", ""), STATUS_QUESTIONNAIRE_SENT)
+        await neos.update_case_status(client.get("CaseID", ""), STATUS_QUESTIONNAIRE_SENT)
 
-        # Log email event and usage
-        log_email(client, subject, body, template_key, cc)
+        await log_email(client, subject, body, template_key, cc)
         log_usage("emails_sent", get_tenant_id(), get_user_id(), 1, {"template": template_key})
 
-        # Audit logging for email sent
         log_audit_event("Email Sent", {
             "tenant_id": get_tenant_id(),
             "user_id": get_user_id(),
@@ -105,10 +109,9 @@ def send_email_and_update(client: dict, subject: str, body: str, cc: list, templ
         )
         return f"❌ Failed: {type(e).__name__}"
 
-
-def log_email(client: dict, subject: str, body: str, template_key: str, cc: list):
+async def log_email(client: dict, subject: str, body: str, template_key: str, cc: list):
     """
-    Appends the sent email metadata to a CSV log file.
+    Appends the sent email metadata to a CSV + JSON log file.
     """
     try:
         subject_clean = sanitize_text(subject)
@@ -117,8 +120,10 @@ def log_email(client: dict, subject: str, body: str, template_key: str, cc: list
         name_clean = sanitize_text(client.get("ClientName", "Unknown"))
 
         tenant_id = get_tenant_id()
-        log_path = os.path.join("email_automation", "logs", f"{tenant_id}_sent_email_log.csv")
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        log_dir = os.path.join("email_automation", "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        csv_path = os.path.join(log_dir, f"{tenant_id}_sent_email_log.csv")
+        json_path = os.path.join(log_dir, f"{tenant_id}_sent_email_log.json")
 
         entry = {
             "Timestamp": datetime.now().isoformat(),
@@ -133,15 +138,25 @@ def log_email(client: dict, subject: str, body: str, template_key: str, cc: list
             "Class Code After": STATUS_QUESTIONNAIRE_SENT,
             "User ID": get_user_id(),
             "Tenant ID": tenant_id,
+            "OpenTrackingURL": f"https://tracking.legalhub.app/open/{tenant_id}/{get_user_id()}/{client.get('CaseID', '')}"
         }
 
-        if os.path.exists(log_path):
-            existing = pd.read_csv(log_path)
-            pd.concat([existing, pd.DataFrame([entry])], ignore_index=True).to_csv(log_path, index=False)
+        # Write CSV
+        if os.path.exists(csv_path):
+            existing = pd.read_csv(csv_path)
+            pd.concat([existing, pd.DataFrame([entry])], ignore_index=True).to_csv(csv_path, index=False)
         else:
-            pd.DataFrame([entry]).to_csv(log_path, index=False)
+            pd.DataFrame([entry]).to_csv(csv_path, index=False)
 
-        # Audit logging for log write
+        # Write JSON log
+        existing_json = []
+        if os.path.exists(json_path):
+            with open(json_path, "r") as jf:
+                existing_json = json.load(jf)
+        existing_json.append(entry)
+        with open(json_path, "w") as jf:
+            json.dump(existing_json, jf, indent=2)
+
         log_audit_event("Email Logged", {
             "tenant_id": tenant_id,
             "user_id": get_user_id(),

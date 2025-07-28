@@ -1,6 +1,12 @@
 from jinja2 import Environment, BaseLoader, select_autoescape
+import json
+import os
+from datetime import datetime
+from core.auth import get_tenant_id
+from core.security import sanitize_filename
+from core.audit import log_audit_event
+from logger import logger
 
-# === Demand Prompts ===
 from core.prompts.demand_guidelines import (
     NO_HALLUCINATION_NOTE as DEMAND_NO_HALLUCINATION,
     LEGAL_FLUENCY_NOTE as DEMAND_LEGAL_FLUENCY,
@@ -11,7 +17,6 @@ from core.prompts.demand_guidelines import (
 )
 from core.prompts.demand_example import EXAMPLE_DEMAND, SETTLEMENT_EXAMPLE
 
-# === FOIA Prompts ===
 from core.prompts.foia_guidelines import (
     FULL_SAFETY_PROMPT as FOIA_SAFETY_PROMPT,
     FOIA_BULLET_POINTS_PROMPT_TEMPLATE,
@@ -19,7 +24,6 @@ from core.prompts.foia_guidelines import (
 )
 from core.prompts.foia_example import FOIA_BULLET_POINTS_EXAMPLES
 
-# === Memo Prompts ===
 from core.prompts.memo_guidelines import FULL_SAFETY_PROMPT as MEMO_SAFETY_PROMPT
 from core.prompts.memo_examples import (
     INTRO_EXAMPLE,
@@ -33,16 +37,13 @@ from core.prompts.memo_examples import (
     CONCLUSION_EXAMPLE,
 )
 
-# === Style Transfer Prompts ===
 from core.prompts.style_transfer import build_style_transfer_prompt
 
-# Setup Jinja2
 jinja_env = Environment(
     loader=BaseLoader(),
     autoescape=select_autoescape(enabled_extensions=("txt", "j2"))
 )
 
-# === Base Template for Demand & Memo ===
 BASE_PROMPT_TEMPLATE = """
 {{ safety_notes }}
 
@@ -59,6 +60,39 @@ Use the following as a tone/style example:
 {{ extra_instructions }}
 """.strip()
 
+PROMPT_REGISTRY_FILE = "prompt_registry.json"
+
+def _load_prompt_registry() -> dict:
+    if os.path.exists(PROMPT_REGISTRY_FILE):
+        with open(PROMPT_REGISTRY_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+def _save_prompt_registry(registry: dict):
+    with open(PROMPT_REGISTRY_FILE, "w") as f:
+        json.dump(registry, f, indent=2)
+
+def register_prompt(prompt_type: str, prompt: str):
+    registry = _load_prompt_registry()
+    tenant_id = get_tenant_id()
+    if tenant_id not in registry:
+        registry[tenant_id] = {}
+    if prompt_type not in registry[tenant_id]:
+        registry[tenant_id][prompt_type] = []
+    registry[tenant_id][prompt_type].append({
+        "timestamp": datetime.utcnow().isoformat(),
+        "prompt": prompt
+    })
+    _save_prompt_registry(registry)
+    try:
+        log_audit_event("Prompt Registered", {
+            "tenant_id": tenant_id,
+            "prompt_type": prompt_type,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        logger.warning(f"Failed to audit prompt registration: {e}")
+
 def build_prompt(
     prompt_type: str,
     section: str,
@@ -67,18 +101,6 @@ def build_prompt(
     extra_instructions: str = "",
     example: str = ""
 ) -> str:
-    """
-    Constructs a full prompt string for GPT based on prompt_type.
-
-    Args:
-        prompt_type (str): "demand", "foia", "memo", or "style_transfer"
-        section (str): Section name
-        summary (str): The factual content
-        client_name (str): Client name reference
-        extra_instructions (str): Extra instructions (quote embedding, bulleting, etc.)
-        example (str): Example text for tone/style
-    """
-
     if prompt_type == "demand":
         safety_notes = "\n\n".join([
             DEMAND_NO_HALLUCINATION,
@@ -89,7 +111,7 @@ def build_prompt(
             DEMAND_BAN_PHRASES
         ])
         template = jinja_env.from_string(BASE_PROMPT_TEMPLATE)
-        return template.render(
+        prompt = template.render(
             safety_notes=safety_notes,
             section=section,
             summary=summary.strip(),
@@ -97,10 +119,12 @@ def build_prompt(
             example=example.strip() or EXAMPLE_DEMAND,
             extra_instructions=extra_instructions.strip(),
         )
+        register_prompt(prompt_type, prompt)
+        return prompt
 
     elif prompt_type == "memo":
         template = jinja_env.from_string(BASE_PROMPT_TEMPLATE)
-        return template.render(
+        prompt = template.render(
             safety_notes=MEMO_SAFETY_PROMPT,
             section=section,
             summary=summary.strip(),
@@ -108,10 +132,11 @@ def build_prompt(
             example=example.strip(),
             extra_instructions=extra_instructions.strip(),
         )
+        register_prompt(prompt_type, prompt)
+        return prompt
 
     elif prompt_type == "foia":
-        # FOIA uses its own structured templates
-        return FOIA_BULLET_POINTS_PROMPT_TEMPLATE.format(
+        prompt = FOIA_BULLET_POINTS_PROMPT_TEMPLATE.format(
             case_synopsis=summary,
             case_type=section,
             facility="facility/system info",
@@ -119,11 +144,14 @@ def build_prompt(
             explicit_instructions=extra_instructions,
             potential_requests=FOIA_BULLET_POINTS_EXAMPLES
         )
+        register_prompt(prompt_type, prompt)
+        return prompt
 
     elif prompt_type == "style_transfer":
-        # Use the dedicated style transfer builder
         examples = example.split("---") if example else []
-        return build_style_transfer_prompt(examples, summary)
+        prompt = build_style_transfer_prompt(examples, summary)
+        register_prompt(prompt_type, prompt)
+        return prompt
 
     else:
         raise ValueError(f"Unknown prompt_type: {prompt_type}")

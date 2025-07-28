@@ -1,6 +1,7 @@
 import os
 import pytest
 from config import get_env
+from core.usage_tracker import check_quota, decrement_quota
 
 def test_get_env_returns_value(monkeypatch):
     monkeypatch.setenv("MY_TEST_KEY", "foo")
@@ -10,3 +11,11 @@ def test_get_env_raises_if_missing(monkeypatch):
     monkeypatch.delenv("SOME_MISSING_KEY", raising=False)
     with pytest.raises(Exception):
         get_env("SOME_MISSING_KEY")
+
+def test_quota_check_and_decrement():
+    try:
+        check_quota("openai_tokens", amount=1)
+        decrement_quota("openai_tokens", amount=1)
+        assert True
+    except Exception:
+        pytest.fail("Quota check or decrement failed unexpectedly")

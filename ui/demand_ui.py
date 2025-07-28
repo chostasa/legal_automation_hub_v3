@@ -7,8 +7,8 @@ from core.session import get_session_temp_dir
 from core.security import sanitize_text, sanitize_filename, redact_log, mask_phi
 from core.constants import demand_template as TEMPLATE_DEMAND
 from services.demand_service import generate_demand_letter
-from core.usage_tracker import log_usage
-from core.auth import get_user_id, get_tenant_id
+from core.usage_tracker import log_usage, check_quota, decrement_quota
+from core.auth import get_user_id, get_tenant_id, get_user_role
 from core.audit import log_audit_event
 from logger import logger
 from core.cache_utils import clear_caches
@@ -29,6 +29,10 @@ def load_binary_file(path: str) -> bytes:
 
 def run_ui():
     st.header("📂 Demand Letter Generator")
+
+    if get_user_role() not in ["Admin", "Staff"]:
+        st.error("❌ You do not have permission to access this module.")
+        return
 
     st.markdown("### 🎨 Optional: Style / Tone Example")
     example_text = ""
@@ -94,6 +98,7 @@ def run_ui():
             return
 
         try:
+            check_quota("demand_letters", amount=1)
             full_name = sanitize_text(client_name)
             formatted_date = incident_date.strftime("%B %d, %Y")
             summary = sanitize_text(summary)
@@ -137,6 +142,7 @@ def run_ui():
 
                     st.session_state.demand_cache[form_key] = (file_path, {})
 
+            decrement_quota("demand_letters", amount=1)
             st.success("✅ Demand letter generated!")
             st.download_button(
                 "⬇️ Download Demand Letter (.docx)",

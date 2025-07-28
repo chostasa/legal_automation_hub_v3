@@ -1,6 +1,7 @@
 import sqlite3
 import json
 import os
+import hashlib
 from datetime import datetime
 from core.error_handling import handle_error
 
@@ -9,11 +10,8 @@ os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 
 def get_connection():
-    """
-    Get a SQLite3 connection with row factory set to dict-like access.
-    """
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = sqlite3.connect(DB_PATH, timeout=30, isolation_level=None)
         conn.row_factory = sqlite3.Row
         return conn
     except Exception as e:
@@ -21,14 +19,10 @@ def get_connection():
 
 
 def init_db():
-    """
-    Create all required tables if they do not exist.
-    """
     try:
         conn = get_connection()
         cur = conn.cursor()
 
-        # Templates table
         cur.execute("""
         CREATE TABLE IF NOT EXISTS templates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,7 +36,6 @@ def init_db():
         )
         """)
 
-        # Examples table
         cur.execute("""
         CREATE TABLE IF NOT EXISTS examples (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,7 +48,6 @@ def init_db():
         )
         """)
 
-        # Audit log table
         cur.execute("""
         CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,7 +55,19 @@ def init_db():
             user_id TEXT,
             action TEXT NOT NULL,
             metadata TEXT,
+            hash TEXT NOT NULL,
             timestamp TEXT NOT NULL
+        )
+        """)
+
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS quotas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            key TEXT NOT NULL,
+            limit_value INTEGER NOT NULL,
+            used_value INTEGER DEFAULT 0,
+            reset_at TEXT NOT NULL
         )
         """)
 
@@ -75,9 +79,6 @@ def init_db():
 
 
 def insert_template(tenant_id: str, name: str, path: str, category: str, tags: list = None):
-    """
-    Insert a new template record.
-    """
     try:
         conn = get_connection()
         cur = conn.cursor()
@@ -99,9 +100,6 @@ def insert_template(tenant_id: str, name: str, path: str, category: str, tags: l
 
 
 def get_templates(tenant_id: str, category: str = None, include_deleted: bool = False):
-    """
-    Retrieve templates for a tenant (optionally filter by category).
-    """
     try:
         conn = get_connection()
         cur = conn.cursor()
@@ -125,9 +123,6 @@ def get_templates(tenant_id: str, category: str = None, include_deleted: bool = 
 
 
 def soft_delete_template(template_id: int, tenant_id: str):
-    """
-    Mark a template as deleted (soft delete).
-    """
     try:
         conn = get_connection()
         cur = conn.cursor()
@@ -140,41 +135,46 @@ def soft_delete_template(template_id: int, tenant_id: str):
         handle_error(e, code="DB_TEMPLATE_DELETE_001", raise_it=True)
 
 
-def insert_audit_event(tenant_id: str, user_id: str, action: str, metadata: dict = None):
-    """
-    Insert a new audit event.
-    """
+def update_template_name(template_id: int, tenant_id: str, new_name: str, new_path: str):
     try:
         conn = get_connection()
         cur = conn.cursor()
         cur.execute("""
-        INSERT INTO audit_log (tenant_id, user_id, action, metadata, timestamp)
-        VALUES (?, ?, ?, ?, ?)
+        UPDATE templates SET name = ?, path = ? WHERE id = ? AND tenant_id = ?
+        """, (new_name, new_path, template_id, tenant_id))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        handle_error(e, code="DB_TEMPLATE_UPDATE_001", raise_it=True)
+
+
+def insert_audit_event(tenant_id: str, user_id: str, action: str, metadata: dict = None):
+    try:
+        ts = datetime.utcnow().isoformat()
+        metadata_str = json.dumps(metadata or {})
+        record_string = f"{tenant_id}|{user_id}|{action}|{metadata_str}|{ts}"
+        record_hash = hashlib.sha256(record_string.encode()).hexdigest()
+
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+        INSERT INTO audit_log (tenant_id, user_id, action, metadata, hash, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?)
         """, (
             tenant_id,
             user_id,
             action,
-            json.dumps(metadata or {}),
-            datetime.utcnow().isoformat()
+            metadata_str,
+            record_hash,
+            ts
         ))
         conn.commit()
         conn.close()
     except Exception as e:
         handle_error(e, code="DB_AUDIT_INSERT_001", raise_it=True)
 
-def update_template_name(template_id: int, tenant_id: str, new_name: str, new_path: str):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
-    UPDATE templates SET name = ?, path = ? WHERE id = ? AND tenant_id = ?
-    """, (new_name, new_path, template_id, tenant_id))
-    conn.commit()
-    conn.close()
 
 def get_audit_events(tenant_id: str, user_id: str = None, action: str = None, limit: int = 50):
-    """
-    Retrieve audit events for a tenant with optional filters.
-    """
     try:
         conn = get_connection()
         cur = conn.cursor()
@@ -193,9 +193,57 @@ def get_audit_events(tenant_id: str, user_id: str = None, action: str = None, li
         params.append(limit)
 
         cur.execute(query, params)
-        rows = [dict(row) for row in cur.fetchall()]
+        rows = []
+        for row in cur.fetchall():
+            row_dict = dict(row)
+            record_string = f"{row_dict['tenant_id']}|{row_dict.get('user_id')}|{row_dict['action']}|{row_dict.get('metadata', '{}')}|{row_dict['timestamp']}"
+            expected_hash = hashlib.sha256(record_string.encode()).hexdigest()
+            row_dict["tampered"] = (row_dict["hash"] != expected_hash)
+            rows.append(row_dict)
         conn.close()
         return rows
 
     except Exception as e:
         handle_error(e, code="DB_AUDIT_GET_001", raise_it=True)
+
+
+def get_quota(tenant_id: str, key: str):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+        SELECT * FROM quotas WHERE tenant_id = ? AND key = ?
+        """, (tenant_id, key))
+        row = cur.fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except Exception as e:
+        handle_error(e, code="DB_QUOTA_GET_001", raise_it=True)
+
+
+def set_quota(tenant_id: str, key: str, limit_value: int, reset_at: str):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+        INSERT INTO quotas (tenant_id, key, limit_value, used_value, reset_at)
+        VALUES (?, ?, ?, 0, ?)
+        ON CONFLICT(tenant_id, key) DO UPDATE SET limit_value = excluded.limit_value, reset_at = excluded.reset_at
+        """, (tenant_id, key, limit_value, reset_at))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        handle_error(e, code="DB_QUOTA_SET_001", raise_it=True)
+
+
+def increment_quota_usage(tenant_id: str, key: str, amount: int = 1):
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute("""
+        UPDATE quotas SET used_value = used_value + ? WHERE tenant_id = ? AND key = ?
+        """, (amount, tenant_id, key))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        handle_error(e, code="DB_QUOTA_INCREMENT_001", raise_it=True)

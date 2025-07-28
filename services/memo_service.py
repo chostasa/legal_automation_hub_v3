@@ -1,5 +1,6 @@
 import os
 import html
+import asyncio
 from core.security import sanitize_text, redact_log, mask_phi
 from core.error_handling import handle_error
 from utils.docx_utils import replace_text_in_docx_all
@@ -7,8 +8,9 @@ from services.openai_client import safe_generate
 from utils.token_utils import trim_to_token_limit
 from utils.thread_utils import run_in_thread
 from logger import logger
+from core.usage_tracker import check_quota_and_decrement
+from core.auth import get_tenant_id
 
-# === Import Guidelines & Examples ===
 from core.prompts.memo_guidelines import FULL_SAFETY_PROMPT
 from core.prompts.memo_examples import (
     INTRO_EXAMPLE,
@@ -27,7 +29,6 @@ from core.generators.quote_parser import (
     generate_quotes_in_chunks
 )
 
-# === System Messages ===
 INTRO_MSG = "Draft a concise, persuasive Introduction."
 PARTIES_MSG = "Summarize parties' roles without redundancy."
 PLAINTIFF_MSG = "Write a single plaintiff's role-based paragraph."
@@ -38,13 +39,11 @@ HARMS_MSG = "Draft a persuasive Harms & Losses section showing impact."
 FUTURE_MSG = "Draft the Future Medical Expenses section."
 CONCLUSION_MSG = "Draft a strong Conclusion with litigation readiness."
 
-# === Polishing Helpers ===
 def polish_section(text: str, context: str = "", test_mode: bool = False) -> str:
-    """Polish each section for clarity, conciseness, and legal tone."""
     if not text.strip():
         return ""
     try:
-        if test_mode:  # Test hook to skip GPT calls during unit tests
+        if test_mode:
             return text.strip()
         prompt = f"""
 {FULL_SAFETY_PROMPT}
@@ -61,16 +60,14 @@ Context: {context}
 Section:
 {text}
 """
-        return safe_generate(prompt=prompt, model="gpt-4")
+        return asyncio.run(safe_generate(prompt=prompt, model="gpt-4"))
     except Exception as e:
         handle_error(e, code="MEMO_POLISH_001", user_message="Failed to polish memo section.")
         return text
 
-
 def final_polish_memo(memo_data: dict, test_mode: bool = False) -> dict:
-    """Perform a final full-memo polish for redundancy, narrative flow, and formatting."""
     try:
-        if test_mode:  # Test hook
+        if test_mode:
             return memo_data
         joined = "\n\n".join([f"## {k}\n{v}" for k, v in memo_data.items()])
         prompt = f"""
@@ -87,9 +84,7 @@ Perform a final, full-memo polish:
 Memo:
 {joined}
 """
-        cleaned = safe_generate(prompt=prompt, model="gpt-4")
-
-        # Split back into sections
+        cleaned = asyncio.run(safe_generate(prompt=prompt, model="gpt-4"))
         new_data = {}
         for section in memo_data.keys():
             marker = f"## {section}"
@@ -102,12 +97,9 @@ Memo:
         handle_error(e, code="MEMO_POLISH_002", user_message="Final polish failed. Returning unpolished memo.")
         return memo_data
 
-
-# === Quote Extraction ===
 def generate_quotes_from_raw_depo(raw_text: str, categories: list, test_mode: bool = False) -> dict:
-    """Extract and categorize quotes from deposition transcript text."""
     try:
-        if test_mode:  # Test hook
+        if test_mode:
             return {cat.lower().replace(" ", "_") + "_quotes": "Test Quote" for cat in categories}
         lines = normalize_deposition_lines(raw_text)
         qa_text = merge_multiline_qas(lines)
@@ -117,13 +109,11 @@ def generate_quotes_from_raw_depo(raw_text: str, categories: list, test_mode: bo
         handle_error(e, code="MEMO_QUOTES_001", user_message="Failed to extract quotes from deposition.")
         return {}
 
-
 def curate_quotes_for_section(section_name: str, quotes: str, context: str, test_mode: bool = False) -> str:
-    """Select the most relevant quotes for a section from a larger quote pool."""
     if not quotes.strip():
         return ""
     try:
-        if test_mode:  # Test hook
+        if test_mode:
             return quotes.strip()
         prompt = f"""
 {FULL_SAFETY_PROMPT}
@@ -139,16 +129,13 @@ Make sure each selected quote directly supports the section's legal or factual a
 Context:
 {context}
 """
-        curated = safe_generate(prompt=prompt, model="gpt-4")
+        curated = asyncio.run(safe_generate(prompt=prompt, model="gpt-4"))
         return curated.strip()
     except Exception as e:
         handle_error(e, code="MEMO_QUOTES_002", user_message=f"Failed to curate quotes for {section_name}.")
         return ""
 
-
-# === Main Memo Generation ===
 def generate_memo_from_fields(data: dict, template_path: str, output_dir: str, test_mode: bool = False) -> tuple:
-    """Main orchestration of memo generation using GPT and template population."""
     try:
         if not template_path or not os.path.exists(template_path):
             handle_error(
@@ -158,11 +145,13 @@ def generate_memo_from_fields(data: dict, template_path: str, output_dir: str, t
                 raise_it=True
             )
 
+        tenant_id = get_tenant_id()
+        check_quota_and_decrement(tenant_id, "memo_generation")
+
         memo_data = {}
         plaintiffs = data.get("plaintiffs", "")
         defendants = data.get("defendants", "")
 
-        # Curate quotes for Facts and Harms
         liability_quotes = curate_quotes_for_section(
             "Facts & Liability", data.get("liability_quotes", ""), data.get('complaint_narrative', ''), test_mode=test_mode
         )
@@ -170,7 +159,6 @@ def generate_memo_from_fields(data: dict, template_path: str, output_dir: str, t
             "Harms & Losses", data.get("damages_quotes", ""), data.get('medical_summary', ''), test_mode=test_mode
         )
 
-        # === Generate Sections ===
         intro_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -186,11 +174,10 @@ Example:
 {INTRO_EXAMPLE}
 """
         memo_data["Introduction"] = polish_section(
-            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(intro_prompt, 3000), model="gpt-4", system_msg=INTRO_MSG)),
+            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(intro_prompt, 3000), model="gpt-4", system_msg=INTRO_MSG))),
             test_mode=test_mode
         )
 
-        # Plaintiffs
         parties_block = []
         for i in range(1, 4):
             name = data.get(f"plaintiff{i}", "").strip()
@@ -209,14 +196,13 @@ Example:
 {PLAINTIFF_STATEMENT_EXAMPLE}
 """
                 memo_data[f"Plaintiff_{i}"] = polish_section(
-                    run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(plaintiff_prompt, 2500), model="gpt-4", system_msg=PLAINTIFF_MSG)),
+                    run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(plaintiff_prompt, 2500), model="gpt-4", system_msg=PLAINTIFF_MSG))),
                     test_mode=test_mode
                 )
                 parties_block.append(memo_data[f"Plaintiff_{i}"])
             else:
                 memo_data[f"Plaintiff_{i}"] = ""
 
-        # Defendants
         for i in range(1, 8):
             name = data.get(f"defendant{i}", "").strip()
             if name:
@@ -234,7 +220,7 @@ Example:
 {DEFENDANT_STATEMENT_EXAMPLE}
 """
                 memo_data[f"Defendant_{i}"] = polish_section(
-                    run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(defendant_prompt, 2500), model="gpt-4", system_msg=DEFENDANT_MSG)),
+                    run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(defendant_prompt, 2500), model="gpt-4", system_msg=DEFENDANT_MSG))),
                     test_mode=test_mode
                 )
                 parties_block.append(memo_data[f"Defendant_{i}"])
@@ -252,11 +238,10 @@ Ensure:
 - No redundancy or repetition of accident details
 """
         memo_data["Parties"] = polish_section(
-            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(parties_prompt, 3000), model="gpt-4", system_msg=PARTIES_MSG)),
+            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(parties_prompt, 3000), model="gpt-4", system_msg=PARTIES_MSG))),
             test_mode=test_mode
         )
 
-        # Facts & Liability
         facts_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -274,11 +259,10 @@ Example:
 {FACTS_LIABILITY_EXAMPLE}
 """
         memo_data["Facts_Liability"] = polish_section(
-            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(facts_prompt, 3500), model="gpt-4", system_msg=FACTS_MSG)),
+            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(facts_prompt, 3500), model="gpt-4", system_msg=FACTS_MSG))),
             test_mode=test_mode
         )
 
-        # Causation/Injuries
         causation_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -294,11 +278,10 @@ Example:
 {CAUSATION_EXAMPLE}
 """
         memo_data["Causation_Injuries_Treatment"] = polish_section(
-            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(causation_prompt, 3000), model="gpt-4", system_msg=CAUSATION_MSG)),
+            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(causation_prompt, 3000), model="gpt-4", system_msg=CAUSATION_MSG))),
             test_mode=test_mode
         )
 
-        # Harms & Losses
         harms_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -316,11 +299,10 @@ Example:
 {HARMS_EXAMPLE}
 """
         memo_data["Additional_Harms_Losses"] = polish_section(
-            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(harms_prompt, 3000), model="gpt-4", system_msg=HARMS_MSG)),
+            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(harms_prompt, 3000), model="gpt-4", system_msg=HARMS_MSG))),
             test_mode=test_mode
         )
 
-        # Future Medical Bills
         future_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -336,11 +318,10 @@ Example:
 {FUTURE_BILLS_EXAMPLE}
 """
         memo_data["Future_Medical_Bills"] = polish_section(
-            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(future_prompt, 2500), model="gpt-4", system_msg=FUTURE_MSG)),
+            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(future_prompt, 2500), model="gpt-4", system_msg=FUTURE_MSG))),
             test_mode=test_mode
         )
 
-        # Conclusion
         conclusion_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -356,7 +337,7 @@ Example:
 {CONCLUSION_EXAMPLE}
 """
         memo_data["Conclusion"] = polish_section(
-            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(conclusion_prompt, 2500), model="gpt-4", system_msg=CONCLUSION_MSG)),
+            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(conclusion_prompt, 2500), model="gpt-4", system_msg=CONCLUSION_MSG))),
             test_mode=test_mode
         )
 
@@ -395,9 +376,7 @@ Example:
             raise_it=True
         )
 
-
 def generate_plaintext_memo(data: dict) -> str:
-    """Generate a plaintext version of the memo for preview."""
     try:
         sections = [
             "Introduction", "Parties", "Facts_Liability",

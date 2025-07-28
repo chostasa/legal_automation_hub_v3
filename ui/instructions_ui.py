@@ -1,9 +1,21 @@
 import streamlit as st
 from core.error_handling import handle_error
+from core.auth import get_user_role, get_tenant_branding, get_tenant_id
+from core.usage_tracker import get_quota_status
 
 def run_ui():
     try:
-        st.title("📖 Legal Automation Hub: Full Instructions & Training")
+        tenant_id = get_tenant_id()
+        branding = get_tenant_branding(tenant_id)
+        st.title(f"📖 {branding.get('firm_name', 'Legal Automation Hub')}: Full Instructions & Training")
+
+        current_role = get_user_role()
+        if current_role != "admin":
+            st.warning("You are viewing limited instructions based on your role.")
+
+        quota_info = get_quota_status()
+        if quota_info:
+            st.info(f"Remaining Quota - Documents: {quota_info.get('documents', 'N/A')}, Tokens: {quota_info.get('openai_tokens', 'N/A')}")
 
         st.markdown("""
 # ⚡ Welcome to the Legal Automation Hub  
