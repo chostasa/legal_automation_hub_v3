@@ -5,10 +5,8 @@ from core.error_handling import handle_error
 from utils.file_utils import sanitize_filename
 from core.audit import log_audit_event
 
+
 def get_session_id() -> str:
-    """
-    Returns the current session_id, or creates a new one in Streamlit's session_state.
-    """
     try:
         if "session_id" not in st.session_state:
             st.session_state["session_id"] = str(uuid.uuid4())
@@ -17,14 +15,11 @@ def get_session_id() -> str:
         handle_error(e, "SESSION_UTILS_001")
         raise
 
+
 def get_session_temp_dir(base_dir: str = "data") -> str:
-    """
-    Creates and returns the tenant/session-specific temp directory.
-    """
     try:
-        # Lazy import to break circular dependency
+        # Lazy import
         from core.auth import get_tenant_id, get_user_id
-        
         tenant_id = get_tenant_id()
         user_id = get_user_id()
         session_id = get_session_id()
@@ -41,50 +36,39 @@ def get_session_temp_dir(base_dir: str = "data") -> str:
             "session_id": session_id,
             "path": path
         })
-
         return path
     except Exception as e:
         handle_error(e, "SESSION_UTILS_002")
         raise
 
+
 def enforce_quota(event_type: str, amount: int = 1) -> None:
-    """
-    Ensures the tenant has enough quota left for an event type, updates usage if allowed.
-    """
     try:
-        # Lazy import for auth and usage_tracker
+        # Lazy import
         from core.auth import get_tenant_id, get_user_id
         from core.usage_tracker import check_quota, increment_quota_usage
 
         tenant_id = get_tenant_id()
         user_id = get_user_id()
-
         if not check_quota(tenant_id, user_id, event_type, amount):
             handle_error(
                 Exception(f"Quota exceeded for {event_type}"),
                 "SESSION_UTILS_003"
             )
             raise RuntimeError(f"Quota exceeded for {event_type}")
-
         increment_quota_usage(tenant_id, user_id, event_type, amount)
     except Exception as e:
         handle_error(e, "SESSION_UTILS_004")
         raise
 
+
 def require_admin_role() -> None:
-    """
-    Enforces that the current user has admin privileges.
-    """
     try:
         # Lazy import
         from core.auth import get_user_role
-
         role = get_user_role()
         if role.lower() != "admin":
-            handle_error(
-                Exception("Admin privileges required."),
-                "SESSION_UTILS_005"
-            )
+            handle_error(Exception("Admin privileges required."), "SESSION_UTILS_005")
             raise PermissionError("Admin privileges required.")
     except Exception as e:
         handle_error(e, "SESSION_UTILS_006")

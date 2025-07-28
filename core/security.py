@@ -3,14 +3,14 @@ import html
 import functools
 import time
 from core.error_handling import handle_error
-from core.usage_tracker import check_quota, increment_quota
 
 SAFE_FILENAME_CHARS = r"[^a-zA-Z0-9_\-\.]"
-SAFE_TEXT_CHARS = r"[^a-zA-Z0-9\s,\.\-_'\"\(\)\[\]@:]"
+SAFE_TEXT_CHARS = r"[^a-zA-Z0-9\s,\.\-_'\"\(\)\[\]@:]" 
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_REQUESTS = 100
 
 _rate_limit_cache = {}
+
 
 def sanitize_email(email: str) -> str:
     try:
@@ -69,6 +69,8 @@ def enforce_quota(event_type: str):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            # Lazy import to avoid circular import
+            from core.usage_tracker import check_quota, increment_quota
             if not check_quota(event_type):
                 raise RuntimeError(f"Quota exceeded for {event_type}")
             result = func(*args, **kwargs)

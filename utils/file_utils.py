@@ -4,7 +4,6 @@ import html
 from lxml import etree
 from utils.template_engine import render_docx_placeholders
 from docx import Document
-from core.security import mask_phi, redact_log
 from core.error_handling import handle_error
 from utils.file_utils import validate_file_size
 from core.audit import log_audit_event
@@ -23,6 +22,7 @@ TARGET_XML_FILES = [
     "word/vbaProject.bin"
 ]
 
+
 def _hash_template_version(file_path: str) -> str:
     """
     Compute SHA256 hash for template version tracking.
@@ -33,10 +33,14 @@ def _hash_template_version(file_path: str) -> str:
     except Exception as e:
         handle_error(e, code="DOCX_HASH_001", raise_it=True)
 
+
 def _scan_for_macros(docx_path: str):
     """
     Scan the template for suspicious macros and log them.
     """
+    # Lazy import to avoid circular import
+    from core.security import mask_phi, redact_log
+
     try:
         if not os.path.exists(docx_path):
             raise FileNotFoundError(f"File does not exist: {docx_path}")
@@ -50,11 +54,15 @@ def _scan_for_macros(docx_path: str):
     except Exception as e:
         handle_error(e, code="DOCX_MACRO_001", raise_it=True)
 
+
 def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str) -> str:
     """
     Replace placeholders in all major parts of a Word template,
     write to a new versioned file, and log the version.
     """
+    # Lazy import to avoid circular import
+    from core.security import mask_phi, redact_log
+
     try:
         if not isinstance(replacements, dict):
             raise ValueError("Replacements must be provided as a dictionary.")
@@ -123,6 +131,7 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
 
     except Exception as e:
         handle_error(e, code="DOCX_REPLACE_001", raise_it=True)
+
 
 def sanitize_filename(filename: str) -> str:
     """
