@@ -4,7 +4,7 @@ import hashlib
 import json
 
 from utils.file_utils import clean_temp_dir
-from utils.session_utils import get_session_temp_dir
+from core.session_utils import get_session_temp_dir
 from core.security import sanitize_text, redact_log, mask_phi
 from core.cache_utils import clear_caches
 from core.audit import log_audit_event

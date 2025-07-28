@@ -9,7 +9,8 @@ from io import BytesIO
 from utils.docx_utils import replace_text_in_docx_all
 from core.session_utils import get_session_temp_dir
 from utils.file_utils import clean_temp_dir
-from core.security import sanitize_text, sanitize_filename, redact_log, mask_phi
+from core.security import sanitize_text, redact_log, mask_phi
+from utils.file_utils import sanitize_filename
 from core.error_handling import handle_error
 from logger import logger
 from core.audit import log_audit_event

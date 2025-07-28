@@ -4,7 +4,8 @@ import json
 from datetime import datetime
 
 from core.auth import get_tenant_id, get_user_id, get_user_role, get_tenant_branding
-from core.security import sanitize_filename, redact_log, mask_phi
+from utils.file_utils import sanitize_filename
+from core.security import redact_log, mask_phi
 from core.audit import log_audit_event
 from core.cache_utils import clear_caches
 from core.error_handling import handle_error

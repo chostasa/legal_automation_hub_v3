@@ -4,7 +4,7 @@ import hashlib
 import asyncio
 from datetime import datetime
 
-from utils.session_utils import get_session_temp_dir
+from core.session_utils import get_session_temp_dir
 from core.security import sanitize_text, sanitize_filename, redact_log, mask_phi
 from services.foia_service import generate_foia_request
 from core.usage_tracker import log_usage, check_quota, decrement_quota

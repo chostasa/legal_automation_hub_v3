@@ -3,7 +3,7 @@ import os
 import hashlib
 from datetime import datetime
 
-from core.session import get_session_temp_dir
+from core.session_utils import get_session_temp_dir
 from core.security import sanitize_text, sanitize_filename, redact_log, mask_phi
 from core.constants import demand_template as TEMPLATE_DEMAND
 from services.demand_service import generate_demand_letter

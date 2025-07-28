@@ -1,12 +1,14 @@
 import streamlit as st
+import pandas as pd
+import datetime
+import json
+
 from core.auth import get_tenant_id, get_user_id, get_user_role, get_tenant_branding
 from core.audit import fetch_audit_events
 from core.error_handling import handle_error
 from core.usage_tracker import get_usage_summary
 from logger import logger
-import pandas as pd
-import datetime
-import json
+
 
 def run_ui():
     try:
@@ -25,15 +27,17 @@ def run_ui():
         action_filter = st.text_input("🔎 Filter by Action (optional)")
         limit = st.slider("Results Limit", min_value=10, max_value=200, value=50, step=10)
 
+        # Metrics section
         with st.expander("📊 Audit Log Metrics"):
             try:
-                usage_summary = get_usage_summary(tenant_id, get_user_id())
+                usage_summary = get_usage_summary(tenant_id, get_user_id()) or {}
                 st.write("🔹 Total Audit Events:", usage_summary.get("audit_events", 0))
                 st.write("🔹 Failed Audit Events:", usage_summary.get("audit_failures", 0))
             except Exception as metric_err:
-                logger.warning(f"Failed to load audit metrics: {metric_err}")
+                logger.warning(f"[AUDIT_UI] Failed to load audit metrics: {metric_err}")
                 st.write("⚠️ Unable to load audit metrics.")
 
+        # Load audit logs
         with st.spinner("Loading audit logs..."):
             logs = fetch_audit_events(
                 user_id=user_id_filter.strip() if isinstance(user_id_filter, str) else user_id_filter,
@@ -41,6 +45,7 @@ def run_ui():
                 limit=limit
             )
 
+        # Display results
         if logs:
             st.success(f"✅ Found {len(logs)} audit events")
             st.dataframe(logs, use_container_width=True)
@@ -69,9 +74,11 @@ def run_ui():
                     file_name=f"audit_logs_{datetime.datetime.now().strftime('%Y%m%d')}.json",
                     mime="application/json"
                 )
+
         else:
             st.info("No audit events match your filter.")
 
     except Exception as e:
+        logger.exception(f"[AUDIT_UI] Unexpected error: {e}")
         msg = handle_error(e, code="AUDIT_UI_001")
         st.error(msg)

@@ -5,7 +5,7 @@ import yaml
 from io import BytesIO
 
 from utils.docx_utils import replace_text_in_docx_all
-from utils.session_utils import get_session_temp_dir
+from core.session import get_session_temp_dir
 from utils.file_utils import clean_temp_dir
 from core.security import redact_log, mask_phi, sanitize_filename
 from core.auth import get_tenant_id, get_user_role
