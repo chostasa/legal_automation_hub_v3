@@ -1,6 +1,6 @@
 import pandas as pd
 import asyncio
-from services.openai_client import safe_generate
+from services.openai_client import OpenAIClient
 from core.prompts.prompt_factory import build_prompt
 from core.security import sanitize_text, mask_phi, redact_log
 from core.error_handling import handle_error
@@ -41,7 +41,8 @@ async def generate_style_mimic_output(example_paragraphs: list[str], new_input: 
             return f"[MOCKED_STYLE] {new_input}"
 
         check_quota("openai_tokens", amount=1)
-        styled_output = await safe_generate(prompt, model="gpt-4", temperature=0.7)
+        client = OpenAIClient()
+        styled_output = await client.safe_generate(prompt, model="gpt-4", temperature=0.7)
         decrement_quota("openai_tokens", amount=1)
 
         if not styled_output.strip():
