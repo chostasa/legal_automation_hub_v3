@@ -13,6 +13,7 @@ from logger import logger
 from core.db import get_templates, insert_audit_event
 from utils.docx_utils import replace_text_in_docx_all
 from services.dropbox_client import DropboxClient
+from core.constants import DROPBOX_TEMPLATES_ROOT  # FIXED: import constant
 
 CATEGORIES = {
     "Mediation Memo": "mediation",
@@ -64,7 +65,7 @@ def run_ui():
                 try:
                     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
                     versioned_name = f"{timestamp}_{sanitize_filename(uploaded_template.name)}"
-                    dropbox_path = f"{client.config.DROPBOX_TEMPLATES_ROOT}/{selected_category}/{versioned_name}"
+                    dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{versioned_name}"
 
                     # Upload directly to Dropbox
                     client.dbx.files_upload(
@@ -135,8 +136,8 @@ def run_ui():
                         )
                         if st.button("Rename", key=f"rename_btn_{t['id']}"):
                             try:
-                                old_path = f"{client.config.DROPBOX_TEMPLATES_ROOT}/{selected_category}/{t['name']}"
-                                new_path = f"{client.config.DROPBOX_TEMPLATES_ROOT}/{selected_category}/{sanitize_filename(new_name)}.docx"
+                                old_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{t['name']}"
+                                new_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{sanitize_filename(new_name)}.docx"
                                 client.dbx.files_move_v2(old_path, new_path, autorename=False)
                                 st.success(f"✅ Renamed to {new_name}.docx")
 
@@ -155,7 +156,7 @@ def run_ui():
                     with col3:
                         if st.button("🗑️ Delete", key=f"delete_{t['id']}"):
                             try:
-                                dropbox_path = f"{client.config.DROPBOX_TEMPLATES_ROOT}/{selected_category}/{t['name']}"
+                                dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{t['name']}"
                                 client.dbx.files_delete_v2(dropbox_path)
                                 st.success(f"✅ Deleted {t['name']}")
 
