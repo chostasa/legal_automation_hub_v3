@@ -10,7 +10,7 @@ from core.security import redact_log, mask_phi
 from core.usage_tracker import log_usage, check_quota, get_usage_summary
 from core.auth import get_user_id, get_tenant_id, get_tenant_branding
 from core.audit import log_audit_event
-from core.error_handling import handle_error
+from core.error_handling import handle_error, AppError
 from logger import logger
 from utils.file_utils import clean_temp_dir
 from core.db import get_templates
@@ -61,6 +61,11 @@ def run_ui():
     # Download the template from Dropbox locally
     try:
         template_path = download_template_file("email", selected_template_name)
+        # Normalize template path: remove any duplicates and extra extension
+        template_path = os.path.normpath(template_path)
+        if template_path.endswith(".txt.txt"):
+            template_path = template_path.replace(".txt.txt", ".txt")
+
         if not os.path.exists(template_path):
             st.error(f"❌ Template file not found locally: {template_path}")
             return
@@ -129,7 +134,7 @@ def run_ui():
                     st.warning(f"⚠️ Skipping {row_data['Client Name']} - missing email.")
                     continue
 
-                # Build email using template_path as-is (no additional manipulation)
+                # Build email using template_path
                 subject, body, cc, client = asyncio.run(build_email(row_data, template_path))
 
                 subject_key = f"subject_{i}"

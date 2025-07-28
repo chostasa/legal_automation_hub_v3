@@ -38,20 +38,24 @@ async def build_email(client_data: dict, template_path: str) -> tuple:
                 details=f"Row data: {client_data}",
             )
 
-        # Ensure the template exists at the specified path
-        if not template_path or not os.path.exists(template_path):
+        # Normalize the template path: remove any duplicate folders or extensions
+        normalized_template_path = os.path.normpath(template_path)
+        if normalized_template_path.endswith(".txt.txt"):
+            normalized_template_path = normalized_template_path.replace(".txt.txt", ".txt")
+
+        if not os.path.exists(normalized_template_path):
             raise AppError(
                 code="EMAIL_BUILD_002",
-                message=f"Template path is invalid or missing: {template_path}",
+                message=f"Template path is invalid or missing: {normalized_template_path}",
                 details=f"Sanitized data: {sanitized}",
             )
 
-        # Merge the template using the correct path
-        subject, body, cc = merge_template(template_path, sanitized)
+        # Merge the template using the correct normalized path
+        subject, body, cc = merge_template(normalized_template_path, sanitized)
         if not subject or not body:
             raise AppError(
                 code="EMAIL_BUILD_003",
-                message=f"Template merge failed for template: {template_path}",
+                message=f"Template merge failed for template: {normalized_template_path}",
                 details=f"Sanitized data: {sanitized}",
             )
 
@@ -68,7 +72,7 @@ async def build_email(client_data: dict, template_path: str) -> tuple:
             "tenant_id": get_tenant_id(),
             "user_id": get_user_id(),
             "client_name": sanitized.get("ClientName"),
-            "template_path": template_path,
+            "template_path": normalized_template_path,
         })
 
         return subject, body, cc, sanitized
