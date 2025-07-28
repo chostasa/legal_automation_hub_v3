@@ -12,18 +12,6 @@ RATE_LIMIT_REQUESTS = 100
 
 _rate_limit_cache = {}
 
-
-def sanitize_filename(value: str) -> str:
-    try:
-        if not isinstance(value, str):
-            raise ValueError("sanitize_filename expects a string")
-        value = re.sub(SAFE_FILENAME_CHARS, "_", value)
-        return value.strip("_")
-    except Exception as e:
-        handle_error(e, code="SECURITY_SANITIZE_FILENAME_ERR")
-        return "invalid_filename"
-
-
 def sanitize_email(email: str) -> str:
     try:
         if not isinstance(email, str):

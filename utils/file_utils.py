@@ -11,6 +11,7 @@ from core.audit import log_audit_event
 from logger import logger
 import hashlib
 import datetime
+import re
 
 NAMESPACES = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
 
@@ -122,3 +123,10 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
 
     except Exception as e:
         handle_error(e, code="DOCX_REPLACE_001", raise_it=True)
+
+def sanitize_filename(filename: str) -> str:
+    """
+    Remove invalid filename characters and return a clean name.
+    """
+    filename = re.sub(r'[<>:"/\\|?*]', '', filename)
+    return filename.strip() or "untitled"

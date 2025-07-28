@@ -1,6 +1,4 @@
 import traceback
-from datetime import datetime
-from core.auth import get_tenant_id, get_user_id
 from logger import logger
 
 class AppError(Exception):
@@ -20,14 +18,16 @@ class AppError(Exception):
 def handle_error(e: Exception, code: str = "GENERIC_000", user_message: str = None, raise_it: bool = False):
     """
     Centralized error handler.
-    - Logs detailed stack trace and context (tenant, user).
-    - Returns a user-facing message with error code for UI display.
-    - Optionally raises an AppError for upstream handling.
     """
-    tenant_id = get_tenant_id() or "UNKNOWN_TENANT"
-    user_id = get_user_id() or "UNKNOWN_USER"
+    try:
+        from core.auth import get_tenant_id, get_user_id
+        tenant_id = get_tenant_id() or "UNKNOWN_TENANT"
+        user_id = get_user_id() or "UNKNOWN_USER"
+    except ImportError:
+        tenant_id = "UNKNOWN_TENANT"
+        user_id = "UNKNOWN_USER"
 
-    # Lazy import to avoid circular import
+    # Lazy import for mask_phi and redact_log
     try:
         from core.security import mask_phi, redact_log
         error_str = mask_phi(redact_log(str(e)))
@@ -52,11 +52,14 @@ def handle_error(e: Exception, code: str = "GENERIC_000", user_message: str = No
 
 
 def log_warning(msg: str, code: str = "GENERIC_WARN", context: dict = None):
-    """
-    Centralized warning logger with tenant/user context.
-    """
-    tenant_id = get_tenant_id() or "UNKNOWN_TENANT"
-    user_id = get_user_id() or "UNKNOWN_USER"
+    try:
+        from core.auth import get_tenant_id, get_user_id
+        tenant_id = get_tenant_id() or "UNKNOWN_TENANT"
+        user_id = get_user_id() or "UNKNOWN_USER"
+    except ImportError:
+        tenant_id = "UNKNOWN_TENANT"
+        user_id = "UNKNOWN_USER"
+
     ctx = f" ctx={context}" if context else ""
 
     try:
@@ -69,11 +72,14 @@ def log_warning(msg: str, code: str = "GENERIC_WARN", context: dict = None):
 
 
 def log_info(msg: str, code: str = "GENERIC_INFO", context: dict = None):
-    """
-    Centralized info logger with tenant/user context.
-    """
-    tenant_id = get_tenant_id() or "UNKNOWN_TENANT"
-    user_id = get_user_id() or "UNKNOWN_USER"
+    try:
+        from core.auth import get_tenant_id, get_user_id
+        tenant_id = get_tenant_id() or "UNKNOWN_TENANT"
+        user_id = get_user_id() or "UNKNOWN_USER"
+    except ImportError:
+        tenant_id = "UNKNOWN_TENANT"
+        user_id = "UNKNOWN_USER"
+
     ctx = f" ctx={context}" if context else ""
 
     try:
