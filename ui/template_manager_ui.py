@@ -17,7 +17,8 @@ CATEGORIES = {
     "Mediation Memo": "mediation",
     "Demand Letter": "demand",
     "FOIA Letter": "foia",
-    "Batch Documents": "batch_docs"
+    "Batch Documents": "batch_docs",
+    "Email Templates": "email"
 }
 
 def get_dir(base_dir: str, tenant_id: str, category: str) -> str:
