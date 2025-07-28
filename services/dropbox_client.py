@@ -5,6 +5,7 @@ from config import AppConfig, get_config
 from core.error_handling import handle_error
 from logger import logger
 
+
 class DropboxClient:
     def __init__(self, config: AppConfig = None):
         self.config = config or get_config()
@@ -17,9 +18,11 @@ class DropboxClient:
         except Exception as e:
             handle_error(e, code="DROPBOX_INIT_001", raise_it=True)
 
-    def download_dashboard_df(self, file_path: str = None, sheet_name: str = "Master Dashboard") -> pd.DataFrame:
+    def download_dashboard_df(
+        self, file_path: str = None, sheet_name: str = "Master Dashboard"
+    ) -> pd.DataFrame:
         """
-        Synchronous version: Download the dashboard Excel from Dropbox and return as DataFrame.
+        Instance method: Download the dashboard Excel from Dropbox and return as DataFrame.
         """
         path = file_path or self.config.DROPBOX_MASTER_DASHBOARD_PATH
 
@@ -32,8 +35,22 @@ class DropboxClient:
             if df.empty:
                 raise ValueError(f"Downloaded Excel is empty for path: {path}")
 
-            logger.info(f"[DROPBOX_DOWNLOAD] 📥 Downloaded dashboard from {path} ({len(df)} rows)")
+            logger.info(
+                f"[DROPBOX_DOWNLOAD] 📥 Downloaded dashboard from {path} ({len(df)} rows)"
+            )
             return df
 
         except Exception as e:
             handle_error(e, code="DROPBOX_DOWNLOAD_001", raise_it=True)
+
+
+# === Global helper to match old imports ===
+def download_dashboard_df(
+    file_path: str = None, sheet_name: str = "Master Dashboard"
+) -> pd.DataFrame:
+    """
+    Global helper function to download the dashboard Excel from Dropbox.
+    This wraps DropboxClient for compatibility with modules importing it directly.
+    """
+    client = DropboxClient()
+    return client.download_dashboard_df(file_path=file_path, sheet_name=sheet_name)
