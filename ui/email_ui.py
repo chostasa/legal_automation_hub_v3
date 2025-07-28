@@ -61,8 +61,11 @@ def run_ui():
     # Download the template from Dropbox locally
     try:
         template_path = download_template_file("email", selected_template_name)
-        # Normalize template path: remove any duplicates and extra extension
+
+        # Final safety check for unexpected issues
         template_path = os.path.normpath(template_path)
+        if "templates/templates" in template_path:
+            template_path = template_path.replace("templates/templates", "templates")
         if template_path.endswith(".txt.txt"):
             template_path = template_path.replace(".txt.txt", ".txt")
 

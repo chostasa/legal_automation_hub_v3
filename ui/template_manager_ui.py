@@ -25,6 +25,7 @@ CATEGORIES = {
     "Email Templates": "email"
 }
 
+
 def run_ui():
     st.header("📪 Template & Style Example Manager")
 
@@ -69,7 +70,16 @@ def run_ui():
             if uploaded_template:
                 try:
                     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-                    versioned_name = f"{timestamp}_{sanitize_filename(uploaded_template.name)}"
+                    base_name = os.path.basename(uploaded_template.name)
+                    sanitized_name = sanitize_filename(base_name)
+
+                    # Fix duplicate extensions (e.g., .txt.txt)
+                    if sanitized_name.endswith(".txt.txt"):
+                        sanitized_name = sanitized_name.replace(".txt.txt", ".txt")
+                    elif sanitized_name.endswith(".docx.docx"):
+                        sanitized_name = sanitized_name.replace(".docx.docx", ".docx")
+
+                    versioned_name = f"{timestamp}_{sanitized_name}"
                     dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{versioned_name}"
 
                     # Save to Dropbox
@@ -141,12 +151,18 @@ def run_ui():
                         if st.button("Rename", key=f"rename_btn_{name}"):
                             try:
                                 old_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{name}"
-                                new_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{sanitize_filename(new_name)}.docx"
+                                clean_new_name = sanitize_filename(new_name)
+
+                                # Ensure no duplicate extension in rename
+                                if not clean_new_name.endswith(".docx"):
+                                    clean_new_name = f"{clean_new_name}.docx"
+
+                                new_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{clean_new_name}"
                                 client.dbx.files_move_v2(old_path, new_path, autorename=False)
-                                st.success(f"✅ Renamed to {new_name}.docx")
+                                st.success(f"✅ Renamed to {clean_new_name}")
                                 clear_caches()
 
-                                log_audit_event("Template Renamed", {"from": name, "to": f"{new_name}.docx"})
+                                log_audit_event("Template Renamed", {"from": name, "to": clean_new_name})
                                 st.rerun()
                             except Exception as e:
                                 msg = handle_error(e, code="TEMPLATE_UI_004")
@@ -190,7 +206,14 @@ def run_ui():
             uploaded_example = st.file_uploader("Upload Style Example (.txt)", type=["txt"], key="example_uploader")
             if uploaded_example:
                 try:
-                    example_path = os.path.join(example_dir, sanitize_filename(uploaded_example.name))
+                    base_name = os.path.basename(uploaded_example.name)
+                    sanitized_name = sanitize_filename(base_name)
+
+                    # Remove duplicate extensions
+                    if sanitized_name.endswith(".txt.txt"):
+                        sanitized_name = sanitized_name.replace(".txt.txt", ".txt")
+
+                    example_path = os.path.join(example_dir, sanitized_name)
                     with open(example_path, "wb") as f:
                         f.write(uploaded_example.read())
 
@@ -249,19 +272,23 @@ def run_ui():
                         )
                         if st.button("Rename", key=f"rename_ex_btn_{filename}"):
                             try:
-                                new_path = os.path.join(example_dir, sanitize_filename(new_name) + ".txt")
+                                clean_new_name = sanitize_filename(new_name)
+                                if not clean_new_name.endswith(".txt"):
+                                    clean_new_name = f"{clean_new_name}.txt"
+
+                                new_path = os.path.join(example_dir, clean_new_name)
                                 if os.path.exists(new_path):
                                     st.warning("⚠️ File with that name already exists.")
                                 else:
                                     os.rename(example_path, new_path)
                                     if os.path.exists(meta_path):
                                         os.rename(meta_path, new_path.replace(".txt", ".json"))
-                                    st.success(f"✅ Renamed to {new_name}.txt")
+                                    st.success(f"✅ Renamed to {clean_new_name}")
                                     clear_caches()
 
                                     log_audit_event("Style Example Renamed", {
                                         "from": filename,
-                                        "to": f"{new_name}.txt",
+                                        "to": clean_new_name,
                                         "tenant_id": tenant_id,
                                         "category": example_category,
                                         "module": "template_manager"

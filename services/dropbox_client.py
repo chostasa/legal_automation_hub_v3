@@ -78,10 +78,18 @@ class DropboxClient:
             handle_error(e, code="DROPBOX_LIST_001", raise_it=True)
 
     def download_file(self, dropbox_path: str, local_dir: str = "downloads") -> str:
-        """Download a file from Dropbox to a local directory and return the local path."""
+        """
+        Download a file from Dropbox to a local directory and return the local path.
+        Ensures that duplicate paths and extensions are cleaned.
+        """
         try:
             os.makedirs(local_dir, exist_ok=True)
             filename = os.path.basename(dropbox_path)
+
+            # Clean up duplicate extensions if any
+            if filename.endswith(".txt.txt"):
+                filename = filename.replace(".txt.txt", ".txt")
+
             local_path = os.path.join(local_dir, filename)
 
             metadata, res = self.dbx.files_download(dropbox_path)
@@ -133,7 +141,19 @@ def list_templates(category: str):
 
 
 def download_template_file(category: str, filename: str, local_dir="templates"):
+    """
+    Download a template file by category.
+    Sanitizes the filename to avoid duplicate paths/extensions.
+    """
     client = DropboxClient()
+
+    # Ensure filename is just the base name
+    filename = os.path.basename(filename)
+
+    # Fix duplicate extensions if any
+    if filename.endswith(".txt.txt"):
+        filename = filename.replace(".txt.txt", ".txt")
+
     path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{filename}"
     return client.download_file(path, local_dir)
 
@@ -145,6 +165,10 @@ def list_examples(module: str):
 
 
 def download_example_file(module: str, filename: str, local_dir="examples"):
+    """
+    Download example files safely, avoiding duplicate paths.
+    """
     client = DropboxClient()
+    filename = os.path.basename(filename)
     path = f"{DROPBOX_EXAMPLES_ROOT}/{module}/{filename}"
     return client.download_file(path, local_dir)
