@@ -39,8 +39,7 @@ def log_audit_event(action: str, metadata: dict = None):
             tenant_id=tenant_id,
             user_id=user_id,
             action=sanitize_text(action),
-            metadata=clean_metadata,     # ✅ Pass metadata properly
-            hash=audit_hash
+            metadata=clean_metadata,    
         )
 
         try:

@@ -24,7 +24,6 @@ CATEGORIES = {
     "Email Templates": "email"
 }
 
-
 def run_ui():
     st.header("📪 Template & Style Example Manager")
 
@@ -109,18 +108,19 @@ def run_ui():
             templates = get_templates(tenant_id=tenant_id, category=selected_category)
             matched_templates = [
                 t for t in templates
-                if search_filter in t["name"].lower() or search_filter in (
+                if search_filter in t.get("name", "").lower() or search_filter in (
                     "".join(json.loads(t.get("tags", "[]")))).lower()
             ]
 
             if matched_templates:
                 for t in matched_templates:
+                    name = t.get("name", "Unknown")
                     tags_raw = t.get("tags", "[]")
                     tags_list = json.loads(tags_raw) if tags_raw else []
 
                     col1, col2, col3 = st.columns([5, 2, 2])
                     with col1:
-                        st.write(f"**{t['name']}**")
+                        st.write(f"**{name}**")
                         if tags_list:
                             st.caption(f"🏷️ Tags: {', '.join(tags_list)}")
 
@@ -130,20 +130,20 @@ def run_ui():
 
                     with col2:
                         new_name = st.text_input(
-                            f"Rename {t['name']}",
-                            value=t['name'].replace(".docx", ""),
-                            key=f"rename_{t['id']}",
+                            f"Rename {name}",
+                            value=name.replace(".docx", ""),
+                            key=f"rename_{name}"
                         )
-                        if st.button("Rename", key=f"rename_btn_{t['id']}"):
+                        if st.button("Rename", key=f"rename_btn_{name}"):
                             try:
-                                old_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{t['name']}"
+                                old_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{name}"
                                 new_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{sanitize_filename(new_name)}.docx"
                                 client.dbx.files_move_v2(old_path, new_path, autorename=False)
                                 st.success(f"✅ Renamed to {new_name}.docx")
 
                                 clear_caches()
                                 log_audit_event("Template Renamed", {
-                                    "from": t["name"],
+                                    "from": name,
                                     "to": f"{new_name}.docx"
                                 })
                                 st.rerun()
@@ -152,15 +152,15 @@ def run_ui():
                                 st.error(msg)
 
                     with col3:
-                        if st.button("🗑️ Delete", key=f"delete_{t['id']}"):
+                        if st.button("🗑️ Delete", key=f"delete_{name}"):
                             try:
-                                dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{t['name']}"
+                                dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{name}"
                                 client.dbx.files_delete_v2(dropbox_path)
-                                st.success(f"✅ Deleted {t['name']}")
+                                st.success(f"✅ Deleted {name}")
 
                                 clear_caches()
                                 log_audit_event("Template Deleted", {
-                                    "filename": t["name"],
+                                    "filename": name,
                                     "category": selected_category
                                 })
                                 st.rerun()
@@ -175,7 +175,6 @@ def run_ui():
             st.error(msg)
 
     # ---------------- Tab 2 ----------------
-    # (Style examples remain local as they were)
     with tab2:
         try:
             selected_example_label = st.selectbox(
@@ -236,7 +235,7 @@ def run_ui():
                     matched_examples.append((e, meta.get("uploaded_at")))
 
             if matched_examples:
-                for filename, uploaded_at in matched_templates:
+                for filename, uploaded_at in matched_examples:
                     col1, col2, col3 = st.columns([5, 2, 2])
                     with col1:
                         st.write(f"🖋️ **{filename}**")
@@ -250,7 +249,7 @@ def run_ui():
                         new_name = st.text_input(
                             f"Rename {filename}",
                             value=filename.replace(".txt", ""),
-                            key=f"rename_ex_{filename}",
+                            key=f"rename_ex_{filename}"
                         )
                         if st.button("Rename", key=f"rename_ex_btn_{filename}"):
                             try:
