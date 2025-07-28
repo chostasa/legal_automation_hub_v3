@@ -26,3 +26,7 @@ foia_template = TEMPLATE_FOIA
 # 📧 Default Email Settings
 # ----------------------------
 DEFAULT_SENDER_EMAIL = os.getenv("DEFAULT_SENDER_EMAIL", "noreply@yourdomain.com")
+
+DROPBOX_TEMPLATES_ROOT = "/LegalAutomationHub/templates"
+DROPBOX_EXAMPLES_ROOT = "/LegalAutomationHub/examples"
+

@@ -4,6 +4,11 @@ import os
 import hashlib
 from datetime import datetime
 from core.error_handling import handle_error
+from services.dropbox_client import (
+    list_templates, list_examples,
+    upload_file_to_dropbox, delete_file_from_dropbox, move_file_in_dropbox
+)
+from core.constants import DROPBOX_TEMPLATES_ROOT, DROPBOX_EXAMPLES_ROOT
 
 DB_PATH = os.path.join("data", "legal_automation_hub.db")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -19,34 +24,10 @@ def get_connection():
 
 
 def init_db():
+    """Initialize DB tables for audit logs and quotas."""
     try:
         conn = get_connection()
         cur = conn.cursor()
-
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS templates (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tenant_id TEXT NOT NULL,
-            name TEXT NOT NULL,
-            path TEXT NOT NULL,
-            tags TEXT,
-            category TEXT NOT NULL,
-            uploaded_at TEXT NOT NULL,
-            deleted INTEGER DEFAULT 0
-        )
-        """)
-
-        cur.execute("""
-        CREATE TABLE IF NOT EXISTS examples (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tenant_id TEXT NOT NULL,
-            name TEXT NOT NULL,
-            path TEXT NOT NULL,
-            category TEXT NOT NULL,
-            uploaded_at TEXT NOT NULL,
-            deleted INTEGER DEFAULT 0
-        )
-        """)
 
         cur.execute("""
         CREATE TABLE IF NOT EXISTS audit_log (
@@ -78,75 +59,119 @@ def init_db():
         handle_error(e, code="DB_INIT_001", raise_it=True)
 
 
-def insert_template(tenant_id: str, name: str, path: str, category: str, tags: list = None):
-    try:
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("""
-        INSERT INTO templates (tenant_id, name, path, category, tags, uploaded_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            tenant_id,
-            name,
-            path,
-            category,
-            json.dumps(tags or []),
-            datetime.utcnow().isoformat()
-        ))
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        handle_error(e, code="DB_TEMPLATE_INSERT_001", raise_it=True)
-
+# ---------------------------
+# Templates (Dropbox)
+# ---------------------------
 
 def get_templates(tenant_id: str, category: str = None, include_deleted: bool = False):
+    """Retrieve templates directly from Dropbox."""
     try:
-        conn = get_connection()
-        cur = conn.cursor()
+        if not category:
+            categories = ["email", "batch_docs", "foia", "demand"]
+            templates = []
+            for cat in categories:
+                files = list_templates(cat)
+                templates += [
+                    {"name": f, "path": f"{DROPBOX_TEMPLATES_ROOT}/{cat}/{f}"}
+                    for f in files
+                ]
+            return templates
 
-        query = "SELECT * FROM templates WHERE tenant_id = ?"
-        params = [tenant_id]
-
-        if category:
-            query += " AND category = ?"
-            params.append(category)
-        if not include_deleted:
-            query += " AND deleted = 0"
-
-        cur.execute(query, params)
-        rows = [dict(row) for row in cur.fetchall()]
-        conn.close()
-        return rows
+        files = list_templates(category)
+        return [{"name": f, "path": f"{DROPBOX_TEMPLATES_ROOT}/{category}/{f}"} for f in files]
 
     except Exception as e:
-        handle_error(e, code="DB_TEMPLATE_GET_001", raise_it=True)
+        handle_error(e, code="DB_TEMPLATE_LIST_001", raise_it=True)
 
 
-def soft_delete_template(template_id: int, tenant_id: str):
+def upload_template(category: str, filename: str, file_bytes: bytes):
+    """Upload a template to Dropbox."""
     try:
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("""
-        UPDATE templates SET deleted = 1 WHERE id = ? AND tenant_id = ?
-        """, (template_id, tenant_id))
-        conn.commit()
-        conn.close()
+        path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{filename}"
+        upload_file_to_dropbox(path, file_bytes)
+        return {"name": filename, "path": path}
+    except Exception as e:
+        handle_error(e, code="DB_TEMPLATE_UPLOAD_001", raise_it=True)
+
+
+def delete_template(category: str, filename: str):
+    """Delete a template from Dropbox."""
+    try:
+        path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{filename}"
+        delete_file_from_dropbox(path)
     except Exception as e:
         handle_error(e, code="DB_TEMPLATE_DELETE_001", raise_it=True)
 
 
-def update_template_name(template_id: int, tenant_id: str, new_name: str, new_path: str):
+def rename_template(category: str, old_name: str, new_name: str):
+    """Rename or move a template in Dropbox."""
     try:
-        conn = get_connection()
-        cur = conn.cursor()
-        cur.execute("""
-        UPDATE templates SET name = ?, path = ? WHERE id = ? AND tenant_id = ?
-        """, (new_name, new_path, template_id, tenant_id))
-        conn.commit()
-        conn.close()
+        old_path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{old_name}"
+        new_path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{new_name}"
+        move_file_in_dropbox(old_path, new_path)
+        return new_path
     except Exception as e:
-        handle_error(e, code="DB_TEMPLATE_UPDATE_001", raise_it=True)
+        handle_error(e, code="DB_TEMPLATE_RENAME_001", raise_it=True)
 
+
+# ---------------------------
+# Examples (Dropbox)
+# ---------------------------
+
+def get_examples(tenant_id: str, category: str = None):
+    """Retrieve examples directly from Dropbox."""
+    try:
+        if not category:
+            categories = ["memos", "demands", "foia"]
+            examples = []
+            for cat in categories:
+                files = list_examples(cat)
+                examples += [
+                    {"name": f, "path": f"{DROPBOX_EXAMPLES_ROOT}/{cat}/{f}"}
+                    for f in files
+                ]
+            return examples
+
+        files = list_examples(category)
+        return [{"name": f, "path": f"{DROPBOX_EXAMPLES_ROOT}/{category}/{f}"} for f in files]
+
+    except Exception as e:
+        handle_error(e, code="DB_EXAMPLES_LIST_001", raise_it=True)
+
+
+def upload_example(category: str, filename: str, file_bytes: bytes):
+    """Upload an example to Dropbox."""
+    try:
+        path = f"{DROPBOX_EXAMPLES_ROOT}/{category}/{filename}"
+        upload_file_to_dropbox(path, file_bytes)
+        return {"name": filename, "path": path}
+    except Exception as e:
+        handle_error(e, code="DB_EXAMPLES_UPLOAD_001", raise_it=True)
+
+
+def delete_example(category: str, filename: str):
+    """Delete an example from Dropbox."""
+    try:
+        path = f"{DROPBOX_EXAMPLES_ROOT}/{category}/{filename}"
+        delete_file_from_dropbox(path)
+    except Exception as e:
+        handle_error(e, code="DB_EXAMPLES_DELETE_001", raise_it=True)
+
+
+def rename_example(category: str, old_name: str, new_name: str):
+    """Rename an example in Dropbox."""
+    try:
+        old_path = f"{DROPBOX_EXAMPLES_ROOT}/{category}/{old_name}"
+        new_path = f"{DROPBOX_EXAMPLES_ROOT}/{category}/{new_name}"
+        move_file_in_dropbox(old_path, new_path)
+        return new_path
+    except Exception as e:
+        handle_error(e, code="DB_EXAMPLES_RENAME_001", raise_it=True)
+
+
+# ---------------------------
+# Audit Log
+# ---------------------------
 
 def insert_audit_event(tenant_id: str, user_id: str, action: str, metadata: dict = None):
     try:
@@ -207,6 +232,10 @@ def get_audit_events(tenant_id: str, user_id: str = None, action: str = None, li
         handle_error(e, code="DB_AUDIT_GET_001", raise_it=True)
 
 
+# ---------------------------
+# Quotas
+# ---------------------------
+
 def get_quota(tenant_id: str, key: str):
     try:
         conn = get_connection()
@@ -248,6 +277,6 @@ def increment_quota_usage(tenant_id: str, key: str, amount: int = 1):
     except Exception as e:
         handle_error(e, code="DB_QUOTA_INCREMENT_001", raise_it=True)
 
+
 # Initialize DB and ensure tables exist
 init_db()
-

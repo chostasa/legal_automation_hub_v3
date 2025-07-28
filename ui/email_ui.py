@@ -16,8 +16,9 @@ from utils.file_utils import clean_temp_dir
 
 clean_temp_dir()
 
-# Column name for client name in dashboard data
+# Column names for client details in dashboard data
 NAME_COLUMN = "Case Details First Party Name (Full - Last, First)"
+EMAIL_COLUMN = "Case Details First Party Details Default Email Account Address"
 
 
 def run_ui():
@@ -35,9 +36,9 @@ def run_ui():
         st.error(msg)
         return
 
-    # Ensure name column exists
-    if NAME_COLUMN not in df.columns:
-        st.error(f"❌ Expected column '{NAME_COLUMN}' not found in dashboard data.")
+    # Ensure required columns exist
+    if NAME_COLUMN not in df.columns or EMAIL_COLUMN not in df.columns:
+        st.error(f"❌ Expected columns '{NAME_COLUMN}' and '{EMAIL_COLUMN}' not found in dashboard data.")
         return
 
     # Pull email templates from DB
@@ -84,7 +85,7 @@ def run_ui():
     if search:
         filtered_df = filtered_df[
             filtered_df[NAME_COLUMN].str.lower().str.contains(search)
-            | filtered_df["Email"].str.lower().str.contains(search)
+            | filtered_df[EMAIL_COLUMN].str.lower().str.contains(search)
         ]
 
     # Multi-select client list
@@ -107,9 +108,15 @@ def run_ui():
             filtered_df[filtered_df[NAME_COLUMN].isin(selected_clients)].iterrows()
         ):
             try:
-                # Normalize the name column for build_email
+                # Normalize the name & email column for build_email
                 row_data = row.to_dict()
                 row_data["Client Name"] = row_data.get(NAME_COLUMN, "")
+                row_data["Email"] = row_data.get(EMAIL_COLUMN, "")
+
+                # Skip if email missing
+                if not row_data["Email"]:
+                    st.warning(f"⚠️ Skipping {row_data['Client Name']} - missing email.")
+                    continue
 
                 subject, body, cc, client = asyncio.run(build_email(row_data, template_path))
                 subject_key = f"subject_{i}"

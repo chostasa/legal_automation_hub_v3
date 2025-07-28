@@ -1,9 +1,11 @@
+import os
 import dropbox
 import pandas as pd
 from io import BytesIO
 from config import AppConfig, get_config
 from core.error_handling import handle_error
 from logger import logger
+from core.constants import DROPBOX_TEMPLATES_ROOT, DROPBOX_EXAMPLES_ROOT
 
 
 class DropboxClient:
@@ -21,9 +23,7 @@ class DropboxClient:
     def download_dashboard_df(
         self, file_path: str = None, sheet_name: str = "Master Dashboard"
     ) -> pd.DataFrame:
-        """
-        Instance method: Download the dashboard Excel from Dropbox and return as DataFrame.
-        """
+        """Download the dashboard Excel from Dropbox and return as DataFrame."""
         path = file_path or self.config.DROPBOX_MASTER_DASHBOARD_PATH
 
         try:
@@ -43,14 +43,58 @@ class DropboxClient:
         except Exception as e:
             handle_error(e, code="DROPBOX_DOWNLOAD_001", raise_it=True)
 
+    def list_files(self, folder_path: str):
+        """List all files in a Dropbox folder."""
+        try:
+            result = self.dbx.files_list_folder(folder_path)
+            return [entry.name for entry in result.entries if isinstance(entry, dropbox.files.FileMetadata)]
+        except Exception as e:
+            handle_error(e, code="DROPBOX_LIST_001", raise_it=True)
 
-# === Global helper to match old imports ===
-def download_dashboard_df(
-    file_path: str = None, sheet_name: str = "Master Dashboard"
-) -> pd.DataFrame:
-    """
-    Global helper function to download the dashboard Excel from Dropbox.
-    This wraps DropboxClient for compatibility with modules importing it directly.
-    """
+    def download_file(self, dropbox_path: str, local_dir: str = "downloads") -> str:
+        """Download a file from Dropbox to a local directory and return the local path."""
+        try:
+            os.makedirs(local_dir, exist_ok=True)
+            filename = os.path.basename(dropbox_path)
+            local_path = os.path.join(local_dir, filename)
+
+            metadata, res = self.dbx.files_download(dropbox_path)
+            with open(local_path, "wb") as f:
+                f.write(res.content)
+
+            logger.info(f"[DROPBOX_DOWNLOAD] 📄 Downloaded {dropbox_path} → {local_path}")
+            return local_path
+        except Exception as e:
+            handle_error(e, code="DROPBOX_DOWNLOAD_FILE_001", raise_it=True)
+
+
+# === Global helper functions (used by modules) ===
+
+def download_dashboard_df(file_path: str = None, sheet_name: str = "Master Dashboard") -> pd.DataFrame:
     client = DropboxClient()
     return client.download_dashboard_df(file_path=file_path, sheet_name=sheet_name)
+
+
+def list_templates(category: str):
+    """Return list of template files for a category (email, batch_docs, etc.)"""
+    client = DropboxClient()
+    path = f"{DROPBOX_TEMPLATES_ROOT}/{category}"
+    return client.list_files(path)
+
+
+def download_template_file(category: str, filename: str, local_dir="templates"):
+    client = DropboxClient()
+    path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{filename}"
+    return client.download_file(path, local_dir)
+
+
+def list_examples(module: str):
+    client = DropboxClient()
+    path = f"{DROPBOX_EXAMPLES_ROOT}/{module}"
+    return client.list_files(path)
+
+
+def download_example_file(module: str, filename: str, local_dir="examples"):
+    client = DropboxClient()
+    path = f"{DROPBOX_EXAMPLES_ROOT}/{module}/{filename}"
+    return client.download_file(path, local_dir)
