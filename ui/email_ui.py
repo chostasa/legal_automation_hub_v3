@@ -6,7 +6,6 @@ from datetime import datetime
 
 from services.email_service import build_email, send_email_and_update
 from services.dropbox_client import download_dashboard_df
-from core.constants import STATUS_INTAKE_COMPLETED
 from core.security import redact_log, mask_phi
 from core.usage_tracker import log_usage, check_quota, get_usage_summary
 from core.auth import get_user_id, get_tenant_id, get_tenant_branding
@@ -27,11 +26,10 @@ def run_ui():
 
     st.header(f"📧 Welcome Email Sender – {branding.get('firm_name', tenant_id)}")
 
-    # Load dashboard data
+    # Load dashboard data (no hard filter, allow all class codes)
     try:
         with st.spinner("📥 Loading dashboard data..."):
-            df = download_dashboard_df()
-            df = df[df["Class Code Title"] == STATUS_INTAKE_COMPLETED].copy()
+            df = download_dashboard_df().copy()
     except Exception as e:
         msg = handle_error(e, code="EMAIL_UI_001")
         st.error(msg)
