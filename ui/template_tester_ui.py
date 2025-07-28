@@ -37,10 +37,6 @@ def stream_file(path: str):
 def run_ui():
     st.header("🧪 Template Tester")
 
-    if get_user_role() != "Admin":
-        st.error("❌ You do not have permission to access the Template Tester.")
-        return
-
     with st.form("tester_form"):
         uploaded_template = st.file_uploader("Upload Template (.docx)", type=["docx"])
         key_value_input = st.text_area(
