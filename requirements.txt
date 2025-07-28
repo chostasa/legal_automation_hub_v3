@@ -35,6 +35,10 @@ docxtpl>=0.16.7
 azure-identity
 azure-keyvault-secrets
 
+#Billing
+stripe==10.9.0
+
+
 
 
 
