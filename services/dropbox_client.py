@@ -44,10 +44,28 @@ class DropboxClient:
             handle_error(e, code="DROPBOX_DOWNLOAD_001", raise_it=True)
 
     def list_files(self, folder_path: str):
-        """List all files in a Dropbox folder."""
+        """
+        List all files in a Dropbox folder. Auto-create folder if it doesn't exist.
+        """
         try:
+            # Ensure the folder exists (create if missing)
+            try:
+                self.dbx.files_get_metadata(folder_path)
+            except dropbox.exceptions.ApiError as e:
+                if (
+                    hasattr(e.error, "is_path")
+                    and e.error.is_path()
+                    and e.error.get_path().is_not_found()
+                ):
+                    # Folder missing: create it
+                    logger.info(f"[DROPBOX] Creating missing folder: {folder_path}")
+                    self.dbx.files_create_folder_v2(folder_path)
+                else:
+                    raise
+
             result = self.dbx.files_list_folder(folder_path)
-            return [entry.name for entry in result.entries if isinstance(entry, dropbox.files.FileMetadata)]
+            return [entry.name for entry in result.entries if hasattr(entry, "name")]
+
         except Exception as e:
             handle_error(e, code="DROPBOX_LIST_001", raise_it=True)
 
@@ -66,6 +84,26 @@ class DropboxClient:
             return local_path
         except Exception as e:
             handle_error(e, code="DROPBOX_DOWNLOAD_FILE_001", raise_it=True)
+
+    def ensure_base_folders(self):
+        """
+        Ensure the full folder tree for templates/examples exists in Dropbox.
+        """
+        base_folders = [
+            f"{DROPBOX_TEMPLATES_ROOT}/email",
+            f"{DROPBOX_TEMPLATES_ROOT}/batch_docs",
+            f"{DROPBOX_TEMPLATES_ROOT}/foia",
+            f"{DROPBOX_TEMPLATES_ROOT}/demand",
+            f"{DROPBOX_EXAMPLES_ROOT}/demand",
+            f"{DROPBOX_EXAMPLES_ROOT}/foia",
+            f"{DROPBOX_EXAMPLES_ROOT}/mediation",
+        ]
+        for folder in base_folders:
+            try:
+                self.dbx.files_get_metadata(folder)
+            except dropbox.exceptions.ApiError:
+                logger.info(f"[DROPBOX] Creating base folder: {folder}")
+                self.dbx.files_create_folder_v2(folder)
 
 
 # === Global helper functions (used by modules) ===
