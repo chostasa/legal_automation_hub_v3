@@ -13,6 +13,7 @@ from core.audit import log_audit_event
 from core.error_handling import handle_error
 from logger import logger
 from utils.file_utils import clean_temp_dir
+from services.dropbox_client import download_template_file
 
 clean_temp_dir()
 
@@ -52,10 +53,19 @@ def run_ui():
     # Choose template
     template_keys = [t["name"] for t in email_templates]
     template_key = st.selectbox("Select Email Template", template_keys)
-    template_path = next((t["path"] for t in email_templates if t["name"] == template_key), None)
+    # Find the Dropbox filename
+    template_name = next((t["name"] for t in email_templates if t["name"] == template_key), None)
 
-    if not template_path or not os.path.exists(template_path):
-        st.error(f"❌ Selected template path not found: {template_path}")
+    if not template_name:
+        st.error("❌ Selected template not found.")
+        return
+
+    # Download from Dropbox to a local file
+    try:
+        template_path = download_template_file("email", template_name)
+    except Exception as e:
+        msg = handle_error(e, code="EMAIL_UI_005")
+        st.error(f"❌ Failed to download template: {msg}")
         return
 
     # Sidebar filters

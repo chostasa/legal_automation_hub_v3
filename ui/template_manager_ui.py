@@ -10,10 +10,9 @@ from core.audit import log_audit_event
 from core.cache_utils import clear_caches
 from core.error_handling import handle_error
 from logger import logger
-from core.db import (
-    get_templates, upload_template, delete_template, rename_template, insert_audit_event
-)
+from core.db import get_templates, insert_audit_event
 from utils.docx_utils import replace_text_in_docx_all
+from services.dropbox_client import DropboxClient
 
 CATEGORIES = {
     "Mediation Memo": "mediation",
@@ -23,15 +22,6 @@ CATEGORIES = {
     "Email Templates": "email"
 }
 
-def get_dir(base_dir: str, tenant_id: str, category: str) -> str:
-    try:
-        path = os.path.join(base_dir, tenant_id, category)
-        os.makedirs(path, exist_ok=True)
-        return path
-    except Exception as e:
-        msg = handle_error(e, code="TEMPLATE_UI_001")
-        st.error(msg)
-        return ""
 
 def run_ui():
     st.header("📪 Template & Style Example Manager")
@@ -50,6 +40,7 @@ def run_ui():
         return
 
     tab1, tab2, tab3 = st.tabs(["📂 Templates", "🖋️ Style Examples", "🎨 Branding"])
+    client = DropboxClient()
 
     # ---------------- Tab 1 ----------------
     with tab1:
@@ -58,7 +49,6 @@ def run_ui():
                 "Choose Template Category", list(CATEGORIES.keys()), key="template_category"
             )
             selected_category = CATEGORIES[selected_category_label]
-            template_dir = get_dir("templates", tenant_id, selected_category)
 
             st.subheader(f"📁 {selected_category_label} Templates")
 
@@ -74,20 +64,16 @@ def run_ui():
                 try:
                     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
                     versioned_name = f"{timestamp}_{sanitize_filename(uploaded_template.name)}"
-                    template_path = os.path.join(template_dir, versioned_name)
-                    with open(template_path, "wb") as f:
-                        f.write(uploaded_template.read())
+                    dropbox_path = f"{client.config.DROPBOX_TEMPLATES_ROOT}/{selected_category}/{versioned_name}"
 
-                    insert_template(
-                        tenant_id=tenant_id,
-                        name=os.path.basename(template_path),
-                        path=template_path,
-                        category=selected_category,
-                        tags=[t.strip() for t in tags.split(",") if t.strip()]
+                    # Upload directly to Dropbox
+                    client.dbx.files_upload(
+                        uploaded_template.getvalue(),
+                        dropbox_path,
+                        mode=client.dbx.files.WriteMode.overwrite
                     )
 
-                    st.success(f"✅ Uploaded template: {os.path.basename(template_path)}")
-
+                    st.success(f"✅ Uploaded template: {versioned_name}")
                     clear_caches()
 
                     insert_audit_event(
@@ -95,7 +81,7 @@ def run_ui():
                         user_id=get_user_id(),
                         action="Template Uploaded",
                         metadata={
-                            "filename": os.path.basename(template_path),
+                            "filename": versioned_name,
                             "tags": tags,
                             "category": selected_category,
                             "version": timestamp,
@@ -103,11 +89,16 @@ def run_ui():
                         }
                     )
 
-                    if selected_category != "email":  # Only generate preview for Word docs
-                        with open(template_path, "rb") as f:
-                            preview_path = template_path.replace(".docx", "_preview.docx")
-                            replace_text_in_docx_all(template_path, {"Preview": "Sample"}, preview_path)
-                            st.download_button("⬇️ Download Preview", open(preview_path, "rb"), file_name=os.path.basename(preview_path))             
+                    # Generate preview only for Word docs
+                    if selected_category != "email":
+                        local_path = client.download_file(dropbox_path, "templates_preview")
+                        preview_path = local_path.replace(".docx", "_preview.docx")
+                        replace_text_in_docx_all(local_path, {"Preview": "Sample"}, preview_path)
+                        st.download_button(
+                            "⬇️ Download Preview",
+                            open(preview_path, "rb"),
+                            file_name=os.path.basename(preview_path)
+                        )
 
                 except Exception as e:
                     msg = handle_error(e, code="TEMPLATE_UI_003")
@@ -121,7 +112,8 @@ def run_ui():
             templates = get_templates(tenant_id=tenant_id, category=selected_category)
             matched_templates = [
                 t for t in templates
-                if search_filter in t["name"].lower() or search_filter in ("".join(json.loads(t.get("tags", "[]")))).lower()
+                if search_filter in t["name"].lower() or search_filter in (
+                    "".join(json.loads(t.get("tags", "[]")))).lower()
             ]
 
             if matched_templates:
@@ -143,23 +135,19 @@ def run_ui():
                         )
                         if st.button("Rename", key=f"rename_btn_{t['id']}"):
                             try:
-                                new_path = os.path.join(template_dir, sanitize_filename(new_name) + ".docx")
-                                if os.path.exists(new_path):
-                                    st.warning("⚠️ File with that name already exists.")
-                                else:
-                                    os.rename(t["path"], new_path)
-                                    update_template_name(t["id"], tenant_id, new_name + ".docx", new_path)
-                                    st.success(f"✅ Renamed to {new_name}.docx")
+                                old_path = f"{client.config.DROPBOX_TEMPLATES_ROOT}/{selected_category}/{t['name']}"
+                                new_path = f"{client.config.DROPBOX_TEMPLATES_ROOT}/{selected_category}/{sanitize_filename(new_name)}.docx"
+                                client.dbx.files_move_v2(old_path, new_path, autorename=False)
+                                st.success(f"✅ Renamed to {new_name}.docx")
 
-                                    clear_caches()
-
-                                    insert_audit_event(
-                                        tenant_id=tenant_id,
-                                        user_id=get_user_id(),
-                                        action="Template Renamed",
-                                        metadata={"from": t["name"], "to": new_name + ".docx"}
-                                    )
-                                    st.rerun()
+                                clear_caches()
+                                insert_audit_event(
+                                    tenant_id=tenant_id,
+                                    user_id=get_user_id(),
+                                    action="Template Renamed",
+                                    metadata={"from": t["name"], "to": new_name + ".docx"}
+                                )
+                                st.rerun()
                             except Exception as e:
                                 msg = handle_error(e, code="TEMPLATE_UI_004")
                                 st.error(msg)
@@ -167,13 +155,11 @@ def run_ui():
                     with col3:
                         if st.button("🗑️ Delete", key=f"delete_{t['id']}"):
                             try:
-                                soft_delete_template(t["id"], tenant_id)
-                                if os.path.exists(t["path"]):
-                                    os.remove(t["path"])
+                                dropbox_path = f"{client.config.DROPBOX_TEMPLATES_ROOT}/{selected_category}/{t['name']}"
+                                client.dbx.files_delete_v2(dropbox_path)
                                 st.success(f"✅ Deleted {t['name']}")
 
                                 clear_caches()
-
                                 insert_audit_event(
                                     tenant_id=tenant_id,
                                     user_id=get_user_id(),
@@ -192,13 +178,15 @@ def run_ui():
             st.error(msg)
 
     # ---------------- Tab 2 ----------------
+    # (Style examples remain local as they were)
     with tab2:
         try:
             selected_example_label = st.selectbox(
                 "Choose Example Category", list(CATEGORIES.keys()), key="example_category"
             )
             example_category = CATEGORIES[selected_example_label]
-            example_dir = get_dir("examples", tenant_id, example_category)
+            example_dir = os.path.join("examples", tenant_id, example_category)
+            os.makedirs(example_dir, exist_ok=True)
 
             st.subheader(f"🖋️ {selected_example_label} Style Examples")
 
@@ -223,16 +211,13 @@ def run_ui():
                     st.success(f"✅ Uploaded example: {os.path.basename(example_path)}")
 
                     clear_caches()
+                    log_audit_event("Style Example Uploaded", {
+                        "filename": os.path.basename(example_path),
+                        "tenant_id": tenant_id,
+                        "category": example_category,
+                        "module": "template_manager",
+                    })
 
-                    try:
-                        log_audit_event("Style Example Uploaded", {
-                            "filename": os.path.basename(example_path),
-                            "tenant_id": tenant_id,
-                            "category": example_category,
-                            "module": "template_manager",
-                        })
-                    except Exception as e:
-                        logger.warning(redact_log(mask_phi(f"⚠️ Failed to write audit log: {e}")))
                 except Exception as e:
                     msg = handle_error(e, code="TEMPLATE_UI_007")
                     st.error(msg)
@@ -244,7 +229,6 @@ def run_ui():
 
             examples = [f for f in os.listdir(example_dir) if f.endswith(".txt")]
             matched_examples = []
-
             for e in examples:
                 meta_path = os.path.join(example_dir, e.replace(".txt", ".json"))
                 meta = {}
@@ -285,7 +269,6 @@ def run_ui():
                                     st.success(f"✅ Renamed to {new_name}.txt")
 
                                     clear_caches()
-
                                     log_audit_event("Style Example Renamed", {
                                         "from": filename,
                                         "to": new_name + ".txt",
@@ -309,7 +292,6 @@ def run_ui():
                                 st.success(f"✅ Deleted {filename}")
 
                                 clear_caches()
-
                                 log_audit_event("Style Example Deleted", {
                                     "filename": filename,
                                     "tenant_id": tenant_id,
@@ -331,10 +313,12 @@ def run_ui():
     with tab3:
         try:
             st.subheader("🎨 Tenant Branding Assets")
+            branding_dir = os.path.join("branding", tenant_id, "assets")
+            os.makedirs(branding_dir, exist_ok=True)
+
             logo_upload = st.file_uploader("Upload Firm Logo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="branding_logo")
             primary_color = st.color_picker("Pick Primary Color", value=branding.get("primary_color", "#0A1D3B"))
 
-            branding_dir = get_dir("branding", tenant_id, "assets")
             branding_config_path = os.path.join(branding_dir, "branding.json")
 
             if logo_upload:
@@ -346,7 +330,11 @@ def run_ui():
                 with open(branding_config_path, "w") as f:
                     json.dump(branding, f, indent=2)
                 st.success("✅ Branding updated successfully.")
-                log_audit_event("Branding Updated", {"tenant_id": tenant_id, "logo": logo_path, "color": primary_color})
+                log_audit_event("Branding Updated", {
+                    "tenant_id": tenant_id,
+                    "logo": logo_path,
+                    "color": primary_color
+                })
 
         except Exception as e:
             msg = handle_error(e, code="TEMPLATE_UI_011")
