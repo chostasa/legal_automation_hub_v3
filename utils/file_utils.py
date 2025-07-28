@@ -188,3 +188,13 @@ def clean_temp_dir(base_dir: str = "data/tmp") -> None:
             os.makedirs(os.path.join(base_dir, tenant_id, user_id), exist_ok=True)
     except Exception as e:
         raise RuntimeError(f"Failed to clean temp directory: {e}")
+
+
+def get_session_temp_dir(base_dir="temp") -> str:
+    """
+    Returns a session-specific temp directory path, creating it if needed.
+    """
+    session_id = get_session_id()
+    temp_dir = os.path.join(base_dir, session_id)
+    os.makedirs(temp_dir, exist_ok=True)
+    return temp_dir
