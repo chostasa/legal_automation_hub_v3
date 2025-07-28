@@ -30,10 +30,6 @@ def load_binary_file(path: str) -> bytes:
 def run_ui():
     st.header("📂 Demand Letter Generator")
 
-    if get_user_role() not in ["Admin", "Staff"]:
-        st.error("❌ You do not have permission to access this module.")
-        return
-
     st.markdown("### 🎨 Optional: Style / Tone Example")
     example_text = ""
     selected_example = None
