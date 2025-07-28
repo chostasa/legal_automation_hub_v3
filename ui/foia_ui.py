@@ -15,6 +15,8 @@ from core.foia_constants import STATE_CITATIONS, STATE_RESPONSE_TIMES
 from core.cache_utils import clear_caches
 from core.error_handling import handle_error
 from utils.thread_utils import run_async  # async helper
+from services.dropbox_client import DropboxClient
+from core.constants import DROPBOX_TEMPLATES_ROOT
 
 # Clean global temp dir at startup, each user will use isolated dirs
 clean_temp_dir()
@@ -32,6 +34,7 @@ def run_ui():
     try:
         tenant_id = get_tenant_id()
         user_id = get_user_id()
+        client = DropboxClient()
 
         # ==================== STYLE EXAMPLES ==================== #
         st.subheader("🎨 Optional Style Example")
@@ -71,17 +74,21 @@ def run_ui():
         else:
             st.info(f"No style examples found in `{EXAMPLE_DIR}`")
 
-        # ==================== TEMPLATES ==================== #
-        TEMPLATE_DIR = os.path.join("templates", tenant_id, "foia")
-        os.makedirs(TEMPLATE_DIR, exist_ok=True)
+        # ==================== TEMPLATES (Dropbox-based) ==================== #
+        st.subheader("📄 FOIA Templates")
 
-        # Upload new template
+        # Upload new template directly to Dropbox
         uploaded_template = st.file_uploader("Upload New FOIA Template (.docx)", type=["docx"], key="template_upload")
         if uploaded_template:
             try:
-                template_path = os.path.join(TEMPLATE_DIR, sanitize_filename(uploaded_template.name))
-                with open(template_path, "wb") as f:
-                    f.write(uploaded_template.read())
+                versioned_name = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{sanitize_filename(uploaded_template.name)}"
+                dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/foia/{versioned_name}"
+
+                client.dbx.files_upload(
+                    uploaded_template.getvalue(),
+                    dropbox_path,
+                    mode=client.dbx.files.WriteMode.overwrite
+                )
 
                 log_audit_event("FOIA Template Uploaded", {
                     "filename": uploaded_template.name,
@@ -93,10 +100,13 @@ def run_ui():
                 msg = handle_error(e, code="FOIA_UI_004")
                 st.error(msg)
 
-        available_templates = [f for f in os.listdir(TEMPLATE_DIR) if f.endswith(".docx")]
-        if available_templates:
-            selected_template = st.selectbox("📂 Choose Existing FOIA Template", available_templates)
-            TEMPLATE_FOIA = os.path.join(TEMPLATE_DIR, selected_template)
+        # List templates from Dropbox
+        template_files = client.list_files(f"{DROPBOX_TEMPLATES_ROOT}/foia")
+        if template_files:
+            selected_template = st.selectbox("📂 Choose Existing FOIA Template", template_files)
+            TEMPLATE_FOIA = client.download_file(
+                f"{DROPBOX_TEMPLATES_ROOT}/foia/{selected_template}", "templates_preview"
+            )
         else:
             st.warning("⚠️ No FOIA templates found. Please upload one.")
             TEMPLATE_FOIA = None

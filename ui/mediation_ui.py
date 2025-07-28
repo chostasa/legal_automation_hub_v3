@@ -6,7 +6,6 @@ import asyncio
 from datetime import datetime
 
 from utils.file_utils import clean_temp_dir, get_session_temp_dir, sanitize_filename
-from core.session_utils import get_session_temp_dir as legacy_get_session_temp_dir
 from core.security import sanitize_text, redact_log, mask_phi
 from core.cache_utils import clear_caches
 from core.audit import log_audit_event
@@ -92,6 +91,7 @@ def run_ui():
 
             uploaded_template = None
             selected_template_path = None
+            selected_template_name = None
 
             if template_choice == "Upload New Template":
                 uploaded_template = st.file_uploader("Upload Mediation Memo Template (.docx)", type=["docx"])

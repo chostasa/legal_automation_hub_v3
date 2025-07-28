@@ -5,29 +5,30 @@ from datetime import datetime
 
 from core.session_utils import get_session_temp_dir
 from core.security import sanitize_text, sanitize_filename, redact_log, mask_phi
-from core.constants import demand_template as TEMPLATE_DEMAND
 from services.demand_service import generate_demand_letter
+from services.dropbox_client import DropboxClient
+from core.constants import DROPBOX_TEMPLATES_ROOT
 from core.usage_tracker import log_usage, check_quota, decrement_quota
-from core.auth import get_user_id, get_tenant_id, get_user_role
+from core.auth import get_user_id, get_tenant_id
 from core.audit import log_audit_event
 from logger import logger
 from core.cache_utils import clear_caches
 from core.error_handling import handle_error
-
 from utils.file_utils import clean_temp_dir
 from utils.thread_utils import run_async
 
 # Clean temp directory scoped by tenant/user
 clean_temp_dir()
 
+# Dropbox client setup
+client = DropboxClient()
+
 tenant_id = get_tenant_id()
 user_id = get_user_id()
 
+# Local style example directory
 EXAMPLE_DIR = os.path.join("examples", tenant_id, "demand")
 os.makedirs(EXAMPLE_DIR, exist_ok=True)
-
-TEMPLATE_DIR = os.path.join("templates", tenant_id, "demand")
-os.makedirs(TEMPLATE_DIR, exist_ok=True)
 
 
 def load_binary_file(path: str) -> bytes:
@@ -80,17 +81,18 @@ def run_ui():
     else:
         st.info(f"No style examples found in {EXAMPLE_DIR}")
 
-    # === TEMPLATES ===
+    # === TEMPLATES (Dropbox) ===
     st.markdown("### 📄 Select Demand Template")
 
-    # Upload new template
+    # Upload new template (to Dropbox)
     uploaded_template = st.file_uploader("Upload New Demand Template (.docx)", type=["docx"], key="upload_template")
     if uploaded_template:
         try:
-            template_filename = sanitize_filename(uploaded_template.name)
-            template_path = os.path.join(TEMPLATE_DIR, template_filename)
-            with open(template_path, "wb") as f:
-                f.write(uploaded_template.read())
+            timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+            template_filename = f"{timestamp}_{sanitize_filename(uploaded_template.name)}"
+            dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/demand/{template_filename}"
+
+            client.dbx.files_upload(uploaded_template.getvalue(), dropbox_path, mode=client.dbx.files.WriteMode.overwrite)
             st.success(f"✅ Uploaded template: {template_filename}")
 
             clear_caches()
@@ -104,13 +106,14 @@ def run_ui():
             msg = handle_error(e, code="DEMAND_UI_005")
             st.error(msg)
 
+    # List templates from Dropbox
     selected_template = None
     try:
-        template_files = [f for f in os.listdir(TEMPLATE_DIR) if f.endswith(".docx")]
+        template_files = client.list_files(f"{DROPBOX_TEMPLATES_ROOT}/demand")
         if template_files:
             selected_template = st.selectbox("Choose Template to Use", template_files)
         else:
-            st.warning(f"No templates found in {TEMPLATE_DIR}. Please upload one above.")
+            st.warning("⚠️ No templates found. Please upload one above.")
     except Exception as e:
         msg = handle_error(e, code="DEMAND_UI_002")
         st.error(msg)
@@ -175,7 +178,11 @@ def run_ui():
                     )
                     file_path = os.path.join(temp_dir, output_filename)
 
-                    template_path = os.path.join(TEMPLATE_DIR, selected_template)
+                    # Download selected template from Dropbox to use
+                    template_path = client.download_file(
+                        f"{DROPBOX_TEMPLATES_ROOT}/demand/{selected_template}", "templates_preview"
+                    )
+
                     if not template_path.lower().endswith(".docx"):
                         st.error("❌ The demand template must be a .docx file.")
                         return
