@@ -1,5 +1,4 @@
 import os
-import asyncio
 from services.openai_client import safe_generate
 from utils.docx_utils import replace_text_in_docx_all
 from core.security import sanitize_text, redact_log, mask_phi
@@ -8,6 +7,7 @@ from core.usage_tracker import check_and_decrement_quota
 from core.auth import get_tenant_id
 from logger import logger
 from core.prompts.prompt_factory import build_prompt
+
 
 def generate_synopsis(casesynopsis: str) -> str:
     """
@@ -18,7 +18,7 @@ def generate_synopsis(casesynopsis: str) -> str:
             raise ValueError("Case synopsis is missing or invalid.")
 
         prompt = build_prompt("foia", "Synopsis", casesynopsis)
-        summary = asyncio.run(safe_generate(prompt=prompt))
+        summary = safe_generate(prompt=prompt)
         if not summary or "legal summarization assistant" in summary.lower():
             return "[Synopsis failed to generate. Check input.]"
         return summary
@@ -29,6 +29,7 @@ def generate_synopsis(casesynopsis: str) -> str:
             user_message="Failed to generate case synopsis.",
             raise_it=True,
         )
+
 
 def generate_foia_request(data: dict, template_path: str, output_path: str, example_text: str = "") -> tuple:
     """
@@ -59,7 +60,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             client_name=data.get("client_id", ""),
             extra_instructions=data.get("explicit_instructions", ""),
         )
-        request_list = asyncio.run(safe_generate(prompt=bullet_prompt))
+        request_list = safe_generate(prompt=bullet_prompt)
         if not request_list:
             raise ValueError("Failed to generate FOIA request list.")
 
@@ -71,7 +72,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             extra_instructions=data.get("explicit_instructions", ""),
             example=example_text
         )
-        foia_body = asyncio.run(safe_generate(prompt=letter_prompt))
+        foia_body = safe_generate(prompt=letter_prompt)
         foia_body = sanitize_text(foia_body)
         if not foia_body:
             raise ValueError("Failed to generate FOIA letter body text.")

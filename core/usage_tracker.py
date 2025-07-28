@@ -8,23 +8,20 @@ from logger import logger
 USAGE_QUOTAS = {
     "openai_tokens": 500000,
     "documents_generated": 10000,
-    "emails_sent": 2000
+    "emails_sent": 2000,
+    "memo_generation": 1000,
+    "template_tester_runs": 500,
+    "foia_requests": 500
 }
 
 
-def get_usage_log_path(tenant_id: str = "internal-tenant") -> str:
-    """
-    Store usage logs in a fixed directory for internal use (no tenant separation).
-    """
+def get_usage_log_path() -> str:
     base_dir = "data/usage_logs"
     os.makedirs(base_dir, exist_ok=True)
     return os.path.join(base_dir, "usage_log.json")
 
 
 def log_usage(event_type: str, amount: int, metadata: dict = None):
-    """
-    Log usage without any external dependencies.
-    """
     path = get_usage_log_path()
     log_entry = {
         "timestamp": datetime.utcnow().isoformat(),
@@ -78,10 +75,20 @@ def check_quota(event_type: str, amount: int = 1) -> bool:
         return False
 
 
+def decrement_quota(event_type: str, amount: int = 1):
+    """
+    Decrement quota by logging usage event.
+    """
+    log_usage(event_type, amount)
+
+
+def check_and_decrement_quota(tenant_id: str, event_type: str, amount: int = 1):
+    if not check_quota(event_type, amount):
+        raise ValueError(f"Quota exceeded for {event_type}")
+    decrement_quota(event_type, amount)
+
+
 def get_quota_status() -> dict:
-    """
-    Return the quota status for all event types.
-    """
     summary = get_usage_summary()
     status = {}
     for event_type, limit in USAGE_QUOTAS.items():

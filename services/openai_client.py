@@ -43,7 +43,7 @@ class OpenAIClient:
             logger.info("[OPENAI_GEN_TEST] Returning deterministic test output.")
             return f"[TEST MODE] Prompt length={len(trimmed)} Model={used_model}"
 
-        if not check_quota(tenant_id=tenant_id, event_type="openai_tokens"):
+        if not check_quota("openai_tokens"):
             raise AppError(code="OPENAI_GEN_000", message="Quota exceeded for tenant.", details=f"Tenant={tenant_id}")
 
         start_time = time.time()
@@ -72,8 +72,6 @@ class OpenAIClient:
         if usage:
             log_usage(
                 event_type="openai_tokens",
-                tenant_id=tenant_id,
-                user_id=user_id,
                 amount=usage.total_tokens,
                 metadata={
                     "model": used_model,

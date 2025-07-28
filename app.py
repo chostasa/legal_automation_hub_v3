@@ -45,7 +45,7 @@ tool = st.sidebar.radio("Select a module:", [
 
 with st.sidebar.expander("📊 Usage Summary"):
     try:
-        usage = get_usage_summary(tenant_id, get_user_id())
+        usage = get_usage_summary()
         st.write("🧠 OpenAI Tokens:", usage.get("openai_tokens", 0))
         st.write("📨 Emails Sent:", usage.get("emails_sent", 0))
         st.progress(min(usage.get("openai_tokens", 0) / usage.get("openai_tokens_quota", 1), 1.0))

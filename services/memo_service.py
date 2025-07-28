@@ -1,6 +1,5 @@
 import os
 import html
-import asyncio
 from core.security import sanitize_text, redact_log, mask_phi
 from core.error_handling import handle_error
 from utils.docx_utils import replace_text_in_docx_all
@@ -60,7 +59,7 @@ Context: {context}
 Section:
 {text}
 """
-        return asyncio.run(safe_generate(prompt=prompt, model="gpt-4"))
+        return safe_generate(prompt=prompt, model="gpt-4")
     except Exception as e:
         handle_error(e, code="MEMO_POLISH_001", user_message="Failed to polish memo section.")
         return text
@@ -84,7 +83,7 @@ Perform a final, full-memo polish:
 Memo:
 {joined}
 """
-        cleaned = asyncio.run(safe_generate(prompt=prompt, model="gpt-4"))
+        cleaned = safe_generate(prompt=prompt, model="gpt-4")
         new_data = {}
         for section in memo_data.keys():
             marker = f"## {section}"
@@ -129,7 +128,7 @@ Make sure each selected quote directly supports the section's legal or factual a
 Context:
 {context}
 """
-        curated = asyncio.run(safe_generate(prompt=prompt, model="gpt-4"))
+        curated = safe_generate(prompt=prompt, model="gpt-4")
         return curated.strip()
     except Exception as e:
         handle_error(e, code="MEMO_QUOTES_002", user_message=f"Failed to curate quotes for {section_name}.")
@@ -174,7 +173,7 @@ Example:
 {INTRO_EXAMPLE}
 """
         memo_data["Introduction"] = polish_section(
-            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(intro_prompt, 3000), model="gpt-4", system_msg=INTRO_MSG))),
+            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(intro_prompt, 3000), model="gpt-4", system_msg=INTRO_MSG)),
             test_mode=test_mode
         )
 
@@ -196,7 +195,7 @@ Example:
 {PLAINTIFF_STATEMENT_EXAMPLE}
 """
                 memo_data[f"Plaintiff_{i}"] = polish_section(
-                    run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(plaintiff_prompt, 2500), model="gpt-4", system_msg=PLAINTIFF_MSG))),
+                    run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(plaintiff_prompt, 2500), model="gpt-4", system_msg=PLAINTIFF_MSG)),
                     test_mode=test_mode
                 )
                 parties_block.append(memo_data[f"Plaintiff_{i}"])
@@ -220,7 +219,7 @@ Example:
 {DEFENDANT_STATEMENT_EXAMPLE}
 """
                 memo_data[f"Defendant_{i}"] = polish_section(
-                    run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(defendant_prompt, 2500), model="gpt-4", system_msg=DEFENDANT_MSG))),
+                    run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(defendant_prompt, 2500), model="gpt-4", system_msg=DEFENDANT_MSG)),
                     test_mode=test_mode
                 )
                 parties_block.append(memo_data[f"Defendant_{i}"])
@@ -238,7 +237,7 @@ Ensure:
 - No redundancy or repetition of accident details
 """
         memo_data["Parties"] = polish_section(
-            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(parties_prompt, 3000), model="gpt-4", system_msg=PARTIES_MSG))),
+            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(parties_prompt, 3000), model="gpt-4", system_msg=PARTIES_MSG)),
             test_mode=test_mode
         )
 
@@ -259,7 +258,7 @@ Example:
 {FACTS_LIABILITY_EXAMPLE}
 """
         memo_data["Facts_Liability"] = polish_section(
-            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(facts_prompt, 3500), model="gpt-4", system_msg=FACTS_MSG))),
+            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(facts_prompt, 3500), model="gpt-4", system_msg=FACTS_MSG)),
             test_mode=test_mode
         )
 
@@ -278,7 +277,7 @@ Example:
 {CAUSATION_EXAMPLE}
 """
         memo_data["Causation_Injuries_Treatment"] = polish_section(
-            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(causation_prompt, 3000), model="gpt-4", system_msg=CAUSATION_MSG))),
+            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(causation_prompt, 3000), model="gpt-4", system_msg=CAUSATION_MSG)),
             test_mode=test_mode
         )
 
@@ -299,7 +298,7 @@ Example:
 {HARMS_EXAMPLE}
 """
         memo_data["Additional_Harms_Losses"] = polish_section(
-            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(harms_prompt, 3000), model="gpt-4", system_msg=HARMS_MSG))),
+            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(harms_prompt, 3000), model="gpt-4", system_msg=HARMS_MSG)),
             test_mode=test_mode
         )
 
@@ -318,7 +317,7 @@ Example:
 {FUTURE_BILLS_EXAMPLE}
 """
         memo_data["Future_Medical_Bills"] = polish_section(
-            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(future_prompt, 2500), model="gpt-4", system_msg=FUTURE_MSG))),
+            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(future_prompt, 2500), model="gpt-4", system_msg=FUTURE_MSG)),
             test_mode=test_mode
         )
 
@@ -337,7 +336,7 @@ Example:
 {CONCLUSION_EXAMPLE}
 """
         memo_data["Conclusion"] = polish_section(
-            run_in_thread(lambda: asyncio.run(safe_generate(prompt=trim_to_token_limit(conclusion_prompt, 2500), model="gpt-4", system_msg=CONCLUSION_MSG))),
+            run_in_thread(lambda: safe_generate(prompt=trim_to_token_limit(conclusion_prompt, 2500), model="gpt-4", system_msg=CONCLUSION_MSG)),
             test_mode=test_mode
         )
 
