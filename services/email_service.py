@@ -38,10 +38,14 @@ async def build_email(client_data: dict, template_path: str) -> tuple:
                 details=f"Row data: {client_data}",
             )
 
-        # Normalize the template path: remove any duplicate folders or extensions
+        # Normalize template path: fix duplicate dirs and double extensions
         normalized_template_path = os.path.normpath(template_path)
-        if normalized_template_path.endswith(".txt.txt"):
-            normalized_template_path = normalized_template_path.replace(".txt.txt", ".txt")
+        if "templates/templates" in normalized_template_path:
+            normalized_template_path = normalized_template_path.replace("templates/templates", "templates")
+
+        while normalized_template_path.endswith((".txt.txt", ".docx.txt", ".txt.docx")):
+            # Force the final extension to .txt
+            normalized_template_path = normalized_template_path.rsplit(".", 1)[0] + ".txt"
 
         if not os.path.exists(normalized_template_path):
             raise AppError(

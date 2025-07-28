@@ -26,6 +26,29 @@ CATEGORIES = {
 }
 
 
+def normalize_filename(name: str, category: str) -> str:
+    """
+    Normalize a file name by removing duplicate extensions and ensuring the right extension.
+    """
+    name = os.path.basename(name)
+    name = sanitize_filename(name)
+
+    # Fix duplicate extensions (e.g., .txt.txt, .docx.docx)
+    while name.endswith((".txt.txt", ".docx.docx", ".docx.txt", ".txt.docx")):
+        if ".txt" in name:
+            name = name.rsplit(".", 1)[0] + ".txt"
+        else:
+            name = name.rsplit(".", 1)[0] + ".docx"
+
+    # Ensure correct extension by category
+    if category == "email" and not name.endswith(".txt"):
+        name = f"{os.path.splitext(name)[0]}.txt"
+    elif category != "email" and not name.endswith(".docx"):
+        name = f"{os.path.splitext(name)[0]}.docx"
+
+    return name
+
+
 def run_ui():
     st.header("📪 Template & Style Example Manager")
 
@@ -70,16 +93,9 @@ def run_ui():
             if uploaded_template:
                 try:
                     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-                    base_name = os.path.basename(uploaded_template.name)
-                    sanitized_name = sanitize_filename(base_name)
+                    normalized_name = normalize_filename(uploaded_template.name, selected_category)
 
-                    # Fix duplicate extensions (e.g., .txt.txt)
-                    if sanitized_name.endswith(".txt.txt"):
-                        sanitized_name = sanitized_name.replace(".txt.txt", ".txt")
-                    elif sanitized_name.endswith(".docx.docx"):
-                        sanitized_name = sanitized_name.replace(".docx.docx", ".docx")
-
-                    versioned_name = f"{timestamp}_{sanitized_name}"
+                    versioned_name = f"{timestamp}_{normalized_name}"
                     dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{versioned_name}"
 
                     # Save to Dropbox
@@ -146,16 +162,12 @@ def run_ui():
                     # Rename template
                     with col2:
                         new_name = st.text_input(
-                            f"Rename {name}", value=name.replace(".docx", ""), key=f"rename_{name}"
+                            f"Rename {name}", value=name.rsplit(".", 1)[0], key=f"rename_{name}"
                         )
                         if st.button("Rename", key=f"rename_btn_{name}"):
                             try:
                                 old_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{name}"
-                                clean_new_name = sanitize_filename(new_name)
-
-                                # Ensure no duplicate extension in rename
-                                if not clean_new_name.endswith(".docx"):
-                                    clean_new_name = f"{clean_new_name}.docx"
+                                clean_new_name = normalize_filename(new_name, selected_category)
 
                                 new_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{clean_new_name}"
                                 client.dbx.files_move_v2(old_path, new_path, autorename=False)
@@ -206,14 +218,9 @@ def run_ui():
             uploaded_example = st.file_uploader("Upload Style Example (.txt)", type=["txt"], key="example_uploader")
             if uploaded_example:
                 try:
-                    base_name = os.path.basename(uploaded_example.name)
-                    sanitized_name = sanitize_filename(base_name)
+                    normalized_name = normalize_filename(uploaded_example.name, "email")
 
-                    # Remove duplicate extensions
-                    if sanitized_name.endswith(".txt.txt"):
-                        sanitized_name = sanitized_name.replace(".txt.txt", ".txt")
-
-                    example_path = os.path.join(example_dir, sanitized_name)
+                    example_path = os.path.join(example_dir, normalized_name)
                     with open(example_path, "wb") as f:
                         f.write(uploaded_example.read())
 
@@ -272,9 +279,7 @@ def run_ui():
                         )
                         if st.button("Rename", key=f"rename_ex_btn_{filename}"):
                             try:
-                                clean_new_name = sanitize_filename(new_name)
-                                if not clean_new_name.endswith(".txt"):
-                                    clean_new_name = f"{clean_new_name}.txt"
+                                clean_new_name = normalize_filename(new_name, "email")
 
                                 new_path = os.path.join(example_dir, clean_new_name)
                                 if os.path.exists(new_path):

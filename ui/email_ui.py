@@ -22,6 +22,25 @@ NAME_COLUMN = "Case Details First Party Name (Full - Last, First)"
 EMAIL_COLUMN = "Case Details First Party Details Default Email Account Address"
 
 
+def normalize_template_path(path: str) -> str:
+    """
+    Normalize template path by removing duplicate folders and extensions.
+    """
+    normalized_path = os.path.normpath(path)
+
+    # Fix duplicate folder names
+    if "templates/templates" in normalized_path:
+        normalized_path = normalized_path.replace("templates/templates", "templates")
+
+    # Fix duplicate extensions
+    if normalized_path.endswith(".txt.txt"):
+        normalized_path = normalized_path.replace(".txt.txt", ".txt")
+    elif normalized_path.endswith(".docx.docx"):
+        normalized_path = normalized_path.replace(".docx.docx", ".docx")
+
+    return normalized_path
+
+
 def run_ui():
     tenant_id = get_tenant_id()
     branding = get_tenant_branding(tenant_id)
@@ -61,13 +80,7 @@ def run_ui():
     # Download the template from Dropbox locally
     try:
         template_path = download_template_file("email", selected_template_name)
-
-        # Final safety check for unexpected issues
-        template_path = os.path.normpath(template_path)
-        if "templates/templates" in template_path:
-            template_path = template_path.replace("templates/templates", "templates")
-        if template_path.endswith(".txt.txt"):
-            template_path = template_path.replace(".txt.txt", ".txt")
+        template_path = normalize_template_path(template_path)
 
         if not os.path.exists(template_path):
             st.error(f"❌ Template file not found locally: {template_path}")
