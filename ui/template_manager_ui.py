@@ -13,7 +13,8 @@ from logger import logger
 from core.db import get_templates, insert_audit_event
 from utils.docx_utils import replace_text_in_docx_all
 from services.dropbox_client import DropboxClient
-from core.constants import DROPBOX_TEMPLATES_ROOT  # FIXED: import constant
+from core.constants import DROPBOX_TEMPLATES_ROOT
+from dropbox.files import WriteMode
 
 CATEGORIES = {
     "Mediation Memo": "mediation",
@@ -71,7 +72,7 @@ def run_ui():
                     client.dbx.files_upload(
                         uploaded_template.getvalue(),
                         dropbox_path,
-                        mode=client.dbx.files.WriteMode.overwrite
+                        mode=WriteMode.overwrite
                     )
 
                     st.success(f"✅ Uploaded template: {versioned_name}")
