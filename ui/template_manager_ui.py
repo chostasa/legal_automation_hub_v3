@@ -60,9 +60,13 @@ def run_ui():
 
             st.subheader(f"📁 {selected_category_label} Templates")
 
+            allowed_types = ["txt"] if selected_category == "email" else ["docx"]
+            upload_label = "Upload Template (.txt)" if selected_category == "email" else "Upload Template (.docx)"
+
             uploaded_template = st.file_uploader(
-                "Upload Template (.docx)", type=["docx"], key="template_uploader"
+                upload_label, type=allowed_types, key="template_uploader"
             )
+
             tags = st.text_input("🏷️ Add tags (comma-separated)", key="template_tags")
             if uploaded_template:
                 try:
@@ -97,10 +101,11 @@ def run_ui():
                         }
                     )
 
-                    with open(template_path, "rb") as f:
-                        preview_path = template_path.replace(".docx", "_preview.docx")
-                        replace_text_in_docx_all(template_path, {"Preview": "Sample"}, preview_path)
-                        st.download_button("⬇️ Download Preview", open(preview_path, "rb"), file_name=os.path.basename(preview_path))
+                    if selected_category != "email":  # Only generate preview for Word docs
+                        with open(template_path, "rb") as f:
+                            preview_path = template_path.replace(".docx", "_preview.docx")
+                            replace_text_in_docx_all(template_path, {"Preview": "Sample"}, preview_path)
+                            st.download_button("⬇️ Download Preview", open(preview_path, "rb"), file_name=os.path.basename(preview_path))             
 
                 except Exception as e:
                     msg = handle_error(e, code="TEMPLATE_UI_003")
