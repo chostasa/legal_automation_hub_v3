@@ -11,12 +11,15 @@ from core.constants import DROPBOX_TEMPLATES_ROOT, DROPBOX_EXAMPLES_ROOT
 class DropboxClient:
     def __init__(self, config: AppConfig = None):
         self.config = config or get_config()
+
         try:
+            # Create Dropbox client using refresh token (auto-refresh access token)
             self.dbx = dropbox.Dropbox(
                 app_key=self.config.DROPBOX_APP_KEY,
                 app_secret=self.config.DROPBOX_APP_SECRET,
                 oauth2_refresh_token=self.config.DROPBOX_REFRESH_TOKEN,
             )
+            logger.info("[DROPBOX_INIT] ✅ Dropbox client initialized with refresh token")
         except Exception as e:
             handle_error(e, code="DROPBOX_INIT_001", raise_it=True)
 
@@ -64,7 +67,12 @@ class DropboxClient:
                     raise
 
             result = self.dbx.files_list_folder(folder_path)
-            return [entry.name for entry in result.entries if hasattr(entry, "name")]
+            files = [entry.name for entry in result.entries if hasattr(entry, "name")]
+
+            logger.info(
+                f"[DROPBOX_LIST] 📂 Listed {len(files)} files in folder: {folder_path}"
+            )
+            return files
 
         except Exception as e:
             handle_error(e, code="DROPBOX_LIST_001", raise_it=True)
@@ -80,7 +88,9 @@ class DropboxClient:
             with open(local_path, "wb") as f:
                 f.write(res.content)
 
-            logger.info(f"[DROPBOX_DOWNLOAD] 📄 Downloaded {dropbox_path} → {local_path}")
+            logger.info(
+                f"[DROPBOX_DOWNLOAD] 📄 Downloaded {dropbox_path} → {local_path}"
+            )
             return local_path
         except Exception as e:
             handle_error(e, code="DROPBOX_DOWNLOAD_FILE_001", raise_it=True)
@@ -108,7 +118,9 @@ class DropboxClient:
 
 # === Global helper functions (used by modules) ===
 
-def download_dashboard_df(file_path: str = None, sheet_name: str = "Master Dashboard") -> pd.DataFrame:
+def download_dashboard_df(
+    file_path: str = None, sheet_name: str = "Master Dashboard"
+) -> pd.DataFrame:
     client = DropboxClient()
     return client.download_dashboard_df(file_path=file_path, sheet_name=sheet_name)
 
