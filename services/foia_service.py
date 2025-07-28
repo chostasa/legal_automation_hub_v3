@@ -3,7 +3,7 @@ from services.openai_client import safe_generate
 from utils.docx_utils import replace_text_in_docx_all
 from core.security import sanitize_text, redact_log, mask_phi
 from core.error_handling import handle_error
-from core.usage_tracker import check_and_decrement_quota
+from core.usage_tracker import check_quota_and_decrement
 from core.auth import get_tenant_id
 from logger import logger
 from core.prompts.prompt_factory import build_prompt
@@ -44,7 +44,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             raise ValueError("Output path is required for FOIA letter generation.")
 
         tenant_id = get_tenant_id()
-        check_and_decrement_quota(tenant_id, "foia_requests")
+        check_quota_and_decrement(tenant_id, "foia_requests")
 
         for k, v in data.items():
             if isinstance(v, str):
