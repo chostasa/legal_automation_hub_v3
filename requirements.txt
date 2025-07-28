@@ -38,6 +38,9 @@ azure-keyvault-secrets
 #Billing
 stripe==10.9.0
 
+#Emails
+aiohttp>=3.8.0
+
 
 
 
