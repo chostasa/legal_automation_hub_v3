@@ -82,10 +82,14 @@ def decrement_quota(event_type: str, amount: int = 1):
     log_usage(event_type, amount)
 
 
-def check_and_decrement_quota(tenant_id: str, event_type: str, amount: int = 1):
+def check_quota_and_decrement(tenant_id: str, event_type: str, amount: int = 1) -> None:
+    """
+    Check if quota is available for the event_type and decrement it.
+    Raise an error if quota exceeded.
+    """
     if not check_quota(event_type, amount):
-        raise ValueError(f"Quota exceeded for {event_type}")
-    decrement_quota(event_type, amount)
+        raise RuntimeError(f"Quota exceeded for {event_type}")
+    log_usage(event_type, amount, metadata={"tenant_id": tenant_id})
 
 
 def get_quota_status() -> dict:
