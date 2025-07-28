@@ -4,10 +4,6 @@ import os
 import hashlib
 from datetime import datetime
 from core.error_handling import handle_error
-from services.dropbox_client import (
-    list_templates, list_examples,
-    upload_file_to_dropbox, delete_file_from_dropbox, move_file_in_dropbox
-)
 from core.constants import DROPBOX_TEMPLATES_ROOT, DROPBOX_EXAMPLES_ROOT
 
 DB_PATH = os.path.join("data", "legal_automation_hub.db")
@@ -65,6 +61,8 @@ def init_db():
 
 def get_templates(tenant_id: str, category: str = None, include_deleted: bool = False):
     """Directly list templates from Dropbox instead of SQLite."""
+    from services.dropbox_client import list_templates   # Lazy import
+
     if not category:
         categories = ["email", "batch_docs", "foia", "demand"]
         templates = []
@@ -81,36 +79,37 @@ def get_templates(tenant_id: str, category: str = None, include_deleted: bool = 
     ]
 
 
-def insert_template(tenant_id: str, name: str, path: str, category: str, tags: list = None):
-    """
-    Wrapper for compatibility with template_manager_ui.
-    Simply uploads to Dropbox.
-    """
+def upload_template(category: str, filename: str, file_bytes: bytes):
+    """Upload a template to Dropbox."""
+    from services.dropbox_client import upload_file_to_dropbox  # Lazy import
     try:
-        # Upload directly to Dropbox
-        with open(path, "rb") as f:
-            file_bytes = f.read()
-        upload_file_to_dropbox(f"{DROPBOX_TEMPLATES_ROOT}/{category}/{name}", file_bytes)
-        return {"name": name, "path": f"{DROPBOX_TEMPLATES_ROOT}/{category}/{name}"}
+        path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{filename}"
+        upload_file_to_dropbox(path, file_bytes)
+        return {"name": filename, "path": path}
     except Exception as e:
-        handle_error(e, code="DB_TEMPLATE_INSERT_001", raise_it=True)
+        handle_error(e, code="DB_TEMPLATE_UPLOAD_001", raise_it=True)
 
 
-def soft_delete_template(template_id: int, tenant_id: str):
-    """Delete template from Dropbox by path (template_id is unused now)."""
+def delete_template(category: str, filename: str):
+    """Delete a template from Dropbox."""
+    from services.dropbox_client import delete_file_from_dropbox  # Lazy import
     try:
-        # This function should be called with path instead of id now
-        delete_file_from_dropbox(template_id)  # here template_id is actually the path
+        path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{filename}"
+        delete_file_from_dropbox(path)
     except Exception as e:
         handle_error(e, code="DB_TEMPLATE_DELETE_001", raise_it=True)
 
 
-def update_template_name(template_id: int, tenant_id: str, new_name: str, new_path: str):
-    """Rename a template in Dropbox."""
+def rename_template(category: str, old_name: str, new_name: str):
+    """Rename or move a template in Dropbox."""
+    from services.dropbox_client import move_file_in_dropbox  # Lazy import
     try:
-        move_file_in_dropbox(template_id, new_path)
+        old_path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{old_name}"
+        new_path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{new_name}"
+        move_file_in_dropbox(old_path, new_path)
+        return new_path
     except Exception as e:
-        handle_error(e, code="DB_TEMPLATE_UPDATE_001", raise_it=True)
+        handle_error(e, code="DB_TEMPLATE_RENAME_001", raise_it=True)
 
 
 # ---------------------------
@@ -119,6 +118,7 @@ def update_template_name(template_id: int, tenant_id: str, new_name: str, new_pa
 
 def get_examples(tenant_id: str, category: str = None):
     """Retrieve examples directly from Dropbox."""
+    from services.dropbox_client import list_examples  # Lazy import
     try:
         if not category:
             categories = ["memos", "demands", "foia"]
@@ -136,6 +136,39 @@ def get_examples(tenant_id: str, category: str = None):
 
     except Exception as e:
         handle_error(e, code="DB_EXAMPLES_LIST_001", raise_it=True)
+
+
+def upload_example(category: str, filename: str, file_bytes: bytes):
+    """Upload an example to Dropbox."""
+    from services.dropbox_client import upload_file_to_dropbox  # Lazy import
+    try:
+        path = f"{DROPBOX_EXAMPLES_ROOT}/{category}/{filename}"
+        upload_file_to_dropbox(path, file_bytes)
+        return {"name": filename, "path": path}
+    except Exception as e:
+        handle_error(e, code="DB_EXAMPLES_UPLOAD_001", raise_it=True)
+
+
+def delete_example(category: str, filename: str):
+    """Delete an example from Dropbox."""
+    from services.dropbox_client import delete_file_from_dropbox  # Lazy import
+    try:
+        path = f"{DROPBOX_EXAMPLES_ROOT}/{category}/{filename}"
+        delete_file_from_dropbox(path)
+    except Exception as e:
+        handle_error(e, code="DB_EXAMPLES_DELETE_001", raise_it=True)
+
+
+def rename_example(category: str, old_name: str, new_name: str):
+    """Rename an example in Dropbox."""
+    from services.dropbox_client import move_file_in_dropbox  # Lazy import
+    try:
+        old_path = f"{DROPBOX_EXAMPLES_ROOT}/{category}/{old_name}"
+        new_path = f"{DROPBOX_EXAMPLES_ROOT}/{category}/{new_name}"
+        move_file_in_dropbox(old_path, new_path)
+        return new_path
+    except Exception as e:
+        handle_error(e, code="DB_EXAMPLES_RENAME_001", raise_it=True)
 
 
 # ---------------------------
@@ -247,5 +280,5 @@ def increment_quota_usage(tenant_id: str, key: str, amount: int = 1):
         handle_error(e, code="DB_QUOTA_INCREMENT_001", raise_it=True)
 
 
-# Initialize DB and ensure tables exist
+# Initialize DB
 init_db()
