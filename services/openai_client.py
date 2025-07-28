@@ -20,7 +20,14 @@ class OpenAIClient:
         self.client = AsyncOpenAI(api_key=self.config.OPENAI_API_KEY)
         self.model = getattr(self.config, "OPENAI_MODEL", DEFAULT_MODEL)
 
-    async def _generate(self, prompt: str, model: str, system_msg: str, temperature: float, test_mode: bool) -> str:
+    async def _generate(
+        self,
+        prompt: str,
+        model: str,
+        system_msg: str,
+        temperature: float,
+        test_mode: bool
+    ) -> str:
         """
         Internal non-decorated async generator method.
         """
@@ -116,7 +123,27 @@ class OpenAIClient:
             )
 
 
+# Singleton instance
 openai_client_instance = OpenAIClient()
+
+
+async def safe_generate_async(
+    prompt: str,
+    model: str = None,
+    system_msg: str = DEFAULT_SYSTEM_MSG,
+    temperature: float = 0.4,
+    test_mode: bool = False,
+) -> str:
+    """
+    Async wrapper for external calls (preferred for all internal code).
+    """
+    return await openai_client_instance.safe_generate(
+        prompt=prompt,
+        model=model,
+        system_msg=system_msg,
+        temperature=temperature,
+        test_mode=test_mode,
+    )
 
 
 def safe_generate(
@@ -127,14 +154,21 @@ def safe_generate(
     test_mode: bool = False,
 ) -> str:
     """
-    Sync wrapper for external calls. This calls the singleton client instance.
+    Legacy sync wrapper for backward compatibility.
+    Uses run_until_complete but does not block async event loops.
     """
-    return asyncio.run(
-        openai_client_instance.safe_generate(
-            prompt=prompt,
-            model=model,
-            system_msg=system_msg,
-            temperature=temperature,
-            test_mode=test_mode,
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    if loop.is_running():
+        # If already inside an event loop, schedule the async call
+        return asyncio.ensure_future(
+            safe_generate_async(prompt, model, system_msg, temperature, test_mode)
         )
-    )
+    else:
+        return loop.run_until_complete(
+            safe_generate_async(prompt, model, system_msg, temperature, test_mode)
+        )

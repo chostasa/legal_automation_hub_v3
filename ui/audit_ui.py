@@ -12,11 +12,13 @@ from logger import logger
 
 def run_ui():
     try:
+        # Get tenant and branding info
         tenant_id = get_tenant_id()
         branding = get_tenant_branding(tenant_id)
 
         st.title(f"📜 Audit Log Viewer – {branding.get('firm_name', tenant_id)}")
 
+        # Role-based filtering logic
         user_role = get_user_role()
         if user_role != "admin":
             st.warning("You do not have permission to view all audit logs. Showing your logs only.")
@@ -37,13 +39,18 @@ def run_ui():
                 logger.warning(f"[AUDIT_UI] Failed to load audit metrics: {metric_err}")
                 st.write("⚠️ Unable to load audit metrics.")
 
-        # Load audit logs
+        # Load and enforce tenant-filtered audit logs
         with st.spinner("Loading audit logs..."):
             logs = fetch_audit_events(
                 user_id=user_id_filter.strip() if isinstance(user_id_filter, str) else user_id_filter,
                 action=action_filter.strip() or None,
-                limit=limit
+                limit=limit,
+                tenant_id=tenant_id  # enforce tenant-level isolation
             )
+
+        # Additional tenant-level filtering in case fetch_audit_events does not hard filter
+        if logs:
+            logs = [log for log in logs if log.get("tenant_id") == tenant_id]
 
         # Display results
         if logs:
@@ -53,7 +60,11 @@ def run_ui():
             export_ready = []
             for log in logs:
                 export_ready.append(log)
-                with st.expander(f"{log['timestamp']} – {log['action']} (User: {log.get('user_id','-')})"):
+                # Display each log's JSON with expandable details
+                with st.expander(
+                    f"{log.get('timestamp', 'Unknown')} – {log.get('action', 'No Action')} "
+                    f"(User: {log.get('user_id', '-')})"
+                ):
                     st.json(log)
 
             # Export Buttons
@@ -79,6 +90,7 @@ def run_ui():
             st.info("No audit events match your filter.")
 
     except Exception as e:
+        # Log and show user-friendly error
         logger.exception(f"[AUDIT_UI] Unexpected error: {e}")
         msg = handle_error(e, code="AUDIT_UI_001")
         st.error(msg)

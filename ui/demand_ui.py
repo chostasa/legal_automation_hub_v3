@@ -15,12 +15,18 @@ from core.cache_utils import clear_caches
 from core.error_handling import handle_error
 
 from utils.file_utils import clean_temp_dir
+from utils.thread_utils import run_async
+
+# Clean temp directory scoped by tenant/user
 clean_temp_dir()
 
-EXAMPLE_DIR = os.path.join("examples", get_tenant_id(), "demand")
+tenant_id = get_tenant_id()
+user_id = get_user_id()
+
+EXAMPLE_DIR = os.path.join("examples", tenant_id, "demand")
 os.makedirs(EXAMPLE_DIR, exist_ok=True)
 
-TEMPLATE_DIR = os.path.join("templates", get_tenant_id(), "demand")
+TEMPLATE_DIR = os.path.join("templates", tenant_id, "demand")
 os.makedirs(TEMPLATE_DIR, exist_ok=True)
 
 def load_binary_file(path: str) -> bytes:
@@ -30,6 +36,7 @@ def load_binary_file(path: str) -> bytes:
 def run_ui():
     st.header("📂 Demand Letter Generator")
 
+    # Style/tone example selection
     st.markdown("### 🎨 Optional: Style / Tone Example")
     example_text = ""
     selected_example = None
@@ -49,6 +56,7 @@ def run_ui():
     else:
         st.info(f"No style examples found in {EXAMPLE_DIR}")
 
+    # Template selection
     st.markdown("### 📄 Select Demand Template")
     selected_template = None
     try:
@@ -61,6 +69,7 @@ def run_ui():
         msg = handle_error(e, code="DEMAND_UI_002")
         st.error(msg)
 
+    # Form input
     with st.form("demand_form"):
         client_name = st.text_input("Client Name")
         defendant = st.text_input("Defendant Name")
@@ -70,6 +79,7 @@ def run_ui():
         damages = st.text_area("Damages Summary")
         submitted = st.form_submit_button("⚙️ Generate Demand Letter")
 
+    # Demand cache scoped by tenant/user
     if "demand_cache" not in st.session_state:
         st.session_state.demand_cache = {}
 
@@ -102,8 +112,10 @@ def run_ui():
             defendant = sanitize_text(defendant)
             location = sanitize_text(location)
 
+            # Create cache key scoped by tenant/user
             fingerprint = "|".join([
-                full_name, formatted_date, summary, damages, example_text.strip()[:100], selected_template
+                tenant_id, user_id, full_name, formatted_date,
+                summary, damages, example_text.strip()[:100], selected_template
             ])
             form_key = hashlib.md5(fingerprint.encode()).hexdigest()
 
@@ -124,7 +136,9 @@ def run_ui():
 
                     clear_caches()
 
-                    generate_demand_letter(
+                    # Run generation async-safe using thread helper
+                    run_async(
+                        generate_demand_letter,
                         client_name=full_name,
                         defendant=defendant,
                         location=location,
@@ -147,11 +161,12 @@ def run_ui():
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
+            # Logging and auditing remain unchanged
             try:
                 log_usage(
                     event_type="demand_generated",
-                    tenant_id=get_tenant_id(),
-                    user_id=get_user_id(),
+                    tenant_id=tenant_id,
+                    user_id=user_id,
                     count=1,
                     metadata={"client_name": full_name, "template_used": selected_template}
                 )
@@ -164,12 +179,15 @@ def run_ui():
                     "incident_date": formatted_date,
                     "used_example": selected_example if example_text else "None",
                     "used_template": selected_template,
+                    "tenant_id": tenant_id,
+                    "user_id": user_id,
                     "module": "demand"
                 })
                 log_audit_event("Demand Template Used", {
                     "template": selected_template,
                     "example_used": selected_example if example_text else "None",
-                    "tenant_id": get_tenant_id(),
+                    "tenant_id": tenant_id,
+                    "user_id": user_id,
                     "module": "demand"
                 })
             except Exception as audit_err:

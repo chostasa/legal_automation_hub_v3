@@ -7,19 +7,23 @@ import datetime
 from logger import logger
 
 def _hash_audit_entry(tenant_id: str, user_id: str, action: str, metadata: dict) -> str:
+    """
+    Creates a tamper-proof SHA256 hash for each audit entry using tenant, user, action, metadata, and UTC timestamp.
+    """
     data = f"{tenant_id}|{user_id}|{action}|{metadata}|{datetime.datetime.utcnow().isoformat()}"
     return hashlib.sha256(data.encode()).hexdigest()
 
 def log_audit_event(action: str, metadata: dict = None):
     """
     Log a structured audit event to the database with user and tenant context.
-    Includes tamper-proof hashing and monitoring.
+    Includes tamper-proof hashing, tenant isolation, and full error resilience.
     """
     try:
         tenant_id = get_tenant_id()
         user_id = get_user_id()
         user_role = get_user_role()
 
+        # Ensure metadata is clean and safe
         clean_metadata = {}
         if metadata:
             for k, v in metadata.items():
@@ -27,6 +31,7 @@ def log_audit_event(action: str, metadata: dict = None):
 
         audit_hash = _hash_audit_entry(tenant_id, user_id, action, clean_metadata)
 
+        # Write to DB
         insert_audit_event(
             tenant_id=tenant_id,
             user_id=user_id,
@@ -37,7 +42,7 @@ def log_audit_event(action: str, metadata: dict = None):
         )
 
         try:
-            logger.info(f"[AUDIT] {tenant_id} - {user_id} - {action}")
+            logger.info(f"[AUDIT] tenant={tenant_id} user={user_id} action={action}")
         except Exception as log_err:
             logger.warning(redact_log(mask_phi(f"⚠️ Failed to push audit metric: {log_err}")))
 
@@ -48,12 +53,16 @@ def log_audit_event(action: str, metadata: dict = None):
 def fetch_audit_events(user_id: str = None, action: str = None, limit: int = 50):
     """
     Retrieve audit events for the current tenant with optional filters.
-    Validates tenant isolation and role-based access and logs metrics.
+    Validates tenant isolation and enforces role-based access control.
+    Non-admins can only see their own events.
     """
     try:
         tenant_id = get_tenant_id()
         current_role = get_user_role()
-        if current_role != "Admin" and user_id is None:
+
+        # Enforce tenant isolation
+        # Non-admins can only view their own logs
+        if current_role.lower() != "admin":
             user_id = get_user_id()
 
         events = get_audit_events(
@@ -63,12 +72,16 @@ def fetch_audit_events(user_id: str = None, action: str = None, limit: int = 50)
             limit=limit
         )
 
+        # Hard-verify tenant isolation on fetched events
+        safe_events = [e for e in events if e.get("tenant_id") == tenant_id]
+
         try:
-            logger.info(f"[AUDIT_FETCH] {tenant_id} fetched {len(events)} events")
+            logger.info(f"[AUDIT_FETCH] tenant={tenant_id} fetched {len(safe_events)} events")
         except Exception as log_err:
             logger.warning(redact_log(mask_phi(f"⚠️ Failed to push audit fetch metric: {log_err}")))
 
-        return events
+        return safe_events
+
     except Exception as e:
         safe_error = redact_log(mask_phi(f"❌ Failed to fetch audit events: {e}"))
         handle_error(safe_error, code="AUDIT_LOG_002", raise_it=True)

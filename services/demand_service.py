@@ -7,7 +7,8 @@ from openpyxl import load_workbook
 from core.security import mask_phi, redact_log, sanitize_text
 from core.error_handling import handle_error
 from utils.docx_utils import replace_text_in_docx_all
-from utils.file_utils import validate_file_size
+from utils.file_utils import validate_file_size, get_session_temp_dir
+from utils.thread_utils import run_in_thread
 from logger import logger
 
 from prompts.prompt_factory import build_prompt
@@ -15,7 +16,10 @@ from core.prompts.demand_example import EXAMPLE_DEMAND, SETTLEMENT_EXAMPLE
 from services.openai_client import safe_generate
 from core.usage_tracker import check_quota_and_decrement
 
-def generate_brief_synopsis(summary: str, full_name: str, example_text: str = None) -> str:
+
+# === Async prompt generators ===
+
+async def generate_brief_synopsis(summary: str, full_name: str, example_text: str = None) -> str:
     try:
         if not summary:
             raise ValueError("No summary text provided for brief synopsis.")
@@ -27,12 +31,18 @@ def generate_brief_synopsis(summary: str, full_name: str, example_text: str = No
             client_name=full_name,
             example=example_text,
         )
-        result = safe_generate(prompt)
+        result = await safe_generate(prompt)
         return result.split(".")[0].strip() + "." if result else "[Brief synopsis unavailable.]"
     except Exception as e:
-        return handle_error(e, code="DEMAND_SYNOPSIS_001", user_message="Failed to generate brief synopsis.", raise_it=True)
+        return handle_error(
+            e,
+            code="DEMAND_SYNOPSIS_001",
+            user_message="Failed to generate brief synopsis.",
+            raise_it=True
+        )
 
-def generate_combined_facts(summary: str, first_name: str, example_text: str = None) -> str:
+
+async def generate_combined_facts(summary: str, first_name: str, example_text: str = None) -> str:
     try:
         if not summary:
             raise ValueError("No summary text provided for facts section.")
@@ -44,11 +54,17 @@ def generate_combined_facts(summary: str, first_name: str, example_text: str = N
             client_name=first_name,
             example=example_text or EXAMPLE_DEMAND,
         )
-        return safe_generate(prompt)
+        return await safe_generate(prompt)
     except Exception as e:
-        return handle_error(e, code="DEMAND_FACTS_001", user_message="Failed to generate facts section.", raise_it=True)
+        return handle_error(
+            e,
+            code="DEMAND_FACTS_001",
+            user_message="Failed to generate facts section.",
+            raise_it=True
+        )
 
-def generate_combined_damages(damages_text: str, first_name: str, example_text: str = None) -> str:
+
+async def generate_combined_damages(damages_text: str, first_name: str, example_text: str = None) -> str:
     try:
         if not damages_text:
             raise ValueError("No damages text provided for damages section.")
@@ -60,11 +76,17 @@ def generate_combined_damages(damages_text: str, first_name: str, example_text: 
             client_name=first_name,
             example=example_text,
         )
-        return safe_generate(prompt)
+        return await safe_generate(prompt)
     except Exception as e:
-        return handle_error(e, code="DEMAND_DAMAGES_001", user_message="Failed to generate damages section.", raise_it=True)
+        return handle_error(
+            e,
+            code="DEMAND_DAMAGES_001",
+            user_message="Failed to generate damages section.",
+            raise_it=True
+        )
 
-def generate_settlement_demand(summary: str, damages: str, first_name: str, example_text: str = None) -> str:
+
+async def generate_settlement_demand(summary: str, damages: str, first_name: str, example_text: str = None) -> str:
     try:
         if not summary and not damages:
             raise ValueError("Summary and damages text are missing for settlement demand.")
@@ -76,11 +98,20 @@ def generate_settlement_demand(summary: str, damages: str, first_name: str, exam
             client_name=first_name,
             example=example_text or SETTLEMENT_EXAMPLE,
         )
-        return safe_generate(prompt)
+        return await safe_generate(prompt)
     except Exception as e:
-        return handle_error(e, code="DEMAND_SETTLEMENT_001", user_message="Failed to generate settlement demand.", raise_it=True)
+        return handle_error(
+            e,
+            code="DEMAND_SETTLEMENT_001",
+            user_message="Failed to generate settlement demand.",
+            raise_it=True
+        )
+
 
 def replace_placeholders(doc: Document, replacements: dict):
+    """
+    Replaces inline placeholders ({{Placeholder}}) in a Word document.
+    """
     for paragraph in doc.paragraphs:
         text = paragraph.text
         for key, val in replacements.items():
@@ -102,7 +133,8 @@ def replace_placeholders(doc: Document, replacements: dict):
                         paragraph.clear()
                         paragraph.add_run(text)
 
-def fill_template(data: dict, template_path: str, output_dir: str) -> str:
+
+async def fill_template(data: dict, template_path: str, output_dir: str) -> str:
     try:
         if not data or not isinstance(data, dict):
             raise ValueError("Input data for template filling is missing or invalid.")
@@ -113,6 +145,8 @@ def fill_template(data: dict, template_path: str, output_dir: str) -> str:
                 user_message="Demand template not found.",
                 raise_it=True,
             )
+
+        # Validate file size and prepare output
         validate_file_size(template_path)
         doc = Document(template_path)
 
@@ -132,22 +166,33 @@ def fill_template(data: dict, template_path: str, output_dir: str) -> str:
             "{{RecipientName}}": sanitize_text(data.get("RecipientName", "[Recipient Name]")),
             "{{ClientName}}": full_name or "[Client Name]",
             "{{IncidentDate}}": incident_date,
-            "{{BriefSynopsis}}": generate_brief_synopsis(summary, full_name, data.get("Example Text")),
-            "{{Demand}}": generate_combined_facts(summary, first_name, data.get("Example Text")),
-            "{{Damages}}": generate_combined_damages(damages, first_name, data.get("Example Text")),
-            "{{SettlementDemand}}": generate_settlement_demand(summary, damages, first_name, data.get("Example Text")),
+            "{{BriefSynopsis}}": await generate_brief_synopsis(summary, full_name, data.get("Example Text")),
+            "{{Demand}}": await generate_combined_facts(summary, first_name, data.get("Example Text")),
+            "{{Damages}}": await generate_combined_damages(damages, first_name, data.get("Example Text")),
+            "{{SettlementDemand}}": await generate_settlement_demand(summary, damages, first_name, data.get("Example Text")),
         }
 
         replace_placeholders(doc, replacements)
+
+        # Use isolated session temp directory
         os.makedirs(output_dir, exist_ok=True)
         output_filename = f"Demand_{full_name.replace(' ', '_') if full_name else 'Client'}_{datetime.today().strftime('%Y-%m-%d')}.docx"
         output_path = os.path.join(output_dir, output_filename)
-        doc.save(output_path)
-        return output_path
-    except Exception as e:
-        handle_error(e, code="DEMAND_FILL_001", user_message="Failed to fill demand template.", raise_it=True)
 
-def generate_all_demands(template_path: str, excel_path: str, output_dir: str):
+        # Save Word doc using thread offload
+        run_in_thread(doc.save, output_path)
+        return output_path
+
+    except Exception as e:
+        handle_error(
+            e,
+            code="DEMAND_FILL_001",
+            user_message="Failed to fill demand template.",
+            raise_it=True
+        )
+
+
+async def generate_all_demands(template_path: str, excel_path: str, output_dir: str):
     try:
         if not os.path.exists(excel_path):
             handle_error(
@@ -156,21 +201,33 @@ def generate_all_demands(template_path: str, excel_path: str, output_dir: str):
                 user_message="Excel input file not found.",
                 raise_it=True,
             )
-        wb = load_workbook(excel_path)
+
+        wb = run_in_thread(load_workbook, excel_path)
         sheet = wb.active
         headers = [str(cell.value).strip() for cell in sheet[1] if cell.value]
+
         os.makedirs(output_dir, exist_ok=True)
 
         for idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
             data = dict(zip(headers, row))
             if not data.get("Client Name", "").strip():
-                logger.warning(redact_log(mask_phi(f"[DEMAND_BATCH_SKIP] Row {idx} skipped: missing Client Name")))
+                logger.warning(
+                    redact_log(mask_phi(f"[DEMAND_BATCH_SKIP] Row {idx} skipped: missing Client Name"))
+                )
                 continue
-            fill_template(data, template_path, output_dir)
-    except Exception as e:
-        handle_error(e, code="DEMAND_BATCH_001", user_message="Failed to generate demand letters from Excel.", raise_it=True)
 
-def generate_demand_letter(
+            await fill_template(data, template_path, output_dir)
+
+    except Exception as e:
+        handle_error(
+            e,
+            code="DEMAND_BATCH_001",
+            user_message="Failed to generate demand letters from Excel.",
+            raise_it=True
+        )
+
+
+async def generate_demand_letter(
     client_name: str,
     defendant: str,
     location: str,
@@ -192,15 +249,26 @@ def generate_demand_letter(
             "RecipientName": defendant,
             "Example Text": example_text or "",
         }
-        return output_path, fill_template(data, template_path, os.path.dirname(output_path))
+        return output_path, await fill_template(data, template_path, os.path.dirname(output_path))
     except Exception as e:
-        handle_error(e, code="DEMAND_GEN_001", user_message="Failed to generate demand letter.", raise_it=True)
+        handle_error(
+            e,
+            code="DEMAND_GEN_001",
+            user_message="Failed to generate demand letter.",
+            raise_it=True
+        )
+
 
 if __name__ == "__main__":
     try:
         TEMPLATE_PATH = "templates/demand_template.docx"
         EXCEL_PATH = "data_demand_requests.xlsx"
-        OUTPUT_DIR = "output_requests"
-        generate_all_demands(TEMPLATE_PATH, EXCEL_PATH, OUTPUT_DIR)
+        OUTPUT_DIR = get_session_temp_dir()  # Isolated temp dir
+        import asyncio
+        asyncio.run(generate_all_demands(TEMPLATE_PATH, EXCEL_PATH, OUTPUT_DIR))
     except Exception as e:
-        handle_error(e, code="DEMAND_MAIN_001", user_message="Error in main demand generator run.")
+        handle_error(
+            e,
+            code="DEMAND_MAIN_001",
+            user_message="Error in main demand generator run."
+        )

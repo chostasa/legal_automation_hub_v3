@@ -1,15 +1,18 @@
 import os
+import asyncio
+from utils.thread_utils import run_in_thread, run_async
 from services.openai_client import safe_generate
 from utils.docx_utils import replace_text_in_docx_all
 from core.security import sanitize_text, redact_log, mask_phi
 from core.error_handling import handle_error
 from core.usage_tracker import check_quota_and_decrement
 from core.auth import get_tenant_id
+from utils.file_utils import get_session_temp_dir
 from logger import logger
 from core.prompts.prompt_factory import build_prompt
 
 
-def generate_synopsis(casesynopsis: str) -> str:
+async def generate_synopsis(casesynopsis: str) -> str:
     """
     Generate a summary synopsis from the provided case synopsis text.
     """
@@ -18,7 +21,7 @@ def generate_synopsis(casesynopsis: str) -> str:
             raise ValueError("Case synopsis is missing or invalid.")
 
         prompt = build_prompt("foia", "Synopsis", casesynopsis)
-        summary = safe_generate(prompt=prompt)
+        summary = await safe_generate(prompt=prompt)
         if not summary or "legal summarization assistant" in summary.lower():
             return "[Synopsis failed to generate. Check input.]"
         return summary
@@ -31,7 +34,7 @@ def generate_synopsis(casesynopsis: str) -> str:
         )
 
 
-def generate_foia_request(data: dict, template_path: str, output_path: str, example_text: str = "") -> tuple:
+async def generate_foia_request(data: dict, template_path: str, output_path: str, example_text: str = "") -> tuple:
     """
     Generates a FOIA request letter (.docx) and returns the file path, body text, and bullet list.
     """
@@ -46,13 +49,15 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
         tenant_id = get_tenant_id()
         check_quota_and_decrement(tenant_id, "foia_requests")
 
+        # sanitize all inputs
         for k, v in data.items():
             if isinstance(v, str):
                 data[k] = sanitize_text(v)
 
         raw_synopsis = data.get("synopsis", "").strip()
-        data["synopsis_summary"] = generate_synopsis(raw_synopsis) if raw_synopsis else "[No synopsis provided]"
+        data["synopsis_summary"] = await generate_synopsis(raw_synopsis) if raw_synopsis else "[No synopsis provided]"
 
+        # Build bullet request list
         bullet_prompt = build_prompt(
             "foia",
             data.get("case_type", "FOIA Request"),
@@ -60,10 +65,11 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             client_name=data.get("client_id", ""),
             extra_instructions=data.get("explicit_instructions", ""),
         )
-        request_list = safe_generate(prompt=bullet_prompt)
+        request_list = await safe_generate(prompt=bullet_prompt)
         if not request_list:
             raise ValueError("Failed to generate FOIA request list.")
 
+        # Build FOIA body letter
         letter_prompt = build_prompt(
             "foia",
             "FOIA Letter",
@@ -72,11 +78,12 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             extra_instructions=data.get("explicit_instructions", ""),
             example=example_text
         )
-        foia_body = safe_generate(prompt=letter_prompt)
+        foia_body = await safe_generate(prompt=letter_prompt)
         foia_body = sanitize_text(foia_body)
         if not foia_body:
             raise ValueError("Failed to generate FOIA letter body text.")
 
+        # Build replacements dict
         replacements = {
             "date": data.get("formatted_date", ""),
             "clientid": data.get("client_id", ""),
@@ -90,6 +97,7 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             "stateresponsetime": data.get("state_response_time", ""),
         }
 
+        # Escape any placeholder formatting issues
         for k, v in replacements.items():
             if isinstance(v, str):
                 replacements[k] = v.replace("{{", "{ {").replace("}}", "} }")
@@ -99,7 +107,8 @@ def generate_foia_request(data: dict, template_path: str, output_path: str, exam
             logger.debug(f"  - {k}: {v[:100]!r}{'...' if len(v) > 100 else ''}")
 
         try:
-            replace_text_in_docx_all(template_path, replacements, output_path)
+            # Run template replacement in a thread to avoid blocking
+            await run_async(run_in_thread, replace_text_in_docx_all, template_path, replacements, output_path)
         except Exception as docx_error:
             logger.warning(redact_log(mask_phi(f"[FOIA_GEN_002] ⚠️ DOCX rendering error: {docx_error}")))
             with open(output_path.replace(".docx", "_FAILED.txt"), "w", encoding="utf-8") as f:

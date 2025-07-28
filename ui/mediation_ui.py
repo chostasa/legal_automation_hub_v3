@@ -2,37 +2,51 @@ import streamlit as st
 import os
 import hashlib
 import json
+import asyncio
 
-from utils.file_utils import clean_temp_dir
-from core.session_utils import get_session_temp_dir
+from utils.file_utils import clean_temp_dir, get_session_temp_dir
+from core.session_utils import get_session_temp_dir as legacy_get_session_temp_dir
 from core.security import sanitize_text, redact_log, mask_phi
 from core.cache_utils import clear_caches
 from core.audit import log_audit_event
-from core.auth import get_tenant_id, get_user_role
+from core.auth import get_tenant_id, get_user_role, get_user_id
 from core.error_handling import handle_error
-from core.usage_tracker import check_quota, decrement_quota
+from core.usage_tracker import check_quota, decrement_quota, log_usage
 from logger import logger
+from utils.thread_utils import run_async
 from services.memo_service import (
     generate_quotes_from_raw_depo,
     generate_memo_from_fields,
     generate_plaintext_memo
 )
 
+# Clean only base tmp dir once
 clean_temp_dir()
 
 ERROR_CODE = "MEMO_GEN_001"
 
+
 def stream_file(path: str):
+    """Stream file in chunks for downloads."""
     with open(path, "rb") as f:
         while chunk := f.read(8192):
             yield chunk
+
+
+async def run_async_memo_generation(data, template_path, temp_dir):
+    """Async wrapper for memo generation."""
+    return await run_async(generate_memo_from_fields, data, template_path, temp_dir)
+
 
 def run_ui():
     st.header("🗞 Mediation Memo Generator")
 
     try:
         tenant_id = get_tenant_id()
+        user_id = get_user_id()
         role = get_user_role()
+
+        # Tenant & user isolated directories
         template_dir = os.path.join("templates", tenant_id, "mediation")
         os.makedirs(template_dir, exist_ok=True)
         available_templates = [f for f in os.listdir(template_dir) if f.endswith(".docx")]
@@ -143,6 +157,7 @@ def run_ui():
                 st.error(f"❌ {msg}")
             return
 
+        # Save uploaded template to user/tenant isolated temp dir
         if template_choice == "Upload New Template" and uploaded_template:
             temp_dir = get_session_temp_dir()
             template_path = os.path.join(temp_dir, uploaded_template.name)
@@ -152,8 +167,9 @@ def run_ui():
         else:
             template_path = selected_template_path
 
+        # Cache key isolation includes tenant and user
         input_fingerprint = "|".join([
-            court, case_number, complaint_narrative, party_info,
+            tenant_id, user_id, court, case_number, complaint_narrative, party_info,
             settlement_summary, medical_summary, future_medical_bills, raw_depo,
             ",".join(plaintiffs), ",".join(defendants), ",".join(quote_categories),
             example_text, template_path or ""
@@ -166,6 +182,7 @@ def run_ui():
             with st.spinner("🔄 Processing..."):
                 try:
                     check_quota("memo_generation", amount=1)
+
                     raw_quotes = generate_quotes_from_raw_depo(raw_depo, quote_categories) if raw_depo else {}
 
                     data = {
@@ -190,7 +207,8 @@ def run_ui():
                         data[f"defendant{i}"] = sanitize_text(name)
 
                     temp_dir = get_session_temp_dir()
-                    file_path, memo_data = generate_memo_from_fields(data, template_path, temp_dir)
+                    file_path, memo_data = asyncio.run(run_async_memo_generation(data, template_path, temp_dir))
+
                     st.session_state.memo_cache[form_key] = (file_path, memo_data, raw_quotes)
                     decrement_quota("memo_generation", amount=1)
 
@@ -199,6 +217,7 @@ def run_ui():
                     st.error(msg)
                     return
 
+        # Party paragraph preview
         if action == "🔍 Preview Party Paragraphs":
             st.subheader("✏️ Review & Edit Party Paragraphs")
             if "party_edits" not in st.session_state:
@@ -221,6 +240,7 @@ def run_ui():
             st.info("💾 Your edits will be included when you select '📂 Generate Memo'.")
             return
 
+        # Apply edits if preview was used
         if "party_edits" in st.session_state:
             for key, val in st.session_state.party_edits.items():
                 memo_data[key] = val
@@ -253,14 +273,11 @@ def run_ui():
                     for q in value.strip().split("\n\n"):
                         st.markdown(f"- {q.strip()}")
 
-        from core.usage_tracker import log_usage
-        from core.auth import get_user_id
-
         try:
             log_usage(
                 event_type="memo_generated",
-                tenant_id=get_tenant_id(),
-                user_id=get_user_id(),
+                tenant_id=tenant_id,
+                user_id=user_id,
                 count=1,
                 metadata={
                     "court": court,
@@ -274,6 +291,7 @@ def run_ui():
 
         try:
             log_audit_event("Mediation Memo Generated", {
+                "tenant_id": tenant_id,
                 "court": court,
                 "case_number": case_number,
                 "plaintiffs": valid_plaintiffs,
@@ -288,7 +306,7 @@ def run_ui():
             log_audit_event("Mediation Template Used", {
                 "template": template_name,
                 "example_used": selected_example_name if example_text else "None",
-                "tenant_id": get_tenant_id(),
+                "tenant_id": tenant_id,
                 "module": "mediation"
             })
 
