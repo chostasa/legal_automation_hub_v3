@@ -1,18 +1,21 @@
 import stripe
 from core.error_handling import handle_error
-from core.auth import get_tenant_id
 
 STRIPE_API_KEY = "sk_test_placeholder"
-
 stripe.api_key = STRIPE_API_KEY
+
 
 def create_customer(email: str, tenant_id: str = None):
     try:
-        tenant_id = tenant_id or get_tenant_id()
+        # Lazy import to break circular import
+        if tenant_id is None:
+            from core.auth import get_tenant_id
+            tenant_id = get_tenant_id()
         return stripe.Customer.create(email=email, metadata={"tenant_id": tenant_id})
     except Exception as e:
         handle_error(e, code="BILLING_CREATE_CUSTOMER")
         return None
+
 
 def create_subscription(customer_id: str, price_id: str):
     try:
@@ -21,12 +24,14 @@ def create_subscription(customer_id: str, price_id: str):
         handle_error(e, code="BILLING_CREATE_SUBSCRIPTION")
         return None
 
+
 def fetch_invoices(customer_id: str):
     try:
         return stripe.Invoice.list(customer=customer_id)
     except Exception as e:
         handle_error(e, code="BILLING_FETCH_INVOICES")
         return []
+
 
 def record_usage(subscription_item_id: str, quantity: int):
     try:
@@ -39,6 +44,7 @@ def record_usage(subscription_item_id: str, quantity: int):
     except Exception as e:
         handle_error(e, code="BILLING_RECORD_USAGE")
         return None
+
 
 def cancel_subscription(subscription_id: str):
     try:

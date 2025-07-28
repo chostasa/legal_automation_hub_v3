@@ -5,7 +5,6 @@ from lxml import etree
 from utils.template_engine import render_docx_placeholders
 from docx import Document
 from core.error_handling import handle_error
-from utils.file_utils import validate_file_size
 from core.audit import log_audit_event
 from logger import logger
 import hashlib
@@ -139,3 +138,26 @@ def sanitize_filename(filename: str) -> str:
     """
     filename = re.sub(r'[<>:"/\\|?*]', '', filename)
     return filename.strip() or "untitled"
+
+
+def validate_file_size(file_path: str, max_size_mb: int = 10) -> None:
+    """
+    Validate that a file is not larger than max_size_mb.
+    """
+    size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    if size_mb > max_size_mb:
+        raise ValueError(f"File size {size_mb:.2f} MB exceeds the limit of {max_size_mb} MB.")
+
+def clean_temp_dir(base_dir: str = "data/tmp") -> None:
+    """
+    Removes all files and folders in the temporary directory.
+    """
+    import shutil
+
+    try:
+        if os.path.exists(base_dir):
+            shutil.rmtree(base_dir)
+            os.makedirs(base_dir, exist_ok=True)
+    except Exception as e:
+        raise RuntimeError(f"Failed to clean temp directory: {e}")
+

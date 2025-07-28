@@ -2,12 +2,12 @@ import os
 import functools
 from core.error_handling import handle_error
 from core.security import sanitize_text
-from core.usage_tracker import check_quota
 
 ROLES = {
     "admin": ["view_audit_logs", "manage_templates", "manage_users"],
     "staff": ["generate_documents", "send_emails"]
 }
+
 
 def get_user_id():
     try:
@@ -16,12 +16,14 @@ def get_user_id():
         handle_error(e, "AUTH_USER_001")
         return None
 
+
 def get_tenant_id():
     try:
         return os.environ.get("TENANT_ID", "test-tenant")
     except Exception as e:
         handle_error(e, "AUTH_TENANT_001")
         return None
+
 
 def get_user_role():
     try:
@@ -30,6 +32,7 @@ def get_user_role():
         handle_error(e, "AUTH_ROLE_001")
         return "staff"
 
+
 def user_has_permission(permission: str) -> bool:
     try:
         role = get_user_role()
@@ -37,6 +40,7 @@ def user_has_permission(permission: str) -> bool:
     except Exception as e:
         handle_error(e, "AUTH_PERM_001")
         return False
+
 
 def enforce_permission(permission: str):
     def decorator(func):
@@ -49,6 +53,7 @@ def enforce_permission(permission: str):
         return wrapper
     return decorator
 
+
 def enforce_tenant_scope(path: str) -> str:
     try:
         tenant_id = sanitize_text(get_tenant_id())
@@ -57,18 +62,23 @@ def enforce_tenant_scope(path: str) -> str:
         handle_error(e, "AUTH_SCOPE_001")
         return path
 
+
 def enforce_quota(event_type: str, amount: int = 1):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
+            # Lazy import to break circular import
+            from core.usage_tracker import check_quota
+            
             tenant_id = get_tenant_id()
             user_id = get_user_id()
-            if not check_quota(event_type, tenant_id, user_id, amount):
+            if not check_quota(tenant_id, user_id, event_type, amount):
                 handle_error(Exception("Quota exceeded"), "AUTH_QUOTA_001")
                 raise RuntimeError(f"Quota exceeded for event: {event_type}")
             return func(*args, **kwargs)
         return wrapper
     return decorator
+
 
 def map_domain_to_tenant(domain: str) -> str:
     try:
@@ -80,6 +90,7 @@ def map_domain_to_tenant(domain: str) -> str:
     except Exception as e:
         handle_error(e, "AUTH_DOMAIN_001")
         return "test-tenant"
+
 
 def get_tenant_branding(tenant_id: str) -> dict:
     try:

@@ -94,7 +94,9 @@ def check_quota(tenant_id: str, user_id: str, event_type: str, amount: int = 1) 
             return True
         within_limit = (current + amount) <= limit
         if not within_limit:
-            logger.warning(f"[USAGE_QUOTA] Tenant={tenant_id} User={user_id} Event={event_type} Current={current} Limit={limit}")
+            logger.warning(
+                f"[USAGE_QUOTA] Tenant={tenant_id} User={user_id} Event={event_type} Current={current} Limit={limit}"
+            )
         return within_limit
     except Exception as e:
         handle_error(e, "USAGE_QUOTA_CHECK_001")
@@ -114,3 +116,20 @@ def push_metrics_to_monitoring():
         logger.info("[METRICS] Pushing usage metrics to monitoring system...")
     except Exception as e:
         handle_error(e, "USAGE_METRICS_PUSH_001")
+
+
+def get_quota_status(tenant_id: str, user_id: str) -> dict:
+    """
+    Returns quota details for each event type: used, limit, remaining, and status.
+    """
+    summary = get_usage_summary(tenant_id, user_id)
+    status = {}
+    for event_type, limit in USAGE_QUOTAS.items():
+        used = summary.get(event_type, 0)
+        status[event_type] = {
+            "used": used,
+            "limit": limit,
+            "remaining": max(limit - used, 0),
+            "within_limit": used < limit,
+        }
+    return status
