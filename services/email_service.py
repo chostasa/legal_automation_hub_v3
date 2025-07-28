@@ -1,7 +1,6 @@
 import os
 import pandas as pd
 from datetime import datetime
-import asyncio
 from core.security import sanitize_text, sanitize_email, redact_log, mask_phi
 from core.constants import STATUS_INTAKE_COMPLETED, STATUS_QUESTIONNAIRE_SENT
 from core.auth import get_user_id, get_tenant_id
@@ -17,10 +16,11 @@ import json
 graph = GraphClient()
 neos = NeosClient()
 
-async def build_email(client_data: dict, template_key: str) -> tuple:
+
+async def build_email(client_data: dict, template_path: str) -> tuple:
     """
     Returns (subject, body, cc, sanitized_dict) for a given client row.
-    Validates input fields and applies sanitization.
+    Accepts the full template_path instead of just a key.
     """
     try:
         sanitized = {
@@ -38,15 +38,27 @@ async def build_email(client_data: dict, template_key: str) -> tuple:
                 details=f"Row data: {client_data}",
             )
 
-        subject, body, cc = merge_template(template_key, sanitized)
-        if not subject or not body:
+        # Validate template_path exists
+        if not template_path or not os.path.exists(template_path):
             raise AppError(
                 code="EMAIL_BUILD_002",
-                message=f"Template merge failed for template: {template_key}",
+                message=f"Template path is invalid or missing: {template_path}",
+                details=f"Sanitized data: {sanitized}"
+            )
+
+        # Pass the template_path into merge_template
+        subject, body, cc = merge_template(template_path, sanitized)
+        if not subject or not body:
+            raise AppError(
+                code="EMAIL_BUILD_003",
+                message=f"Template merge failed for template: {template_path}",
                 details=f"Sanitized data: {sanitized}",
             )
 
-        # Embed open-tracking pixel and click tracking (basic)
+        # Ensure cc is always a list
+        cc = cc or []
+
+        # Embed open-tracking pixel
         open_tracking_url = f"https://tracking.legalhub.app/open/{get_tenant_id()}/{get_user_id()}/{sanitized['CaseID']}"
         tracking_pixel = f'<img src="{open_tracking_url}" alt="" style="display:none" />'
         body = f"{body}\n\n{tracking_pixel}"
@@ -55,7 +67,7 @@ async def build_email(client_data: dict, template_key: str) -> tuple:
             "tenant_id": get_tenant_id(),
             "user_id": get_user_id(),
             "client_name": sanitized.get("ClientName"),
-            "template": template_key,
+            "template_path": template_path,
         })
 
         return subject, body, cc, sanitized
@@ -63,11 +75,13 @@ async def build_email(client_data: dict, template_key: str) -> tuple:
     except AppError:
         raise
     except Exception as e:
-        handle_error(e, code="EMAIL_BUILD_003", user_message="Failed to build email.", raise_it=True)
+        handle_error(e, code="EMAIL_BUILD_004", user_message="Failed to build email.", raise_it=True)
 
-async def send_email_and_update(client: dict, subject: str, body: str, cc: list, template_key: str) -> str:
+
+async def send_email_and_update(client: dict, subject: str, body: str, cc: list, template_path: str) -> str:
     """
     Sends the email, updates NEOS, logs usage and returns a result string.
+    Accepts template_path instead of template_key.
     """
     try:
         if not client.get("Email") or client["Email"] == "invalid@example.com":
@@ -76,22 +90,27 @@ async def send_email_and_update(client: dict, subject: str, body: str, cc: list,
                 message=f"Cannot send email: invalid email address for client {client.get('ClientName', '[Unknown]')}",
             )
 
-        # Billing-aware quota check
+        # Quota check (ensure signature order matches your check_quota)
         await check_quota("emails_sent", get_tenant_id(), get_user_id(), 1)
 
         with logger.contextualize(tenant_id=get_tenant_id(), user_id=get_user_id()):
             await graph.send_email(sender_address=None, to=client["Email"], subject=subject, body=body)
 
-        await neos.update_case_status(client.get("CaseID", ""), STATUS_QUESTIONNAIRE_SENT)
+        # Try NEOS update separately so email still counts if NEOS fails
+        try:
+            await neos.update_case_status(client.get("CaseID", ""), STATUS_QUESTIONNAIRE_SENT)
+        except Exception as e:
+            logger.warning(f"⚠️ NEOS update failed for CaseID {client.get('CaseID', '')}: {e}")
 
-        await log_email(client, subject, body, template_key, cc)
-        log_usage("emails_sent", get_tenant_id(), get_user_id(), 1, {"template": template_key})
+        # Log the email
+        await log_email(client, subject, body, template_path, cc)
+        log_usage("emails_sent", get_tenant_id(), get_user_id(), 1, {"template_path": template_path})
 
         log_audit_event("Email Sent", {
             "tenant_id": get_tenant_id(),
             "user_id": get_user_id(),
             "client_name": client.get("ClientName"),
-            "template": template_key,
+            "template_path": template_path,
             "case_id": client.get("CaseID", ""),
         })
 
@@ -109,9 +128,11 @@ async def send_email_and_update(client: dict, subject: str, body: str, cc: list,
         )
         return f"❌ Failed: {type(e).__name__}"
 
-async def log_email(client: dict, subject: str, body: str, template_key: str, cc: list):
+
+async def log_email(client: dict, subject: str, body: str, template_path: str, cc: list):
     """
     Appends the sent email metadata to a CSV + JSON log file.
+    Uses template_path for reference.
     """
     try:
         subject_clean = sanitize_text(subject)
@@ -131,8 +152,8 @@ async def log_email(client: dict, subject: str, body: str, template_key: str, cc
             "Email": email_clean,
             "Subject": subject_clean,
             "Body": body_clean,
-            "Template": template_key,
-            "CC List": ", ".join(cc),
+            "Template Path": template_path,
+            "CC List": ", ".join(cc or []),
             "Case ID": client.get("CaseID", ""),
             "Class Code Before": STATUS_INTAKE_COMPLETED,
             "Class Code After": STATUS_QUESTIONNAIRE_SENT,
@@ -141,18 +162,21 @@ async def log_email(client: dict, subject: str, body: str, template_key: str, cc
             "OpenTrackingURL": f"https://tracking.legalhub.app/open/{tenant_id}/{get_user_id()}/{client.get('CaseID', '')}"
         }
 
-        # Write CSV
+        # Write CSV (atomic append)
         if os.path.exists(csv_path):
             existing = pd.read_csv(csv_path)
             pd.concat([existing, pd.DataFrame([entry])], ignore_index=True).to_csv(csv_path, index=False)
         else:
             pd.DataFrame([entry]).to_csv(csv_path, index=False)
 
-        # Write JSON log
+        # Write JSON log (atomic append)
         existing_json = []
         if os.path.exists(json_path):
             with open(json_path, "r") as jf:
-                existing_json = json.load(jf)
+                try:
+                    existing_json = json.load(jf)
+                except json.JSONDecodeError:
+                    existing_json = []
         existing_json.append(entry)
         with open(json_path, "w") as jf:
             json.dump(existing_json, jf, indent=2)
@@ -161,7 +185,7 @@ async def log_email(client: dict, subject: str, body: str, template_key: str, cc
             "tenant_id": tenant_id,
             "user_id": get_user_id(),
             "client_name": name_clean,
-            "template": template_key,
+            "template_path": template_path,
         })
 
     except Exception as e:
