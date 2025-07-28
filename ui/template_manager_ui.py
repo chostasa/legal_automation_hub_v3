@@ -10,7 +10,9 @@ from core.audit import log_audit_event
 from core.cache_utils import clear_caches
 from core.error_handling import handle_error
 from logger import logger
-from core.db import insert_template, get_templates, soft_delete_template, update_template_name, insert_audit_event
+from core.db import (
+    get_templates, upload_template, delete_template, rename_template, insert_audit_event
+)
 from utils.docx_utils import replace_text_in_docx_all
 
 CATEGORIES = {
