@@ -20,7 +20,7 @@ neos = NeosClient()
 async def build_email(client_data: dict, template_path: str) -> tuple:
     """
     Returns (subject, body, cc, sanitized_dict) for a given client row.
-    Accepts the full template_path instead of just a key.
+    Uses full template_path provided by the caller.
     """
     try:
         sanitized = {
@@ -38,15 +38,15 @@ async def build_email(client_data: dict, template_path: str) -> tuple:
                 details=f"Row data: {client_data}",
             )
 
-        # Validate template_path exists
+        # Ensure the template exists at the specified path
         if not template_path or not os.path.exists(template_path):
             raise AppError(
                 code="EMAIL_BUILD_002",
                 message=f"Template path is invalid or missing: {template_path}",
-                details=f"Sanitized data: {sanitized}"
+                details=f"Sanitized data: {sanitized}",
             )
 
-        # Pass the template_path into merge_template
+        # Merge the template using the correct path
         subject, body, cc = merge_template(template_path, sanitized)
         if not subject or not body:
             raise AppError(
@@ -55,14 +55,15 @@ async def build_email(client_data: dict, template_path: str) -> tuple:
                 details=f"Sanitized data: {sanitized}",
             )
 
-        # Ensure cc is always a list
+        # Normalize CC
         cc = cc or []
 
-        # Embed open-tracking pixel
+        # Add tracking pixel
         open_tracking_url = f"https://tracking.legalhub.app/open/{get_tenant_id()}/{get_user_id()}/{sanitized['CaseID']}"
         tracking_pixel = f'<img src="{open_tracking_url}" alt="" style="display:none" />'
         body = f"{body}\n\n{tracking_pixel}"
 
+        # Log event
         log_audit_event("Email Built", {
             "tenant_id": get_tenant_id(),
             "user_id": get_user_id(),
@@ -75,13 +76,18 @@ async def build_email(client_data: dict, template_path: str) -> tuple:
     except AppError:
         raise
     except Exception as e:
-        handle_error(e, code="EMAIL_BUILD_004", user_message="Failed to build email.", raise_it=True)
+        handle_error(
+            e,
+            code="EMAIL_BUILD_004",
+            user_message="Failed to build email.",
+            raise_it=True
+        )
 
 
 async def send_email_and_update(client: dict, subject: str, body: str, cc: list, template_path: str) -> str:
     """
     Sends the email, updates NEOS, logs usage and returns a result string.
-    Accepts template_path instead of template_key.
+    Uses the full template_path.
     """
     try:
         if not client.get("Email") or client["Email"] == "invalid@example.com":
@@ -90,22 +96,29 @@ async def send_email_and_update(client: dict, subject: str, body: str, cc: list,
                 message=f"Cannot send email: invalid email address for client {client.get('ClientName', '[Unknown]')}",
             )
 
-        # Quota check (ensure signature order matches your check_quota)
+        # Quota check
         await check_quota("emails_sent", get_tenant_id(), get_user_id(), 1)
 
+        # Send email using Graph
         with logger.contextualize(tenant_id=get_tenant_id(), user_id=get_user_id()):
-            await graph.send_email(sender_address=None, to=client["Email"], subject=subject, body=body)
+            await graph.send_email(
+                sender_address=None,
+                to=client["Email"],
+                subject=subject,
+                body=body
+            )
 
-        # Try NEOS update separately so email still counts if NEOS fails
+        # Update NEOS status (non-blocking if it fails)
         try:
             await neos.update_case_status(client.get("CaseID", ""), STATUS_QUESTIONNAIRE_SENT)
         except Exception as e:
             logger.warning(f"⚠️ NEOS update failed for CaseID {client.get('CaseID', '')}: {e}")
 
-        # Log the email
+        # Log email
         await log_email(client, subject, body, template_path, cc)
         log_usage("emails_sent", get_tenant_id(), get_user_id(), 1, {"template_path": template_path})
 
+        # Audit
         log_audit_event("Email Sent", {
             "tenant_id": get_tenant_id(),
             "user_id": get_user_id(),
@@ -131,8 +144,7 @@ async def send_email_and_update(client: dict, subject: str, body: str, cc: list,
 
 async def log_email(client: dict, subject: str, body: str, template_path: str, cc: list):
     """
-    Appends the sent email metadata to a CSV + JSON log file.
-    Uses template_path for reference.
+    Logs email activity into CSV and JSON files using template_path.
     """
     try:
         subject_clean = sanitize_text(subject)
@@ -143,6 +155,7 @@ async def log_email(client: dict, subject: str, body: str, template_path: str, c
         tenant_id = get_tenant_id()
         log_dir = os.path.join("email_automation", "logs")
         os.makedirs(log_dir, exist_ok=True)
+
         csv_path = os.path.join(log_dir, f"{tenant_id}_sent_email_log.csv")
         json_path = os.path.join(log_dir, f"{tenant_id}_sent_email_log.json")
 
@@ -162,14 +175,14 @@ async def log_email(client: dict, subject: str, body: str, template_path: str, c
             "OpenTrackingURL": f"https://tracking.legalhub.app/open/{tenant_id}/{get_user_id()}/{client.get('CaseID', '')}"
         }
 
-        # Write CSV (atomic append)
+        # Append to CSV
         if os.path.exists(csv_path):
             existing = pd.read_csv(csv_path)
             pd.concat([existing, pd.DataFrame([entry])], ignore_index=True).to_csv(csv_path, index=False)
         else:
             pd.DataFrame([entry]).to_csv(csv_path, index=False)
 
-        # Write JSON log (atomic append)
+        # Append to JSON
         existing_json = []
         if os.path.exists(json_path):
             with open(json_path, "r") as jf:
@@ -181,6 +194,7 @@ async def log_email(client: dict, subject: str, body: str, template_path: str, c
         with open(json_path, "w") as jf:
             json.dump(existing_json, jf, indent=2)
 
+        # Audit event
         log_audit_event("Email Logged", {
             "tenant_id": tenant_id,
             "user_id": get_user_id(),

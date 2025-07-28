@@ -129,6 +129,7 @@ def run_ui():
                     st.warning(f"⚠️ Skipping {row_data['Client Name']} - missing email.")
                     continue
 
+                # Build email using template_path as-is (no additional manipulation)
                 subject, body, cc, client = asyncio.run(build_email(row_data, template_path))
 
                 subject_key = f"subject_{i}"
