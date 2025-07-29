@@ -8,6 +8,26 @@ from logger import logger
 from core.constants import DROPBOX_TEMPLATES_ROOT, DROPBOX_EXAMPLES_ROOT
 
 
+def normalize_path(path: str) -> str:
+    """
+    Normalize a Dropbox or local file path by fixing duplicate folders and extensions.
+    """
+    normalized_path = os.path.normpath(path)
+
+    # Fix duplicate folder names
+    if "templates/templates" in normalized_path:
+        normalized_path = normalized_path.replace("templates/templates", "templates")
+
+    # Fix duplicate extensions (.txt.txt, .docx.docx, .docx.txt, .txt.docx)
+    while normalized_path.endswith((".txt.txt", ".docx.docx", ".docx.txt", ".txt.docx")):
+        if ".txt" in normalized_path:
+            normalized_path = normalized_path.rsplit(".", 1)[0] + ".txt"
+        else:
+            normalized_path = normalized_path.rsplit(".", 1)[0] + ".docx"
+
+    return normalized_path
+
+
 class DropboxClient:
     def __init__(self, config: AppConfig = None):
         self.config = config or get_config()
@@ -27,7 +47,7 @@ class DropboxClient:
         self, file_path: str = None, sheet_name: str = "Master Dashboard"
     ) -> pd.DataFrame:
         """Download the dashboard Excel from Dropbox and return as DataFrame."""
-        path = file_path or self.config.DROPBOX_MASTER_DASHBOARD_PATH
+        path = normalize_path(file_path or self.config.DROPBOX_MASTER_DASHBOARD_PATH)
 
         try:
             metadata, res = self.dbx.files_download(path)
@@ -50,6 +70,7 @@ class DropboxClient:
         """
         List all files in a Dropbox folder. Auto-create folder if it doesn't exist.
         """
+        folder_path = normalize_path(folder_path)
         try:
             # Ensure the folder exists (create if missing)
             try:
@@ -67,7 +88,7 @@ class DropboxClient:
                     raise
 
             result = self.dbx.files_list_folder(folder_path)
-            files = [entry.name for entry in result.entries if hasattr(entry, "name")]
+            files = [normalize_path(entry.name) for entry in result.entries if hasattr(entry, "name")]
 
             logger.info(
                 f"[DROPBOX_LIST] 📂 Listed {len(files)} files in folder: {folder_path}"
@@ -82,14 +103,10 @@ class DropboxClient:
         Download a file from Dropbox to a local directory and return the local path.
         Ensures that duplicate paths and extensions are cleaned.
         """
+        dropbox_path = normalize_path(dropbox_path)
         try:
             os.makedirs(local_dir, exist_ok=True)
-            filename = os.path.basename(dropbox_path)
-
-            # Clean up duplicate extensions if any
-            if filename.endswith(".txt.txt"):
-                filename = filename.replace(".txt.txt", ".txt")
-
+            filename = normalize_path(os.path.basename(dropbox_path))
             local_path = os.path.join(local_dir, filename)
 
             metadata, res = self.dbx.files_download(dropbox_path)
@@ -117,6 +134,7 @@ class DropboxClient:
             f"{DROPBOX_EXAMPLES_ROOT}/mediation",
         ]
         for folder in base_folders:
+            folder = normalize_path(folder)
             try:
                 self.dbx.files_get_metadata(folder)
             except dropbox.exceptions.ApiError:
@@ -147,14 +165,8 @@ def download_template_file(category: str, filename: str, local_dir="templates"):
     """
     client = DropboxClient()
 
-    # Ensure filename is just the base name
-    filename = os.path.basename(filename)
-
-    # Fix duplicate extensions if any
-    if filename.endswith(".txt.txt"):
-        filename = filename.replace(".txt.txt", ".txt")
-
-    path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{filename}"
+    filename = normalize_path(os.path.basename(filename))
+    path = normalize_path(f"{DROPBOX_TEMPLATES_ROOT}/{category}/{filename}")
     return client.download_file(path, local_dir)
 
 
@@ -169,6 +181,6 @@ def download_example_file(module: str, filename: str, local_dir="examples"):
     Download example files safely, avoiding duplicate paths.
     """
     client = DropboxClient()
-    filename = os.path.basename(filename)
-    path = f"{DROPBOX_EXAMPLES_ROOT}/{module}/{filename}"
+    filename = normalize_path(os.path.basename(filename))
+    path = normalize_path(f"{DROPBOX_EXAMPLES_ROOT}/{module}/{filename}")
     return client.download_file(path, local_dir)

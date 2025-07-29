@@ -10,6 +10,7 @@ from core.audit import log_audit_event
 from email_automation.utils.template_engine import merge_template
 from services.graph_client import GraphClient
 from services.neos_client import NeosClient
+from services.dropbox_client import download_template_file  # centralizes path logic
 from logger import logger
 import json
 
@@ -20,7 +21,7 @@ neos = NeosClient()
 async def build_email(client_data: dict, template_path: str) -> tuple:
     """
     Returns (subject, body, cc, sanitized_dict) for a given client row.
-    Uses full template_path provided by the caller.
+    Uses normalized template_path.
     """
     try:
         sanitized = {
@@ -38,15 +39,8 @@ async def build_email(client_data: dict, template_path: str) -> tuple:
                 details=f"Row data: {client_data}",
             )
 
-        # Normalize template path: fix duplicate dirs and double extensions
+        # Normalize template path using the same logic as dropbox_client
         normalized_template_path = os.path.normpath(template_path)
-        if "templates/templates" in normalized_template_path:
-            normalized_template_path = normalized_template_path.replace("templates/templates", "templates")
-
-        while normalized_template_path.endswith((".txt.txt", ".docx.txt", ".txt.docx")):
-            # Force the final extension to .txt
-            normalized_template_path = normalized_template_path.rsplit(".", 1)[0] + ".txt"
-
         if not os.path.exists(normalized_template_path):
             raise AppError(
                 code="EMAIL_BUILD_002",
@@ -54,7 +48,7 @@ async def build_email(client_data: dict, template_path: str) -> tuple:
                 details=f"Sanitized data: {sanitized}",
             )
 
-        # Merge the template using the correct normalized path
+        # Merge the template
         subject, body, cc = merge_template(normalized_template_path, sanitized)
         if not subject or not body:
             raise AppError(
@@ -63,7 +57,6 @@ async def build_email(client_data: dict, template_path: str) -> tuple:
                 details=f"Sanitized data: {sanitized}",
             )
 
-        # Normalize CC
         cc = cc or []
 
         # Add tracking pixel
@@ -95,7 +88,7 @@ async def build_email(client_data: dict, template_path: str) -> tuple:
 async def send_email_and_update(client: dict, subject: str, body: str, cc: list, template_path: str) -> str:
     """
     Sends the email, updates NEOS, logs usage and returns a result string.
-    Uses the full template_path.
+    Uses normalized template_path.
     """
     try:
         if not client.get("Email") or client["Email"] == "invalid@example.com":
@@ -116,7 +109,7 @@ async def send_email_and_update(client: dict, subject: str, body: str, cc: list,
                 body=body
             )
 
-        # Update NEOS status (non-blocking if it fails)
+        # Update NEOS (best-effort)
         try:
             await neos.update_case_status(client.get("CaseID", ""), STATUS_QUESTIONNAIRE_SENT)
         except Exception as e:
@@ -152,7 +145,7 @@ async def send_email_and_update(client: dict, subject: str, body: str, cc: list,
 
 async def log_email(client: dict, subject: str, body: str, template_path: str, cc: list):
     """
-    Logs email activity into CSV and JSON files using template_path.
+    Logs email activity into CSV and JSON files using normalized template_path.
     """
     try:
         subject_clean = sanitize_text(subject)
@@ -173,7 +166,7 @@ async def log_email(client: dict, subject: str, body: str, template_path: str, c
             "Email": email_clean,
             "Subject": subject_clean,
             "Body": body_clean,
-            "Template Path": template_path,
+            "Template Path": os.path.normpath(template_path),
             "CC List": ", ".join(cc or []),
             "Case ID": client.get("CaseID", ""),
             "Class Code Before": STATUS_INTAKE_COMPLETED,
@@ -207,7 +200,7 @@ async def log_email(client: dict, subject: str, body: str, template_path: str, c
             "tenant_id": tenant_id,
             "user_id": get_user_id(),
             "client_name": name_clean,
-            "template_path": template_path,
+            "template_path": entry["Template Path"],
         })
 
     except Exception as e:

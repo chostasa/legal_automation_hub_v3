@@ -5,7 +5,6 @@ from datetime import datetime
 
 from core.auth import get_tenant_id, get_user_role, get_tenant_branding
 from utils.file_utils import sanitize_filename
-from core.security import redact_log, mask_phi
 from core.audit import log_audit_event
 from core.cache_utils import clear_caches
 from core.error_handling import handle_error
@@ -25,7 +24,6 @@ CATEGORIES = {
     "Email Templates": "email"
 }
 
-
 def normalize_filename(name: str, category: str) -> str:
     """
     Normalize a file name by removing duplicate extensions and ensuring the right extension.
@@ -33,14 +31,14 @@ def normalize_filename(name: str, category: str) -> str:
     name = os.path.basename(name)
     name = sanitize_filename(name)
 
-    # Fix duplicate extensions (e.g., .txt.txt, .docx.docx)
+    # Remove duplicate extensions (loops until fixed)
     while name.endswith((".txt.txt", ".docx.docx", ".docx.txt", ".txt.docx")):
         if ".txt" in name:
             name = name.rsplit(".", 1)[0] + ".txt"
         else:
             name = name.rsplit(".", 1)[0] + ".docx"
 
-    # Ensure correct extension by category
+    # Ensure proper extension
     if category == "email" and not name.endswith(".txt"):
         name = f"{os.path.splitext(name)[0]}.txt"
     elif category != "email" and not name.endswith(".docx"):
@@ -52,17 +50,15 @@ def normalize_filename(name: str, category: str) -> str:
 def run_ui():
     st.header("📪 Template & Style Example Manager")
 
-    # Fetch tenant and branding details
+    # Tenant info
     try:
         tenant_id = get_tenant_id()
         branding = get_tenant_branding(tenant_id)
         st.caption(f"Tenant: {branding.get('firm_name', tenant_id)}")
     except Exception as e:
-        msg = handle_error(e, code="TEMPLATE_UI_002")
-        st.error(msg)
+        st.error(handle_error(e, code="TEMPLATE_UI_002"))
         return
 
-    # Only admin users can access template manager
     if get_user_role() != "admin":
         st.warning("⚠️ Only Admins can manage templates.")
         return
@@ -83,31 +79,22 @@ def run_ui():
             allowed_types = ["txt"] if selected_category == "email" else ["docx"]
             upload_label = "Upload Template (.txt)" if selected_category == "email" else "Upload Template (.docx)"
 
-            uploaded_template = st.file_uploader(
-                upload_label, type=allowed_types, key="template_uploader"
-            )
-
-            tags = st.text_input("🏷️ Add tags (comma-separated)", key="template_tags")
+            uploaded_template = st.file_uploader(upload_label, type=allowed_types)
+            tags = st.text_input("🏷️ Add tags (comma-separated)")
 
             # Upload new template
             if uploaded_template:
                 try:
                     timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
                     normalized_name = normalize_filename(uploaded_template.name, selected_category)
-
                     versioned_name = f"{timestamp}_{normalized_name}"
-                    dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{versioned_name}"
 
-                    # Save to Dropbox
-                    client.dbx.files_upload(
-                        uploaded_template.getvalue(),
-                        dropbox_path,
-                        mode=WriteMode.overwrite
-                    )
+                    dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{versioned_name}"
+                    client.dbx.files_upload(uploaded_template.getvalue(), dropbox_path, mode=WriteMode.overwrite)
+
                     st.success(f"✅ Uploaded template: {versioned_name}")
                     clear_caches()
 
-                    # Log audit
                     log_audit_event("Template Uploaded", {
                         "filename": versioned_name,
                         "tags": tags,
@@ -116,60 +103,52 @@ def run_ui():
                         "module": "template_manager"
                     })
 
-                    # Preview (Word docs only)
+                    # Generate preview for Word templates
                     if selected_category != "email":
                         local_path = client.download_file(dropbox_path, "templates_preview")
                         preview_path = local_path.replace(".docx", "_preview.docx")
                         replace_text_in_docx_all(local_path, {"Preview": "Sample"}, preview_path)
                         st.download_button(
-                            "⬇️ Download Preview",
-                            open(preview_path, "rb"),
-                            file_name=os.path.basename(preview_path)
+                            "⬇️ Download Preview", open(preview_path, "rb"), file_name=os.path.basename(preview_path)
                         )
-
                 except Exception as e:
-                    msg = handle_error(e, code="TEMPLATE_UI_003")
-                    st.error(msg)
+                    st.error(handle_error(e, code="TEMPLATE_UI_003"))
 
             st.markdown("---")
-            search_filter = st.text_input("🔍 Search by name or tag", key="search_templates").lower()
+            search_filter = st.text_input("🔍 Search by name or tag").lower()
 
-            # Fetch templates from DB
+            # Load template list
             templates = get_templates(tenant_id=tenant_id, category=selected_category)
             matched_templates = [
                 t for t in templates
-                if search_filter in t.get("name", "").lower()
-                or search_filter in "".join(json.loads(t.get("tags", "[]"))).lower()
+                if search_filter in t.get("name", "").lower() or
+                search_filter in "".join(json.loads(t.get("tags", "[]"))).lower()
             ]
 
-            # Template list and actions
             if matched_templates:
                 for t in matched_templates:
                     name = t.get("name", "Unknown")
-                    tags_raw = t.get("tags", "[]")
-                    tags_list = json.loads(tags_raw) if tags_raw else []
+                    tags_list = json.loads(t.get("tags", "[]") or "[]")
+                    uploaded_at = t.get("uploaded_at", "")
 
                     col1, col2, col3 = st.columns([5, 2, 2])
                     with col1:
                         st.write(f"**{name}**")
                         if tags_list:
                             st.caption(f"🏷️ Tags: {', '.join(tags_list)}")
-
-                        uploaded_at = t.get("uploaded_at")
                         if uploaded_at:
                             st.caption(f"📅 Uploaded: {uploaded_at.split('T')[0]}")
 
-                    # Rename template
                     with col2:
                         new_name = st.text_input(
                             f"Rename {name}", value=name.rsplit(".", 1)[0], key=f"rename_{name}"
                         )
                         if st.button("Rename", key=f"rename_btn_{name}"):
                             try:
-                                old_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{name}"
                                 clean_new_name = normalize_filename(new_name, selected_category)
-
+                                old_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{name}"
                                 new_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{clean_new_name}"
+
                                 client.dbx.files_move_v2(old_path, new_path, autorename=False)
                                 st.success(f"✅ Renamed to {clean_new_name}")
                                 clear_caches()
@@ -177,15 +156,12 @@ def run_ui():
                                 log_audit_event("Template Renamed", {"from": name, "to": clean_new_name})
                                 st.rerun()
                             except Exception as e:
-                                msg = handle_error(e, code="TEMPLATE_UI_004")
-                                st.error(msg)
+                                st.error(handle_error(e, code="TEMPLATE_UI_004"))
 
-                    # Delete template
                     with col3:
                         if st.button("🗑️ Delete", key=f"delete_{name}"):
                             try:
-                                dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{name}"
-                                client.dbx.files_delete_v2(dropbox_path)
+                                client.dbx.files_delete_v2(f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{name}")
                                 st.success(f"✅ Deleted {name}")
                                 clear_caches()
 
@@ -194,14 +170,12 @@ def run_ui():
                                 })
                                 st.rerun()
                             except Exception as e:
-                                msg = handle_error(e, code="TEMPLATE_UI_005")
-                                st.error(msg)
+                                st.error(handle_error(e, code="TEMPLATE_UI_005"))
             else:
                 st.info("No templates found matching your search.")
 
         except Exception as e:
-            msg = handle_error(e, code="TEMPLATE_UI_006")
-            st.error(msg)
+            st.error(handle_error(e, code="TEMPLATE_UI_006"))
 
     # ==================== Tab 2: Style Examples ==================== #
     with tab2:
@@ -215,17 +189,17 @@ def run_ui():
 
             st.subheader(f"🖋️ {selected_example_label} Style Examples")
 
-            uploaded_example = st.file_uploader("Upload Style Example (.txt)", type=["txt"], key="example_uploader")
+            uploaded_example = st.file_uploader("Upload Style Example (.txt)", type=["txt"])
             if uploaded_example:
                 try:
                     normalized_name = normalize_filename(uploaded_example.name, "email")
-
                     example_path = os.path.join(example_dir, normalized_name)
+
                     with open(example_path, "wb") as f:
                         f.write(uploaded_example.read())
 
                     meta = {
-                        "filename": os.path.basename(example_path),
+                        "filename": normalized_name,
                         "uploaded_at": datetime.utcnow().isoformat(),
                         "tenant_id": tenant_id,
                         "category": example_category,
@@ -233,46 +207,40 @@ def run_ui():
                     with open(example_path.replace(".txt", ".json"), "w") as f:
                         json.dump(meta, f, indent=2)
 
-                    st.success(f"✅ Uploaded example: {os.path.basename(example_path)}")
+                    st.success(f"✅ Uploaded example: {normalized_name}")
                     clear_caches()
 
                     log_audit_event("Style Example Uploaded", {
-                        "filename": os.path.basename(example_path),
+                        "filename": normalized_name,
                         "tenant_id": tenant_id,
                         "category": example_category,
                         "module": "template_manager"
                     })
                 except Exception as e:
-                    msg = handle_error(e, code="TEMPLATE_UI_007")
-                    st.error(msg)
+                    st.error(handle_error(e, code="TEMPLATE_UI_007"))
 
             st.markdown("---")
-            search_filter = st.text_input("🔍 Search by name", key="search_examples").lower()
-
+            search_filter = st.text_input("🔍 Search by name").lower()
             examples = [f for f in os.listdir(example_dir) if f.endswith(".txt")]
-            matched_examples = []
-            for e in examples:
-                meta_path = os.path.join(example_dir, e.replace(".txt", ".json"))
-                meta = {}
-                if os.path.exists(meta_path):
-                    with open(meta_path, "r") as mf:
-                        meta = json.load(mf)
-                if search_filter in e.lower():
-                    matched_examples.append((e, meta.get("uploaded_at")))
 
-            # Example list and actions
-            if matched_examples:
-                for filename, uploaded_at in matched_examples:
+            if examples:
+                for filename in examples:
+                    meta_path = os.path.join(example_dir, filename.replace(".txt", ".json"))
+                    uploaded_at = ""
+                    if os.path.exists(meta_path):
+                        with open(meta_path, "r") as mf:
+                            meta = json.load(mf)
+                            uploaded_at = meta.get("uploaded_at", "")
+
+                    if search_filter not in filename.lower():
+                        continue
+
                     col1, col2, col3 = st.columns([5, 2, 2])
                     with col1:
                         st.write(f"🖋️ **{filename}**")
                         if uploaded_at:
                             st.caption(f"📅 Uploaded: {uploaded_at.split('T')[0]}")
 
-                    example_path = os.path.join(example_dir, filename)
-                    meta_path = example_path.replace(".txt", ".json")
-
-                    # Rename example
                     with col2:
                         new_name = st.text_input(
                             f"Rename {filename}", value=filename.replace(".txt", ""), key=f"rename_ex_{filename}"
@@ -280,17 +248,17 @@ def run_ui():
                         if st.button("Rename", key=f"rename_ex_btn_{filename}"):
                             try:
                                 clean_new_name = normalize_filename(new_name, "email")
-
                                 new_path = os.path.join(example_dir, clean_new_name)
+
                                 if os.path.exists(new_path):
                                     st.warning("⚠️ File with that name already exists.")
                                 else:
-                                    os.rename(example_path, new_path)
+                                    os.rename(example_dir + "/" + filename, new_path)
                                     if os.path.exists(meta_path):
                                         os.rename(meta_path, new_path.replace(".txt", ".json"))
+
                                     st.success(f"✅ Renamed to {clean_new_name}")
                                     clear_caches()
-
                                     log_audit_event("Style Example Renamed", {
                                         "from": filename,
                                         "to": clean_new_name,
@@ -300,19 +268,17 @@ def run_ui():
                                     })
                                     st.rerun()
                             except Exception as e:
-                                msg = handle_error(e, code="TEMPLATE_UI_008")
-                                st.error(msg)
+                                st.error(handle_error(e, code="TEMPLATE_UI_008"))
 
-                    # Delete example
                     with col3:
                         if st.button("🗑️ Delete", key=f"delete_ex_{filename}"):
                             try:
-                                os.remove(example_path)
+                                os.remove(example_dir + "/" + filename)
                                 if os.path.exists(meta_path):
                                     os.remove(meta_path)
+
                                 st.success(f"✅ Deleted {filename}")
                                 clear_caches()
-
                                 log_audit_event("Style Example Deleted", {
                                     "filename": filename,
                                     "tenant_id": tenant_id,
@@ -321,14 +287,12 @@ def run_ui():
                                 })
                                 st.rerun()
                             except Exception as e:
-                                msg = handle_error(e, code="TEMPLATE_UI_009")
-                                st.error(msg)
+                                st.error(handle_error(e, code="TEMPLATE_UI_009"))
             else:
                 st.info("No examples found matching your search.")
 
         except Exception as e:
-            msg = handle_error(e, code="TEMPLATE_UI_010")
-            st.error(msg)
+            st.error(handle_error(e, code="TEMPLATE_UI_010"))
 
     # ==================== Tab 3: Branding ==================== #
     with tab3:
@@ -337,7 +301,7 @@ def run_ui():
             branding_dir = os.path.join("branding", tenant_id, "assets")
             os.makedirs(branding_dir, exist_ok=True)
 
-            logo_upload = st.file_uploader("Upload Firm Logo (PNG/JPG)", type=["png", "jpg", "jpeg"], key="branding_logo")
+            logo_upload = st.file_uploader("Upload Firm Logo (PNG/JPG)", type=["png", "jpg", "jpeg"])
             primary_color = st.color_picker("Pick Primary Color", value=branding.get("primary_color", "#0A1D3B"))
             branding_config_path = os.path.join(branding_dir, "branding.json")
 
@@ -359,5 +323,4 @@ def run_ui():
                     "color": primary_color
                 })
         except Exception as e:
-            msg = handle_error(e, code="TEMPLATE_UI_011")
-            st.error(msg)
+            st.error(handle_error(e, code="TEMPLATE_UI_011"))
