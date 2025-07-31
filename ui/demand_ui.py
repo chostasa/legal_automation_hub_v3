@@ -48,7 +48,7 @@ def load_with_retry(path: str, retries: int = 5, delay: float = 0.5) -> bytes:
 
 
 async def run_ui():
-    st.header("📂 Demand Letter Generator")
+    st.header("📂 Demands")
 
     # === STYLE EXAMPLES ===
     st.markdown("### 🎨 Optional: Style / Tone Example")
