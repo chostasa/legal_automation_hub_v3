@@ -27,16 +27,18 @@ async def polish_demand_text(text: str) -> str:
 
         prompt = f"""
 You will receive a draft demand letter. Your task:
-1. Remove repetition and redundant sentences/facts/injuries across sections.
-2. Do not restate full injury descriptions more than once; later references should summarize by category.
-3. Cut boilerplate phrases like "Based on these facts..." if already implied.
-4. Keep quantified damages ($ amounts, costs) and causation language intact.
-5. Maintain persuasive legal framing and transitions.
-6. Do NOT add any new facts, injuries, or numbers.
+
+1. ONLY remove exact or near-exact repetition (e.g., repeated sentences or paragraphs) while preserving at least one instance of every unique fact, argument, or injury description. 
+2. DO NOT remove or shorten damages descriptions, evidence references, or quality-of-life impacts unless they are literally duplicated.
+3. Keep quantified damages ($ amounts, costs) and causation language intact and exactly as stated.
+4. Preserve the full narrative flow: Facts → Damages → Settlement Demand. Do not collapse sections or shorten the letter unnecessarily.
+5. Maintain persuasive tone, legal transitions, and emotional impact language. 
+6. Do NOT add new facts or reword content beyond light trimming for exact duplicates.
 
 Here is the draft:
 {text}
 """
+
         polished = await safe_generate(prompt)
         return polished.strip() if polished else text
 
@@ -204,7 +206,9 @@ async def fill_template(data: dict, template_path: str, output_dir: str) -> dict
         polished_text = await polish_demand_text(full_text)
 
         polished_doc = Document()
-        polished_doc.add_paragraph(polished_text)
+        for paragraph in polished_text.split("\n"):
+            if paragraph.strip():
+                polished_doc.add_paragraph(paragraph.strip())
         polished_doc.save(polished_path)
 
         logger.info(f"[DEMAND_GEN] Saved unpolished: {unpolished_path}, polished: {polished_path}")
