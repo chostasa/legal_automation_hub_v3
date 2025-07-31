@@ -28,17 +28,19 @@ async def polish_demand_text(text: str) -> str:
         prompt = f"""
 You will receive a full draft of a demand letter.
 
-Your task is to improve the text **without removing key content**:
+Your task is to polish it while retaining persuasive detail:
 
-1. **Preserve all section headings** exactly as written (e.g., "Facts of the Occurrence", "Damages", "Settlement Demand"). 
-   Do not merge or rename them.
-2. Remove only true repetition (e.g., sentences or paragraphs that say the same thing twice).
-3. Retain at least one full description of injuries, evidence, and emotional context. 
-   Later references can summarize by category, but do NOT cut emotional weight or persuasive detail.
-4. Do not remove evidence references (police report, witness statements, video evidence).
-5. Maintain all quantified damages and dollar amounts.
-6. Keep a persuasive legal tone with strong transitions.
-7. Do not shorten for the sake of word count—keep the narrative richness intact.
+1. Preserve **all section headings** exactly as written (e.g., "Facts of the Occurrence", "Damages", "Settlement Demand"). 
+   Do not merge, rename, or delete headings.
+2. Rephrase or remove only *true repetition* (i.e., full sentences or paragraphs that state the same fact/injury twice). 
+3. Retain **at least one full description** of injuries, evidence, and emotional context. 
+   Later references may summarize by category, but do NOT cut emotional weight, damages detail, or context.
+4. Keep all **evidence references** (police reports, witnesses, video footage, etc.).
+5. Preserve all **quantified damages and dollar amounts**.
+6. Strengthen transitions and flow so each section logically builds on the prior one.
+7. Do NOT over-shorten for word count. Narrative richness and emotional impact are important.
+8. Do NOT remove educational disruption, long-term impact, or emotional harm details, as these are persuasive.
+9. Do not add any new facts, injuries, or numbers that were not in the original draft.
 
 Here is the draft demand letter:
 {text}
