@@ -43,7 +43,19 @@ def run_ui():
             if "dashboard_df" in st.session_state:
                 df = st.session_state.dashboard_df.copy()
                 st.info("📊 Loaded filtered clients from Dashboard.")
+
+                # Allow column removal only when data comes from Dashboard
+                st.markdown("### 🗂️ Choose Columns to Keep (Optional)")
+                all_columns = list(df.columns)
+                selected_columns = st.multiselect(
+                    "Select which columns to keep for email building:",
+                    options=all_columns,
+                    default=all_columns
+                )
+                df = df[selected_columns]
+
             else:
+                # Load full dashboard data from Dropbox
                 with st.spinner("📥 Loading dashboard data..."):
                     df = download_dashboard_df().copy()
         except Exception as e:
@@ -57,16 +69,6 @@ def run_ui():
             f"❌ Expected columns '{NAME_COLUMN}' and '{EMAIL_COLUMN}' not found in data."
         )
         return
-
-    # Let user remove unwanted columns
-    st.markdown("### 🗂️ Choose Columns to Keep (Optional)")
-    all_columns = list(df.columns)
-    selected_columns = st.multiselect(
-        "Select which columns to keep for email building:",
-        options=all_columns,
-        default=all_columns
-    )
-    df = df[selected_columns]
 
     # Load templates from DB
     email_templates = get_templates(tenant_id=tenant_id, category="email")
