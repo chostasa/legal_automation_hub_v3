@@ -102,7 +102,7 @@ async def generate_foia_request(
         if not foia_body:
             raise ValueError("Failed to generate FOIA letter body text.")
 
-        # Build replacements dict
+        # Build replacements dict (no placeholder escaping here)
         replacements = {
             "date": data.get("formatted_date", ""),
             "clientid": data.get("client_id", ""),
@@ -114,15 +114,10 @@ async def generate_foia_request(
             "synopsis": data.get("synopsis_summary", ""),
             "statecitation": data.get("state_citation", ""),
             "stateresponsetime": data.get("state_response_time", ""),
-            "bulletpoints": "\n\n".join(f"• {line}" for line in bullet_lines)
+            "bulletpoints": "\n\n".join(f"• {line.lstrip('* ').strip()}" for line in bullet_lines)
             if bullet_lines
             else "[No bullet points generated]",
         }
-
-        # Escape any placeholder formatting issues
-        for k, v in replacements.items():
-            if isinstance(v, str):
-                replacements[k] = v.replace("{{", "{ {").replace("}}", "} }")
 
         logger.info("[FOIA_GEN_000] Rendering FOIA template with replacements:")
         for k, v in replacements.items():
@@ -151,10 +146,6 @@ async def generate_foia_request(
                 user_message="FOIA letter generation failed (no file was created).",
                 raise_it=True,
             )
-
-        bullet_lines = request_list.splitlines() if isinstance(request_list, str) else []
-        if not bullet_lines:
-            logger.warning(redact_log("[FOIA_GEN_005] FOIA request list is empty after generation."))
 
         return output_path, foia_body, bullet_lines
 
