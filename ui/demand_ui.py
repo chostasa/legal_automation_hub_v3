@@ -16,7 +16,7 @@ from logger import logger
 from core.cache_utils import clear_caches
 from core.error_handling import handle_error
 from utils.file_utils import clean_temp_dir
-from utils.thread_utils import run_async  # <-- to safely handle async tasks
+from utils.thread_utils import run_async  # To safely handle async tasks
 
 # Clean temp directory scoped by tenant/user
 clean_temp_dir()
@@ -38,9 +38,7 @@ def load_binary_file(path: str) -> bytes:
 
 
 def load_with_retry(path: str, retries: int = 5, delay: float = 0.5) -> bytes:
-    """
-    Retry-safe loader for generated demand letters to avoid race conditions.
-    """
+    """Retry-safe loader for generated demand letters."""
     for attempt in range(retries):
         if os.path.exists(path):
             return load_binary_file(path)
@@ -54,7 +52,6 @@ def run_ui():
     # === STYLE EXAMPLES ===
     st.markdown("### 🎨 Optional: Style / Tone Example")
 
-    # Upload new example
     uploaded_example = st.file_uploader(
         "Upload New Style Example (.txt)", type=["txt"], key="upload_example"
     )
@@ -98,7 +95,6 @@ def run_ui():
     # === TEMPLATES (Dropbox) ===
     st.markdown("### 📄 Select Demand Template")
 
-    # Upload new template (to Dropbox)
     uploaded_template = st.file_uploader(
         "Upload New Demand Template (.docx)", type=["docx"], key="upload_template"
     )
@@ -129,7 +125,6 @@ def run_ui():
             msg = handle_error(e, code="DEMAND_UI_005")
             st.error(msg)
 
-    # List templates from Dropbox
     selected_template = None
     try:
         template_files = client.list_files(f"{DROPBOX_TEMPLATES_ROOT}/demand")
@@ -151,7 +146,7 @@ def run_ui():
         damages = st.text_area("Damages Summary")
         submitted = st.form_submit_button("⚙️ Generate Demand Letter")
 
-    # Demand cache scoped by tenant/user
+    # Demand cache
     if "demand_cache" not in st.session_state:
         st.session_state.demand_cache = {}
 
@@ -184,7 +179,6 @@ def run_ui():
             defendant = sanitize_text(defendant)
             location = sanitize_text(location)
 
-            # Cache key
             example_hash = hashlib.md5(example_text.encode()).hexdigest() if example_text else "noexample"
             fingerprint = "|".join([
                 tenant_id, user_id, full_name, formatted_date,
@@ -193,16 +187,11 @@ def run_ui():
             form_key = hashlib.md5(fingerprint.encode()).hexdigest()
 
             if form_key in st.session_state.demand_cache:
-                file_path, _ = st.session_state.demand_cache[form_key]
+                paths = st.session_state.demand_cache[form_key]
                 st.info("🔄 Using previously generated demand letter from cache.")
             else:
                 with st.spinner("🧠 Generating demand letter..."):
                     temp_dir = get_session_temp_dir()
-                    output_filename = sanitize_filename(
-                        f"Demand_{full_name}_{datetime.today().strftime('%Y-%m-%d')}.docx"
-                    )
-                    file_path = os.path.join(temp_dir, output_filename)
-
                     template_path = client.download_file(
                         f"{DROPBOX_TEMPLATES_ROOT}/demand/{selected_template}",
                         "templates_preview"
@@ -215,7 +204,7 @@ def run_ui():
                     clear_caches()
 
                     # Run async generation using thread helper
-                    run_async(
+                    paths = run_async(
                         generate_demand_letter,
                         client_name=full_name,
                         defendant=defendant,
@@ -224,25 +213,37 @@ def run_ui():
                         summary=summary,
                         damages=damages,
                         template_path=template_path,
-                        output_path=file_path,
+                        output_path=os.path.join(temp_dir, "temp.docx"),
                         example_text=example_text
                     )
 
-                    st.session_state.demand_cache[form_key] = (file_path, {})
+                    st.session_state.demand_cache[form_key] = paths
 
             decrement_quota("demand_letters", amount=1)
-            st.success("✅ Demand letter generated!")
+            st.success("✅ Demand letters generated!")
+
+            # Show both download buttons
+            unpolished_path = paths["unpolished"]
+            polished_path = paths["polished"]
 
             try:
-                file_data = load_with_retry(file_path)
+                unpolished_data = load_with_retry(unpolished_path)
+                polished_data = load_with_retry(polished_path)
             except FileNotFoundError as e:
-                st.error(f"❌ Demand letter could not be located: {e}")
+                st.error(f"❌ Demand letters could not be located: {e}")
                 return
 
             st.download_button(
-                "⬇️ Download Demand Letter (.docx)",
-                data=file_data,
-                file_name=os.path.basename(file_path),
+                "⬇️ Download UNPOLISHED Demand Letter (.docx)",
+                data=unpolished_data,
+                file_name=os.path.basename(unpolished_path),
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+
+            st.download_button(
+                "⬇️ Download POLISHED Demand Letter (.docx)",
+                data=polished_data,
+                file_name=os.path.basename(polished_path),
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
@@ -259,18 +260,11 @@ def run_ui():
                 logger.warning(redact_log(mask_phi(f"⚠️ Failed to log demand usage: {log_err}")))
 
             try:
-                log_audit_event("Demand Letter Generated", {
+                log_audit_event("Demand Letters Generated", {
                     "client_name": full_name,
                     "incident_date": formatted_date,
                     "used_example": selected_example if example_text else "None",
                     "used_template": selected_template,
-                    "tenant_id": tenant_id,
-                    "user_id": user_id,
-                    "module": "demand"
-                })
-                log_audit_event("Demand Template Used", {
-                    "template": selected_template,
-                    "example_used": selected_example if example_text else "None",
                     "tenant_id": tenant_id,
                     "user_id": user_id,
                     "module": "demand"

@@ -106,22 +106,35 @@ def build_prompt(
     example: str = ""
 ) -> str:
     if prompt_type == "demand":
+        # === Section-specific constraints ===
+        section_lower = section.lower()
+        if "fact" in section_lower or "liability" in section_lower:
+            section_instructions = "Do NOT include damages or settlement demand language here. Focus only on liability (duty, breach, causation) and supporting facts."
+        elif "damage" in section_lower:
+            section_instructions = "Do NOT re-argue liability. Summarize harm by category without re-listing all injuries in detail. Show how the harm affects quality of life and economic loss."
+        elif "settlement" in section_lower or "demand" in section_lower:
+            section_instructions = "Do NOT repeat full facts or injury details. Only state the quantified total damages and tie them to a clear settlement demand."
+        else:
+            section_instructions = "Stay concise and persuasive, adding new content for this section."
+
         safety_notes = "\n\n".join([
             DEMAND_NO_HALLUCINATION,
-            DEMAND_LEGAL_FLUENCY,
             DEMAND_STRUCTURE,
+            DEMAND_LEGAL_FLUENCY,
             DEMAND_TRANSITION,
             DEMAND_NO_PASSIVE,
             DEMAND_BAN_PHRASES,
-            DEMAND_FINAL_POLISH
+            DEMAND_FINAL_POLISH,
+            section_instructions
         ])
+
         template = jinja_env.from_string(BASE_PROMPT_TEMPLATE)
         prompt = template.render(
             safety_notes=safety_notes,
             section=section,
             summary=summary.strip(),
             client_name=client_name.strip(),
-            example=example.strip() or EXAMPLE_DEMAND,
+            example=example.strip() or EXAMPLE_DEMAND if "settlement" not in section_lower else SETTLEMENT_EXAMPLE,
             extra_instructions=extra_instructions.strip(),
         )
         register_prompt(prompt_type, prompt)
@@ -142,50 +155,42 @@ def build_prompt(
 
     elif prompt_type == "foia":
         if section.lower() == "synopsis":
-            # Short case summary
-            prompt = FOIA_SYNOPSIS_PROMPT.format(
-                case_synopsis=summary
-            )
-
+            prompt = FOIA_SYNOPSIS_PROMPT.format(case_synopsis=summary)
         elif section.lower() == "foia letter":
-            # Letter body generation
             prompt = f"""
-    {FOIA_SAFETY_PROMPT}
+{FOIA_SAFETY_PROMPT}
 
-    You are drafting the FOIA request letter for {client_name}.
+You are drafting the FOIA request letter for {client_name}.
 
-    Facts and case summary:
-    {summary}
+Facts and case summary:
+{summary}
 
-    Explicit instructions (if any): {extra_instructions}
+Explicit instructions (if any): {extra_instructions}
 
-    Use a professional legal tone, consistent with the examples below, but DO NOT copy facts from them.
-    """
-
+Use a professional legal tone, consistent with the examples below, but DO NOT copy facts from them.
+"""
         else:
-            # Bullet points generation: examples are now tone-only
             prompt = f"""
-    {FOIA_SAFETY_PROMPT}
+{FOIA_SAFETY_PROMPT}
 
-    You are drafting FOIA bullet points for a civil legal claim.
+You are drafting FOIA bullet points for a civil legal claim.
 
-    Case synopsis:
-    {summary}
+Case synopsis:
+{summary}
 
-    Case type: {section}
-    Facility/system involved: facility/system info
-    Defendant role: defendant role
+Case type: {section}
+Facility/system involved: facility/system info
+Defendant role: defendant role
 
-    Explicit instructions:
-    {extra_instructions}
+Explicit instructions:
+{extra_instructions}
 
-    Now draft a **role-specific** list of records, documents, media, and communications a skilled civil attorney would request. 
-    DO NOT fabricate or assume facts. 
-    DO NOT include dates, case numbers, or details from the example below — they are for style and tone only:
+Now draft a **role-specific** list of records, documents, media, and communications a skilled civil attorney would request. 
+DO NOT fabricate or assume facts. 
+DO NOT include dates, case numbers, or details from the example below — they are for style and tone only:
 
-    EXAMPLE BULLET STYLE (for tone only, facts are not relevant):
-    {FOIA_BULLET_POINTS_EXAMPLES}
-    """
-
+EXAMPLE BULLET STYLE (for tone only, facts are not relevant):
+{FOIA_BULLET_POINTS_EXAMPLES}
+"""
         register_prompt(prompt_type, prompt)
         return prompt
