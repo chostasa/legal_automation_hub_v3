@@ -121,7 +121,7 @@ async def generate_foia_request(data: dict, template_path: str, output_path: str
 
         try:
             # Run template replacement in a thread to avoid blocking
-            await run_async(run_in_thread, replace_text_in_docx_all, template_path, replacements, output_path)
+            await run_in_thread(replace_text_in_docx_all, template_path, replacements, output_path)
         except Exception as docx_error:
             logger.warning(redact_log(mask_phi(f"[FOIA_GEN_002] ⚠️ DOCX rendering error: {docx_error}")))
             with open(output_path.replace(".docx", "_FAILED.txt"), "w", encoding="utf-8") as f:
