@@ -48,11 +48,8 @@ async def build_email(client_data: dict, template_name: str, attachments: list =
         if not os.path.exists(template_path):
             template_path = download_template_file("email", template_name, "email_templates_cache")
 
-        # Detect if the template is HTML (preserve formatting)
-        is_html = template_path.lower().endswith(".html")
-
         # Merge the template into subject/body
-        subject, body, cc = merge_template(template_path, sanitized, is_html=is_html)
+        subject, body, cc = merge_template(template_path, sanitized)
         if not subject or not body:
             raise AppError(
                 code="EMAIL_BUILD_003",
@@ -61,12 +58,6 @@ async def build_email(client_data: dict, template_name: str, attachments: list =
             )
 
         cc = cc or []
-
-        # Add tracking pixel (only for HTML emails)
-        if is_html:
-            open_tracking_url = f"https://tracking.legalhub.app/open/{get_tenant_id()}/{get_user_id()}/{sanitized['CaseID']}"
-            tracking_pixel = f'<img src="{open_tracking_url}" alt="" style="display:none" />'
-            body = f"{body}\n\n{tracking_pixel}"
 
         # Log event
         log_audit_event("Email Built", {
