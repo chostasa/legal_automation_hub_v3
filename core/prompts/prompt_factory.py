@@ -137,42 +137,51 @@ def build_prompt(
 
     elif prompt_type == "foia":
         if section.lower() == "synopsis":
-            # Use a short summary prompt
+            # Short case summary
             prompt = FOIA_SYNOPSIS_PROMPT.format(
                 case_synopsis=summary
             )
+
         elif section.lower() == "foia letter":
-            # Use a general letter generation prompt
+            # Letter body generation
             prompt = f"""
     {FOIA_SAFETY_PROMPT}
 
     You are drafting the FOIA request letter for {client_name}.
+
     Facts and case summary:
     {summary}
 
     Explicit instructions (if any): {extra_instructions}
 
-    Use a professional legal tone.
+    Use a professional legal tone, consistent with the examples below, but DO NOT copy facts from them.
     """
+
         else:
-            # Default: bullet points
-            prompt = FOIA_BULLET_POINTS_PROMPT_TEMPLATE.format(
-                case_synopsis=summary,
-                case_type=section,
-                facility="facility/system info",
-                defendant_role="defendant role",
-                explicit_instructions=extra_instructions,
-                potential_requests=FOIA_BULLET_POINTS_EXAMPLES
-            )
+            # Bullet points generation: examples are now tone-only
+            prompt = f"""
+    {FOIA_SAFETY_PROMPT}
+
+    You are drafting FOIA bullet points for a civil legal claim.
+
+    Case synopsis:
+    {summary}
+
+    Case type: {section}
+    Facility/system involved: facility/system info
+    Defendant role: defendant role
+
+    Explicit instructions:
+    {extra_instructions}
+
+    Now draft a **role-specific** list of records, documents, media, and communications a skilled civil attorney would request. 
+    DO NOT fabricate or assume facts. 
+    DO NOT include dates, case numbers, or details from the example below — they are for style and tone only:
+
+    EXAMPLE BULLET STYLE (for tone only, facts are not relevant):
+    {FOIA_BULLET_POINTS_EXAMPLES}
+    """
 
         register_prompt(prompt_type, prompt)
         return prompt
 
-    elif prompt_type == "style_transfer":
-        examples = example.split("---") if example else []
-        prompt = build_style_transfer_prompt(examples, summary)
-        register_prompt(prompt_type, prompt)
-        return prompt
-
-    else:
-        raise ValueError(f"Unknown prompt_type: {prompt_type}")
