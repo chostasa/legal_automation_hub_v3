@@ -53,6 +53,10 @@ Your task is to produce a final version that is persuasive, complete, and profes
 14. Never add or guess facts – Do not insert new injuries, events, or numbers that do not exist in the draft.
 15. **Evoke empathy in the reader:** Intentionally heighten the emotional gravity of Jane's suffering and life disruption. Show the human cost of the defendant's negligence in a way that will pull at the heartstrings of the reader (without adding facts).
 16. **Increase persuasive pressure:** Frame the narrative so that a defense attorney or insurance adjuster reading this letter would feel urgent pressure to settle. Make clear that a failure to resolve the case will lead to substantial exposure at trial.
+17. Highlight credibility of your client: Emphasize their trustworthiness and the consistency of their account. Underscore how third‑party witnesses, medical records, and evidence corroborate her story to leave no doubt about liability.
+18. Balance emotion with professionalism: While evoking empathy, ensure the tone is never inflammatory or overly casual. The letter should feel heartfelt yet authoritative, as if it were being presented directly to a judge or jury.
+19. Underscore trial risk and jury appeal: Clearly suggest that a jury would be deeply sympathetic to the client's circumstances and likely award damages exceeding the current settlement demand. This frames settlement as the defendant’s best option.
+20. Maintain the client’s dignity: When describing injuries, hardships, or suffering, avoid language that could be perceived as exploitative. The goal is to show the client's resilience while demonstrating the magnitude of what she has endured.
 
 **Goal:** The final letter must read like it was personally reviewed and signed off by a senior trial attorney. 
 It should be compelling, emotionally resonant, and leave the defense scrambling to settle.
