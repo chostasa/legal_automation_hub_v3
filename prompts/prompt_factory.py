@@ -136,14 +136,35 @@ def build_prompt(
         return prompt
 
     elif prompt_type == "foia":
-        prompt = FOIA_BULLET_POINTS_PROMPT_TEMPLATE.format(
-            case_synopsis=summary,
-            case_type=section,
-            facility="facility/system info",
-            defendant_role="defendant role",
-            explicit_instructions=extra_instructions,
-            potential_requests=FOIA_BULLET_POINTS_EXAMPLES
-        )
+        if section.lower() == "synopsis":
+            # Use a short summary prompt
+            prompt = FOIA_SYNOPSIS_PROMPT.format(
+                case_synopsis=summary
+            )
+        elif section.lower() == "foia letter":
+            # Use a general letter generation prompt
+            prompt = f"""
+    {FOIA_SAFETY_PROMPT}
+
+    You are drafting the FOIA request letter for {client_name}.
+    Facts and case summary:
+    {summary}
+
+    Explicit instructions (if any): {extra_instructions}
+
+    Use a professional legal tone.
+    """
+        else:
+            # Default: bullet points
+            prompt = FOIA_BULLET_POINTS_PROMPT_TEMPLATE.format(
+                case_synopsis=summary,
+                case_type=section,
+                facility="facility/system info",
+                defendant_role="defendant role",
+                explicit_instructions=extra_instructions,
+                potential_requests=FOIA_BULLET_POINTS_EXAMPLES
+            )
+
         register_prompt(prompt_type, prompt)
         return prompt
 
