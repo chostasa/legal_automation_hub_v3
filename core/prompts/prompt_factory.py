@@ -14,6 +14,7 @@ from core.prompts.demand_guidelines import (
     LEGAL_TRANSITION_NOTE as DEMAND_TRANSITION,
     NO_PASSIVE_LANGUAGE_NOTE as DEMAND_NO_PASSIVE,
     BAN_PHRASES_NOTE as DEMAND_BAN_PHRASES,
+    FINAL_POLISH_NOTE as DEMAND_FINAL_POLISH,
 )
 from core.prompts.demand_example import EXAMPLE_DEMAND, SETTLEMENT_EXAMPLE
 
@@ -111,7 +112,8 @@ def build_prompt(
             DEMAND_STRUCTURE,
             DEMAND_TRANSITION,
             DEMAND_NO_PASSIVE,
-            DEMAND_BAN_PHRASES
+            DEMAND_BAN_PHRASES,
+            DEMAND_FINAL_POLISH
         ])
         template = jinja_env.from_string(BASE_PROMPT_TEMPLATE)
         prompt = template.render(
