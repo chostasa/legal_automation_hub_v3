@@ -32,7 +32,7 @@ async def generate_brief_synopsis(summary: str, full_name: str, example_text: st
             example=example_text,
         )
         result = await safe_generate(prompt)
-        return result.split(".")[0].strip() + "." if result else "[Brief synopsis unavailable.]"
+        return result.strip() if result else "[Brief synopsis unavailable.]"
     except Exception as e:
         return handle_error(
             e,

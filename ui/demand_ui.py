@@ -16,6 +16,7 @@ from logger import logger
 from core.cache_utils import clear_caches
 from core.error_handling import handle_error
 from utils.file_utils import clean_temp_dir
+from utils.thread_utils import run_async  # <-- to safely handle async tasks
 
 # Clean temp directory scoped by tenant/user
 clean_temp_dir()
@@ -47,8 +48,8 @@ def load_with_retry(path: str, retries: int = 5, delay: float = 0.5) -> bytes:
     raise FileNotFoundError(f"Demand letter not found after {retries} retries: {path}")
 
 
-async def run_ui():
-    st.header("📂 Demands")
+def run_ui():
+    st.header("📂 Demand Letter Generator")
 
     # === STYLE EXAMPLES ===
     st.markdown("### 🎨 Optional: Style / Tone Example")
@@ -183,7 +184,7 @@ async def run_ui():
             defendant = sanitize_text(defendant)
             location = sanitize_text(location)
 
-            # Create cache key scoped by tenant/user (use hash of example text to avoid collisions)
+            # Cache key
             example_hash = hashlib.md5(example_text.encode()).hexdigest() if example_text else "noexample"
             fingerprint = "|".join([
                 tenant_id, user_id, full_name, formatted_date,
@@ -202,7 +203,6 @@ async def run_ui():
                     )
                     file_path = os.path.join(temp_dir, output_filename)
 
-                    # Download selected template from Dropbox
                     template_path = client.download_file(
                         f"{DROPBOX_TEMPLATES_ROOT}/demand/{selected_template}",
                         "templates_preview"
@@ -214,8 +214,9 @@ async def run_ui():
 
                     clear_caches()
 
-                    # Await demand generation synchronously
-                    await generate_demand_letter(
+                    # Run async generation using thread helper
+                    run_async(
+                        generate_demand_letter,
                         client_name=full_name,
                         defendant=defendant,
                         location=location,
@@ -232,7 +233,6 @@ async def run_ui():
             decrement_quota("demand_letters", amount=1)
             st.success("✅ Demand letter generated!")
 
-            # Retry-safe load for download
             try:
                 file_data = load_with_retry(file_path)
             except FileNotFoundError as e:
@@ -246,7 +246,7 @@ async def run_ui():
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
-            # Logging and auditing
+            # Logging
             try:
                 log_usage(
                     event_type="demand_generated",
