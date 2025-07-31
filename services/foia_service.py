@@ -120,7 +120,7 @@ async def generate_foia_request(
             "synopsis": data.get("synopsis_summary", ""),
             "statecitation": data.get("state_citation", ""),
             "stateresponsetime": data.get("state_response_time", ""),
-            "bulletpoints": "\n\n".join(f"• {line.lstrip('* ').strip()}" for line in bullet_lines)
+            "bulletpoints": "\n\n".join(f"• {line.lstrip('*• ').strip()}" for line in bullet_lines)
             if bullet_lines
             else "[No bullet points generated]",
         }

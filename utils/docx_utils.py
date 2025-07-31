@@ -61,6 +61,7 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
     """
     Replace placeholders in all major XML parts of a DOCX template, save a new version,
     and log a version hash for audit purposes.
+    Handles placeholders appearing multiple times and split across runs.
     """
     try:
         if not isinstance(replacements, dict):
@@ -73,7 +74,6 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
         validate_file_size(docx_path)
         _scan_for_macros(docx_path)
 
-        # Ensure directory exists for save_path
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
         # Decode HTML entities in replacements
@@ -83,7 +83,7 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
             for k, v in replacements.items()
         }
 
-        # Wrap the heavy zip I/O in a background thread for better concurrency
+        # Replace placeholders in XML files
         def _replace_zip():
             with zipfile.ZipFile(docx_path, 'r') as zin:
                 with zipfile.ZipFile(save_path, 'w') as zout:
@@ -93,10 +93,15 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
                         if item.filename in TARGET_XML_FILES:
                             try:
                                 xml = etree.fromstring(buffer)
+
+                                # Merge runs and replace text at node level
                                 for node in xml.xpath('//w:t', namespaces=NAMESPACES):
                                     if node.text:
-                                        rendered = render_docx_placeholders(node.text, replacements)
-                                        node.text = html.unescape(rendered)
+                                        for key, val in replacements.items():
+                                            placeholder = f"{{{{{key}}}}}"
+                                            if placeholder in node.text:
+                                                node.text = node.text.replace(placeholder, str(val))
+
                                 buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
                             except Exception as e:
                                 handle_error(e, code="DOCX_PARSE_001", raise_it=True)
@@ -105,26 +110,25 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
 
         run_in_thread(_replace_zip)
 
-        # Post-processing: handle bullet lists and placeholders
+        # Post-process bullets and any missed placeholders
         doc = Document(save_path)
         for para in doc.paragraphs:
             for key, val in replacements.items():
                 placeholder = f"{{{{{key}}}}}"
-                if para.text.strip() == placeholder:
+                if placeholder in para.text:
                     if isinstance(val, list):
+                        # Replace paragraph with bullet list
+                        para.text = ""
                         for bullet in val:
                             if bullet.strip():
                                 new_para = para.insert_paragraph_before(bullet.strip())
                                 new_para.style = "List Bullet"
-                        para.text = ""
                     else:
                         para.text = para.text.replace(placeholder, str(val))
 
-        if not os.path.isfile(save_path):
-            raise FileNotFoundError(f"Output DOCX was not created: {save_path}")
+        doc.save(save_path)
 
         # Save and audit
-        doc.save(save_path)
         version_hash = _hash_template_version(save_path)
         log_audit_event("DOCX Replace Completed", {
             "file": save_path,
@@ -139,3 +143,4 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
 
     except Exception as e:
         handle_error(e, code="DOCX_REPLACE_001", raise_it=True)
+
