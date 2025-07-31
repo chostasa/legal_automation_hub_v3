@@ -26,16 +26,21 @@ async def polish_demand_text(text: str) -> str:
             return text
 
         prompt = f"""
-You will receive a draft demand letter. Your task:
+You will receive a full draft of a demand letter.
 
-1. ONLY remove exact or near-exact repetition (e.g., repeated sentences or paragraphs) while preserving at least one instance of every unique fact, argument, or injury description. 
-2. DO NOT remove or shorten damages descriptions, evidence references, or quality-of-life impacts unless they are literally duplicated.
-3. Keep quantified damages ($ amounts, costs) and causation language intact and exactly as stated.
-4. Preserve the full narrative flow: Facts → Damages → Settlement Demand. Do not collapse sections or shorten the letter unnecessarily.
-5. Maintain persuasive tone, legal transitions, and emotional impact language. 
-6. Do NOT add new facts or reword content beyond light trimming for exact duplicates.
+Your task is to improve the text **without removing key content**:
 
-Here is the draft:
+1. **Preserve all section headings** exactly as written (e.g., "Facts of the Occurrence", "Damages", "Settlement Demand"). 
+   Do not merge or rename them.
+2. Remove only true repetition (e.g., sentences or paragraphs that say the same thing twice).
+3. Retain at least one full description of injuries, evidence, and emotional context. 
+   Later references can summarize by category, but do NOT cut emotional weight or persuasive detail.
+4. Do not remove evidence references (police report, witness statements, video evidence).
+5. Maintain all quantified damages and dollar amounts.
+6. Keep a persuasive legal tone with strong transitions.
+7. Do not shorten for the sake of word count—keep the narrative richness intact.
+
+Here is the draft demand letter:
 {text}
 """
 
@@ -202,7 +207,7 @@ async def fill_template(data: dict, template_path: str, output_dir: str) -> dict
         doc.save(unpolished_path)
 
         # Polish entire text and overwrite to new polished document
-        full_text = "\n".join([p.text for p in doc.paragraphs])
+        full_text = "\n\n".join([p.text for p in doc.paragraphs if p.text.strip()])
         polished_text = await polish_demand_text(full_text)
 
         polished_doc = Document()
