@@ -53,6 +53,7 @@ async def generate_combined_facts(summary: str, first_name: str, example_text: s
             summary,
             client_name=first_name,
             example=example_text or EXAMPLE_DEMAND,
+            extra_instructions="Avoid restating injuries already described in the damages section."
         )
         return await safe_generate(prompt)
     except Exception as e:

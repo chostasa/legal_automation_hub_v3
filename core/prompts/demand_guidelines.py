@@ -50,9 +50,12 @@ Replace them with confident terms: “is,” “will show,” “demonstrates,�
 
 FINAL_POLISH_NOTE = """
 Each paragraph must advance the legal theory or damages claim. 
-Do not include filler sentences or generalized sympathy language without factual basis. 
+Do not repeat the same injury, fact, or legal point in multiple sections. If it has been stated once in detail, summarize or reference it later by category (e.g., "orthopedic trauma") instead of repeating the full description.
+
+Be concise and persuasive: cut technical or clinical detail (e.g., imaging results, medication names) unless it strengthens causation or damages. 
+
 Vary sentence length and structure for maximum impact. 
-Close with a demand paragraph that would withstand managing partner review: confident, fully quantified, and leaving no ambiguity about liability and damages.
+Close with a settlement demand paragraph that ties the damages to the requested amount in a single, tight conclusion.
 """
 
 FULL_SAFETY_PROMPT = "\n\n".join([
