@@ -34,7 +34,7 @@ async def generate_synopsis(casesynopsis: str) -> str:
         )
 
 
-async def generate_foia_request(data: dict, template_name: str, output_path: str, example_text: str = "") -> tuple:
+async def generate_foia_request(data: dict, template_path: str, output_path: str, example_text: str = "") -> tuple:
     """
     Generates a FOIA request letter (.docx) and returns the file path, body text, and bullet list.
     Downloads template from Dropbox if it's not already present locally.
@@ -42,15 +42,14 @@ async def generate_foia_request(data: dict, template_name: str, output_path: str
     try:
         if not isinstance(data, dict):
             raise ValueError("FOIA input data is invalid.")
-        if not template_name:
-            raise ValueError("Template name is missing.")
+        if not template_path:
+            raise ValueError("Template path is missing.")
         if not output_path:
             raise ValueError("Output path is required for FOIA letter generation.")
 
         # Ensure template is downloaded if missing locally
-        template_path = os.path.normpath(template_name)
         if not os.path.exists(template_path):
-            template_path = download_template_file("foia", template_name, "foia_templates_cache")
+            template_path = download_template_file("foia", template_path, "foia_templates_cache")
 
         if not template_path or not os.path.exists(template_path):
             handle_error(
