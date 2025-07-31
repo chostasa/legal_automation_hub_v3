@@ -64,9 +64,19 @@ class GraphClient:
                 raise_it=True
             )
 
-    async def send_email(self, sender_address: str, to: str, subject: str, body: str):
+    async def send_email(
+        self,
+        sender_address: str,
+        to: str,
+        subject: str,
+        body: str,
+        cc: list = None,
+        attachments: list = None,
+        body_type: str = "HTML"
+    ):
         """
-        Send an email using Microsoft Graph API with retry and error handling.
+        Send an email using Microsoft Graph API with full HTML support and attachments.
+        body_type: "HTML" (default) or "Text"
         """
         start_time = time.time()
         try:
@@ -90,19 +100,29 @@ class GraphClient:
                 "Authorization": f"Bearer {self.token}",
                 "Content-Type": "application/json"
             }
+
+            # Format recipients
+            to_recipients = [{"emailAddress": {"address": to}}]
+            cc_recipients = [{"emailAddress": {"address": addr}} for addr in (cc or [])]
+
+            # Build attachments if provided (already base64 encoded)
+            formatted_attachments = attachments or []
+
             payload = {
                 "message": {
                     "subject": subject,
                     "body": {
-                        "contentType": "Text",
+                        "contentType": body_type,
                         "content": body
                     },
-                    "toRecipients": [
-                        {"emailAddress": {"address": to}}
-                    ]
+                    "toRecipients": to_recipients,
+                    "ccRecipients": cc_recipients,
                 },
                 "saveToSentItems": "true"
             }
+
+            if formatted_attachments:
+                payload["message"]["attachments"] = formatted_attachments
 
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, headers=headers, json=payload, timeout=10) as response:

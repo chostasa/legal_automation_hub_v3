@@ -28,21 +28,45 @@ def run_ui():
 
     st.header(f"📧 Welcome Email Sender – {branding.get('firm_name', tenant_id)}")
 
-    # Load dashboard data
-    try:
-        with st.spinner("📥 Loading dashboard data..."):
-            df = download_dashboard_df().copy()
-    except Exception as e:
-        msg = handle_error(e, code="EMAIL_UI_001")
-        st.error(msg)
-        return
+    # Allow Excel Upload or Dashboard data
+    uploaded_excel = st.file_uploader("📂 Upload Excel with Client Data (Optional)", type=["xlsx"])
+    if uploaded_excel:
+        try:
+            df = pd.read_excel(uploaded_excel)
+            st.session_state.dashboard_df = df.copy()
+            st.success("✅ Excel uploaded successfully. Using uploaded data.")
+        except Exception as e:
+            st.error(f"❌ Failed to read Excel: {e}")
+            return
+    else:
+        try:
+            if "dashboard_df" in st.session_state:
+                df = st.session_state.dashboard_df.copy()
+                st.info("📊 Loaded filtered clients from Dashboard.")
+            else:
+                with st.spinner("📥 Loading dashboard data..."):
+                    df = download_dashboard_df().copy()
+        except Exception as e:
+            msg = handle_error(e, code="EMAIL_UI_001")
+            st.error(msg)
+            return
 
     # Check required columns exist
     if NAME_COLUMN not in df.columns or EMAIL_COLUMN not in df.columns:
         st.error(
-            f"❌ Expected columns '{NAME_COLUMN}' and '{EMAIL_COLUMN}' not found in dashboard data."
+            f"❌ Expected columns '{NAME_COLUMN}' and '{EMAIL_COLUMN}' not found in data."
         )
         return
+
+    # Let user remove unwanted columns
+    st.markdown("### 🗂️ Choose Columns to Keep (Optional)")
+    all_columns = list(df.columns)
+    selected_columns = st.multiselect(
+        "Select which columns to keep for email building:",
+        options=all_columns,
+        default=all_columns
+    )
+    df = df[selected_columns]
 
     # Load templates from DB
     email_templates = get_templates(tenant_id=tenant_id, category="email")
@@ -58,10 +82,9 @@ def run_ui():
         st.error("❌ Selected template not found.")
         return
 
-    # Download the template from Dropbox locally (dropbox_client handles normalization)
+    # Download the template from Dropbox locally
     try:
         template_path = download_template_file("email", selected_template_name)
-
         if not os.path.exists(template_path):
             st.error(f"❌ Template file not found locally: {template_path}")
             return
@@ -73,11 +96,16 @@ def run_ui():
     # Sidebar filters
     with st.sidebar:
         st.markdown("### 🔎 Filter Clients")
-        class_codes = sorted(df["Class Code Title"].dropna().unique())
+        class_codes = sorted(df["Class Code Title"].dropna().unique()) if "Class Code Title" in df.columns else []
         statuses = sorted(df["Status"].dropna().unique()) if "Status" in df.columns else []
 
         selected_codes = st.multiselect("Class Code", class_codes, default=class_codes)
         selected_statuses = st.multiselect("Status", statuses, default=statuses) if statuses else []
+
+        st.markdown("### 📎 Attachments (Optional)")
+        attachments = st.file_uploader(
+            "Attach PDF or Word files", type=["pdf", "docx"], accept_multiple_files=True
+        )
 
         st.markdown("### 📊 Usage Summary")
         try:
@@ -88,10 +116,13 @@ def run_ui():
             st.write("⚠️ Unable to load usage summary.")
 
     # Filter the dataframe based on filters
-    filtered_df = df[
-        df["Class Code Title"].isin(selected_codes)
-        & (df["Status"].isin(selected_statuses) if statuses else True)
-    ]
+    if "Class Code Title" in df.columns:
+        filtered_df = df[
+            df["Class Code Title"].isin(selected_codes)
+            & (df["Status"].isin(selected_statuses) if statuses else True)
+        ]
+    else:
+        filtered_df = df.copy()
 
     # Search bar
     search = st.text_input("🔍 Search client name or email").strip().lower()
@@ -121,7 +152,7 @@ def run_ui():
             filtered_df[filtered_df[NAME_COLUMN].isin(selected_clients)].iterrows()
         ):
             try:
-                # Prepare row data
+                # Prepare row data (placeholder source)
                 row_data = row.to_dict()
                 row_data["Client Name"] = row_data.get(NAME_COLUMN, "")
                 row_data["Email"] = row_data.get(EMAIL_COLUMN, "")
@@ -130,8 +161,10 @@ def run_ui():
                     st.warning(f"⚠️ Skipping {row_data['Client Name']} - missing email.")
                     continue
 
-                # Build email using template_path
-                subject, body, cc, client = asyncio.run(build_email(row_data, template_path))
+                # Build email with placeholders filled
+                subject, body, cc, client, _ = asyncio.run(
+                    build_email(row_data, template_path, attachments)
+                )
 
                 subject_key = f"subject_{i}"
                 body_key = f"body_{i}"
@@ -139,7 +172,11 @@ def run_ui():
 
                 st.markdown(f"**{client['ClientName']}** — _{client['Email']}_")
                 st.text_input("✏️ Subject", subject, key=subject_key)
-                st.text_area("📄 Body", body, key=body_key, height=300)
+
+                # Show body in HTML preview
+                st.markdown("📄 Email Body Preview:")
+                st.components.v1.html(body, height=350, scrolling=True)
+
                 st.markdown(
                     f"**Status**: {st.session_state.email_status.get(status_key, '⏳ Ready')}"
                 )
@@ -149,7 +186,7 @@ def run_ui():
                         check_quota(tenant_id, get_user_id(), "emails_sent", 1)
                         with st.spinner(f"📧 Sending email to {client['ClientName']}..."):
                             status = asyncio.run(
-                                send_email_and_update(client, subject, body, cc, template_path)
+                                send_email_and_update(client, subject, body, cc, template_path, attachments)
                             )
                             st.session_state.email_status[status_key] = status
 
@@ -208,7 +245,7 @@ def run_ui():
                         try:
                             check_quota(tenant_id, get_user_id(), "emails_sent", 1)
                             status = await send_email_and_update(
-                                client_data, subj, bod, cc_list, template_path
+                                client_data, subj, bod, cc_list, template_path, attachments
                             )
                             st.session_state.email_status[preview_item["status_key"]] = status
 

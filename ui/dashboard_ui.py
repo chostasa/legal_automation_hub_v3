@@ -138,6 +138,11 @@ def run_ui():
             st.session_state.dashboard_df = filtered_df[all_display_cols].copy()
             st.success("✅ Data sent! Go to the '📄 Batch Doc Generator' to merge.")
 
+        # NEW: Send data to Email Tool
+        if st.button("📧 Send to Email Tool"):
+            st.session_state.dashboard_df = filtered_df[all_display_cols].copy()
+            st.success("✅ Filtered clients sent! Go to the '📧 Welcome Email Sender' to continue.")
+
         # Download CSV
         st.download_button(
             label="⬇️ Download Filtered Results as CSV",

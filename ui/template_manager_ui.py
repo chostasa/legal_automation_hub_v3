@@ -47,6 +47,7 @@ EXAMPLES_PATH_MAP = {
     "mediation_memo": DROPBOX_MEDIATION_EXAMPLES_DIR
 }
 
+
 def normalize_filename(name: str, category: str) -> str:
     """
     Normalize a file name by removing duplicate extensions and ensuring the right extension.
@@ -55,17 +56,22 @@ def normalize_filename(name: str, category: str) -> str:
     name = sanitize_filename(name)
 
     # Remove duplicate extensions (loops until fixed)
-    while name.endswith((".txt.txt", ".docx.docx", ".docx.txt", ".txt.docx")):
+    while name.endswith((".txt.txt", ".html.html", ".docx.docx", ".docx.txt", ".txt.docx", ".html.txt", ".txt.html")):
         if ".txt" in name:
             name = name.rsplit(".", 1)[0] + ".txt"
+        elif ".html" in name:
+            name = name.rsplit(".", 1)[0] + ".html"
         else:
             name = name.rsplit(".", 1)[0] + ".docx"
 
     # Ensure proper extension
-    if category == "email" and not name.endswith(".txt"):
-        name = f"{os.path.splitext(name)[0]}.txt"
-    elif category != "email" and not name.endswith(".docx"):
-        name = f"{os.path.splitext(name)[0]}.docx"
+    if category == "email":
+        # Allow .txt or .html for email templates
+        if not (name.endswith(".txt") or name.endswith(".html")):
+            name = f"{os.path.splitext(name)[0]}.txt"
+    else:
+        if not name.endswith(".docx"):
+            name = f"{os.path.splitext(name)[0]}.docx"
 
     return name
 
@@ -100,8 +106,9 @@ def run_ui():
 
             st.subheader(f"📁 {selected_category_label} Templates")
 
-            allowed_types = ["txt"] if selected_category == "email" else ["docx"]
-            upload_label = "Upload Template (.txt)" if selected_category == "email" else "Upload Template (.docx)"
+            # For email templates, allow .txt and .html
+            allowed_types = ["txt", "html"] if selected_category == "email" else ["docx"]
+            upload_label = "Upload Template (.txt or .html)" if selected_category == "email" else "Upload Template (.docx)"
 
             uploaded_template = st.file_uploader(upload_label, type=allowed_types)
             tags = st.text_input("🏷️ Add tags (comma-separated)")
@@ -135,6 +142,14 @@ def run_ui():
                         st.download_button(
                             "⬇️ Download Preview", open(preview_path, "rb"), file_name=os.path.basename(preview_path)
                         )
+                    else:
+                        # Preview HTML templates
+                        if versioned_name.endswith(".html"):
+                            st.markdown("📄 **HTML Template Preview:**")
+                            st.components.v1.html(uploaded_template.getvalue().decode("utf-8"), height=350, scrolling=True)
+                        else:
+                            # .txt templates preview as plain text
+                            st.text_area("📄 Template Preview", uploaded_template.getvalue().decode("utf-8"), height=250)
                 except Exception as e:
                     st.error(handle_error(e, code="TEMPLATE_UI_003"))
 

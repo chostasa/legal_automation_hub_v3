@@ -27,10 +27,12 @@ def normalize_path(path: str) -> str:
     if "templates/templates" in normalized_path:
         normalized_path = normalized_path.replace("templates/templates", "templates")
 
-    # Fix duplicate extensions (.txt.txt, .docx.docx, .docx.txt, .txt.docx)
-    while normalized_path.endswith((".txt.txt", ".docx.docx", ".docx.txt", ".txt.docx")):
+    # Fix duplicate extensions (.txt.txt, .html.html, .docx.docx, .docx.txt, etc.)
+    while normalized_path.endswith((".txt.txt", ".html.html", ".docx.docx", ".docx.txt", ".txt.docx", ".txt.html", ".html.txt")):
         if ".txt" in normalized_path:
             normalized_path = normalized_path.rsplit(".", 1)[0] + ".txt"
+        elif ".html" in normalized_path:
+            normalized_path = normalized_path.rsplit(".", 1)[0] + ".html"
         else:
             normalized_path = normalized_path.rsplit(".", 1)[0] + ".docx"
 
@@ -116,6 +118,11 @@ class DropboxClient:
         try:
             os.makedirs(local_dir, exist_ok=True)
             filename = normalize_path(os.path.basename(dropbox_path))
+
+            # Enforce only supported template extensions (.txt, .html, .docx)
+            if not filename.endswith((".txt", ".html", ".docx")):
+                raise ValueError(f"Unsupported template type: {filename}")
+
             local_path = os.path.join(local_dir, filename)
 
             metadata, res = self.dbx.files_download(dropbox_path)
@@ -196,6 +203,11 @@ def download_template_file(category: str, filename: str, local_dir="templates"):
     }
     client = DropboxClient()
     filename = normalize_path(os.path.basename(filename))
+
+    # Enforce supported extensions (.txt or .html for emails)
+    if category == "email" and not filename.endswith((".txt", ".html")):
+        raise ValueError(f"Email templates must be .txt or .html (got {filename})")
+
     path = normalize_path(f"{folder_map[category]}/{filename}")
     return client.download_file(path, local_dir)
 
@@ -227,6 +239,7 @@ def download_example_file(module: str, filename: str, local_dir="examples"):
     path = normalize_path(f"{folder_map[module]}/{filename}")
     return client.download_file(path, local_dir)
 
+
 def upload_file_to_dropbox(path: str, file_bytes: bytes):
     """
     Upload a file to Dropbox, creating folders if needed.
@@ -234,6 +247,11 @@ def upload_file_to_dropbox(path: str, file_bytes: bytes):
     client = DropboxClient()
     try:
         path = normalize_path(path)
+
+        # Validate supported template extensions
+        if path.endswith((".txt", ".html", ".docx")) is False:
+            raise ValueError(f"Unsupported file extension for upload: {path}")
+
         folder = os.path.dirname(path)
         client.list_files(folder)  # ensure folder exists
         client.dbx.files_upload(file_bytes, path, mode=dropbox.files.WriteMode.overwrite)
@@ -267,4 +285,3 @@ def move_file_in_dropbox(old_path: str, new_path: str):
         logger.info(f"[DROPBOX_MOVE] 🔄 Renamed/relocated {old_path} → {new_path}")
     except Exception as e:
         handle_error(e, code="DROPBOX_MOVE_001", raise_it=True)
-

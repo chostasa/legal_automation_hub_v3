@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import base64
 from datetime import datetime
 from core.security import sanitize_text, sanitize_email, redact_log, mask_phi
 from core.constants import STATUS_INTAKE_COMPLETED, STATUS_QUESTIONNAIRE_SENT
@@ -18,12 +19,14 @@ graph = GraphClient()
 neos = NeosClient()
 
 
-async def build_email(client_data: dict, template_name: str) -> tuple:
+async def build_email(client_data: dict, template_name: str, attachments: list = None) -> tuple:
     """
-    Returns (subject, body, cc, sanitized_dict) for a given client row.
+    Returns (subject, body, cc, sanitized_dict, attachments) for a given client row.
     Downloads and normalizes the template_path from Dropbox if missing locally.
+    attachments: list of file-like objects or paths.
     """
     try:
+        # Build sanitized dictionary for placeholder substitution
         sanitized = {
             "ClientName": sanitize_text(client_data.get("Client Name", "")),
             "ReferringAttorney": sanitize_text(client_data.get("Referring Attorney", "N/A")),
@@ -32,6 +35,7 @@ async def build_email(client_data: dict, template_name: str) -> tuple:
             "Email": sanitize_email(client_data.get("Email", "")),
         }
 
+        # Validate email
         if not sanitized["Email"] or sanitized["Email"] == "invalid@example.com":
             raise AppError(
                 code="EMAIL_BUILD_001",
@@ -44,8 +48,11 @@ async def build_email(client_data: dict, template_name: str) -> tuple:
         if not os.path.exists(template_path):
             template_path = download_template_file("email", template_name, "email_templates_cache")
 
-        # Merge the template
-        subject, body, cc = merge_template(template_path, sanitized)
+        # Detect if the template is HTML (preserve formatting)
+        is_html = template_path.lower().endswith(".html")
+
+        # Merge the template into subject/body
+        subject, body, cc = merge_template(template_path, sanitized, is_html=is_html)
         if not subject or not body:
             raise AppError(
                 code="EMAIL_BUILD_003",
@@ -55,10 +62,11 @@ async def build_email(client_data: dict, template_name: str) -> tuple:
 
         cc = cc or []
 
-        # Add tracking pixel
-        open_tracking_url = f"https://tracking.legalhub.app/open/{get_tenant_id()}/{get_user_id()}/{sanitized['CaseID']}"
-        tracking_pixel = f'<img src="{open_tracking_url}" alt="" style="display:none" />'
-        body = f"{body}\n\n{tracking_pixel}"
+        # Add tracking pixel (only for HTML emails)
+        if is_html:
+            open_tracking_url = f"https://tracking.legalhub.app/open/{get_tenant_id()}/{get_user_id()}/{sanitized['CaseID']}"
+            tracking_pixel = f'<img src="{open_tracking_url}" alt="" style="display:none" />'
+            body = f"{body}\n\n{tracking_pixel}"
 
         # Log event
         log_audit_event("Email Built", {
@@ -68,7 +76,7 @@ async def build_email(client_data: dict, template_name: str) -> tuple:
             "template_path": template_path,
         })
 
-        return subject, body, cc, sanitized
+        return subject, body, cc, sanitized, attachments or []
 
     except AppError:
         raise
@@ -81,9 +89,9 @@ async def build_email(client_data: dict, template_name: str) -> tuple:
         )
 
 
-async def send_email_and_update(client: dict, subject: str, body: str, cc: list, template_name: str) -> str:
+async def send_email_and_update(client: dict, subject: str, body: str, cc: list, template_name: str, attachments: list = None) -> str:
     """
-    Sends the email, updates NEOS, logs usage and returns a result string.
+    Sends the email (with attachments), updates NEOS, logs usage and returns a result string.
     Downloads template from Dropbox if missing locally.
     """
     try:
@@ -96,13 +104,39 @@ async def send_email_and_update(client: dict, subject: str, body: str, cc: list,
         # Quota check
         await check_quota("emails_sent", get_tenant_id(), get_user_id(), 1)
 
+        # Prepare attachments for Graph
+        formatted_attachments = []
+        if attachments:
+            for a in attachments:
+                if hasattr(a, "read"):
+                    file_bytes = a.read()
+                    file_name = a.name
+                else:
+                    # If path is passed
+                    file_name = os.path.basename(a)
+                    with open(a, "rb") as f:
+                        file_bytes = f.read()
+
+                formatted_attachments.append({
+                    "@odata.type": "#microsoft.graph.fileAttachment",
+                    "name": file_name,
+                    "contentType": "application/octet-stream",
+                    "contentBytes": base64.b64encode(file_bytes).decode("utf-8")
+                })
+
+        # Detect body type for Graph API
+        body_type = "HTML" if body.strip().startswith("<") else "Text"
+
         # Send email using Graph
         with logger.contextualize(tenant_id=get_tenant_id(), user_id=get_user_id()):
             await graph.send_email(
                 sender_address=None,
                 to=client["Email"],
                 subject=subject,
-                body=body
+                body=body,
+                cc=cc,
+                attachments=formatted_attachments,
+                body_type=body_type
             )
 
         # Update NEOS (best-effort)
