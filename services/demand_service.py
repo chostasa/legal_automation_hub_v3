@@ -26,23 +26,38 @@ async def polish_demand_text(text: str) -> str:
             return text
 
         prompt = f"""
-You will receive a full draft of a demand letter.
+You will receive a full draft of a demand letter. 
+Your task is to produce a final A+++ version that is persuasive, complete, and professionally polished.
 
-Your task is to polish it while retaining persuasive detail:
+**Core Instructions:**
+1. **Keep the overall structure and all section headings exactly as written** 
+   (e.g., "Facts of the Occurrence", "Damages", "Settlement Demand"). 
+   Do not rename or merge sections.
+2. **Remove only true repetition or redundant phrasing**. Do NOT cut important facts, 
+   emotional details, evidence references, or quantified damages. Retain all language, tone, and legal fluency.
+3. **Preserve emotional and narrative richness:** keep descriptions of panic attacks, 
+   impact on education, family hardship, and quality-of-life losses. 
+   These details are critical to persuasion.
+4. Strengthen transitions between sections so the argument flows logically.
+5. Use active voice, strong legal framing (duty → breach → causation → harm), 
+   and persuasive tone throughout.
+6. Ensure all damages, costs, and dollar amounts remain intact and clearly tied 
+   to the requested settlement.
+7. Avoid overly clinical or robotic language—make it compelling while remaining professional.
+8. Do not shorten for the sake of word count – Trim only true redundancy. Keep the narrative full and persuasive, even if it is longer.
+9. Preserve every evidence reference (e.g., police report, witness statements, security footage) – these are essential for credibility.
+10. Explicitly connect injuries to damages – Ensure every physical, emotional, and financial harm is tied to the breach of duty and justified in the settlement demand.
+11. Reinforce the settlement demand at the conclusion – End the letter with a strong, firm call for payment, explicitly referencing the total amount requested.
+12. Clarify complex damages in plain English – If medical terms are used, follow them with a short plain-language explanation for impact (e.g., “bulging discs, which cause daily pain and limit mobility”).
+13. Emphasize future impact – Ensure long-term medical needs, lost earning capacity, and ongoing emotional harm are clearly stated
+14. Never add or guess facts – Do not insert new injuries, events, or numbers that do not exist in the draft.
 
-1. Preserve **all section headings** exactly as written (e.g., "Facts of the Occurrence", "Damages", "Settlement Demand"). 
-   Do not merge, rename, or delete headings.
-2. Rephrase or remove only *true repetition* (i.e., full sentences or paragraphs that state the same fact/injury twice). 
-3. Retain **at least one full description** of injuries, evidence, and emotional context. 
-   Later references may summarize by category, but do NOT cut emotional weight, damages detail, or context.
-4. Keep all **evidence references** (police reports, witnesses, video footage, etc.).
-5. Preserve all **quantified damages and dollar amounts**.
-6. Strengthen transitions and flow so each section logically builds on the prior one.
-7. Do NOT over-shorten for word count. Narrative richness and emotional impact are important.
-8. Do NOT remove educational disruption, long-term impact, or emotional harm details, as these are persuasive.
-9. Do not add any new facts, injuries, or numbers that were not in the original draft.
 
-Here is the draft demand letter:
+**Goal:** The final letter should read like it was personally reviewed and approved 
+by a senior trial attorney. It must be concise, emotionally compelling, and 
+ready to send to opposing counsel.
+
+Here is the draft demand letter to polish:
 {text}
 """
 
