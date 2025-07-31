@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import hashlib
 from datetime import datetime
+import asyncio
 
 from core.session_utils import get_session_temp_dir
 from core.security import sanitize_text, sanitize_filename, redact_log, mask_phi
@@ -14,7 +15,6 @@ from utils.file_utils import clean_temp_dir
 from core.foia_constants import STATE_CITATIONS, STATE_RESPONSE_TIMES
 from core.cache_utils import clear_caches
 from core.error_handling import handle_error
-from utils.thread_utils import run_async  # async helper
 from services.dropbox_client import DropboxClient
 from core.constants import DROPBOX_TEMPLATES_ROOT
 
@@ -214,12 +214,13 @@ def run_ui():
                         )
                         file_path = os.path.join(temp_dir, output_filename)
 
-                        _, _, bullet_list = run_async(
-                            generate_foia_request,
-                            data=data,
-                            template_path=TEMPLATE_FOIA,
-                            output_path=file_path,
-                            example_text=example_text
+                        output_path, foia_body, bullet_list = asyncio.run(
+                            generate_foia_request(
+                                data=data,
+                                template_path=TEMPLATE_FOIA,
+                                output_path=file_path,
+                                example_text=example_text
+                            )
                         )
 
                         decrement_quota("foia_letters", amount=1)
