@@ -10,7 +10,7 @@ from core.audit import log_audit_event
 from email_automation.utils.template_engine import merge_template
 from services.graph_client import GraphClient
 from services.neos_client import NeosClient
-from services.dropbox_client import download_template_file  # centralizes path logic
+from services.dropbox_client import download_template_file  # centralizes Dropbox path logic
 from logger import logger
 import json
 
@@ -18,10 +18,10 @@ graph = GraphClient()
 neos = NeosClient()
 
 
-async def build_email(client_data: dict, template_path: str) -> tuple:
+async def build_email(client_data: dict, template_name: str) -> tuple:
     """
     Returns (subject, body, cc, sanitized_dict) for a given client row.
-    Uses normalized template_path.
+    Downloads and normalizes the template_path from Dropbox if missing locally.
     """
     try:
         sanitized = {
@@ -39,21 +39,17 @@ async def build_email(client_data: dict, template_path: str) -> tuple:
                 details=f"Row data: {client_data}",
             )
 
-        # Normalize template path using the same logic as dropbox_client
-        normalized_template_path = os.path.normpath(template_path)
-        if not os.path.exists(normalized_template_path):
-            raise AppError(
-                code="EMAIL_BUILD_002",
-                message=f"Template path is invalid or missing: {normalized_template_path}",
-                details=f"Sanitized data: {sanitized}",
-            )
+        # If the template doesn't exist locally, download from Dropbox (email category)
+        template_path = os.path.normpath(template_name)
+        if not os.path.exists(template_path):
+            template_path = download_template_file("email", template_name, "email_templates_cache")
 
         # Merge the template
-        subject, body, cc = merge_template(normalized_template_path, sanitized)
+        subject, body, cc = merge_template(template_path, sanitized)
         if not subject or not body:
             raise AppError(
                 code="EMAIL_BUILD_003",
-                message=f"Template merge failed for template: {normalized_template_path}",
+                message=f"Template merge failed for template: {template_path}",
                 details=f"Sanitized data: {sanitized}",
             )
 
@@ -69,7 +65,7 @@ async def build_email(client_data: dict, template_path: str) -> tuple:
             "tenant_id": get_tenant_id(),
             "user_id": get_user_id(),
             "client_name": sanitized.get("ClientName"),
-            "template_path": normalized_template_path,
+            "template_path": template_path,
         })
 
         return subject, body, cc, sanitized
@@ -85,10 +81,10 @@ async def build_email(client_data: dict, template_path: str) -> tuple:
         )
 
 
-async def send_email_and_update(client: dict, subject: str, body: str, cc: list, template_path: str) -> str:
+async def send_email_and_update(client: dict, subject: str, body: str, cc: list, template_name: str) -> str:
     """
     Sends the email, updates NEOS, logs usage and returns a result string.
-    Uses normalized template_path.
+    Downloads template from Dropbox if missing locally.
     """
     try:
         if not client.get("Email") or client["Email"] == "invalid@example.com":
@@ -114,6 +110,11 @@ async def send_email_and_update(client: dict, subject: str, body: str, cc: list,
             await neos.update_case_status(client.get("CaseID", ""), STATUS_QUESTIONNAIRE_SENT)
         except Exception as e:
             logger.warning(f"⚠️ NEOS update failed for CaseID {client.get('CaseID', '')}: {e}")
+
+        # Ensure template is available for logging
+        template_path = os.path.normpath(template_name)
+        if not os.path.exists(template_path):
+            template_path = download_template_file("email", template_name, "email_templates_cache")
 
         # Log email
         await log_email(client, subject, body, template_path, cc)

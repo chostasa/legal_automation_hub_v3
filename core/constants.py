@@ -12,7 +12,7 @@ STATUS_CHOICES = [
 ]
 
 # ----------------------------
-# 📄 Template Paths
+# 📄 Template Paths (Local)
 # ----------------------------
 TEMPLATE_DEMAND = "templates/demand_template.docx"
 TEMPLATE_FOIA = "templates/foia_template.docx"
@@ -27,8 +27,23 @@ foia_template = TEMPLATE_FOIA
 # ----------------------------
 DEFAULT_SENDER_EMAIL = os.getenv("DEFAULT_SENDER_EMAIL", "noreply@yourdomain.com")
 
-DROPBOX_TEMPLATES_ROOT = "/Legal Automation Hub/Legal Automation Hub/LegalAutomationHub/templates"
-DROPBOX_EXAMPLES_ROOT = "/Legal Automation Hub/Legal Automation Hub/LegalAutomationHub/examples"
+# ----------------------------
+# 📂 Dropbox Root Paths
+# ----------------------------
+DROPBOX_TEMPLATES_ROOT = "/Templates"
+DROPBOX_EXAMPLES_ROOT = "/Examples"
 
+# ----------------------------
+# 📂 Dropbox Template Folders
+# ----------------------------
+DROPBOX_EMAIL_TEMPLATE_DIR = f"{DROPBOX_TEMPLATES_ROOT}/Email"
+DROPBOX_DEMAND_TEMPLATE_DIR = f"{DROPBOX_TEMPLATES_ROOT}/Demand"
+DROPBOX_MEDIATION_TEMPLATE_DIR = f"{DROPBOX_TEMPLATES_ROOT}/Mediation_Memo"
+DROPBOX_FOIA_TEMPLATE_DIR = f"{DROPBOX_TEMPLATES_ROOT}/FOIA"
 
-
+# ----------------------------
+# 📂 Dropbox Example Folders
+# ----------------------------
+DROPBOX_DEMAND_EXAMPLES_DIR = f"{DROPBOX_EXAMPLES_ROOT}/Demand"
+DROPBOX_FOIA_EXAMPLES_DIR = f"{DROPBOX_EXAMPLES_ROOT}/FOIA"
+DROPBOX_MEDIATION_EXAMPLES_DIR = f"{DROPBOX_EXAMPLES_ROOT}/Mediation"

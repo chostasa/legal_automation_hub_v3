@@ -4,7 +4,17 @@ import os
 import hashlib
 from datetime import datetime
 from core.error_handling import handle_error
-from core.constants import DROPBOX_TEMPLATES_ROOT, DROPBOX_EXAMPLES_ROOT
+from core.constants import (
+    DROPBOX_TEMPLATES_ROOT,
+    DROPBOX_EXAMPLES_ROOT,
+    DROPBOX_EMAIL_TEMPLATE_DIR,
+    DROPBOX_DEMAND_TEMPLATE_DIR,
+    DROPBOX_MEDIATION_TEMPLATE_DIR,
+    DROPBOX_FOIA_TEMPLATE_DIR,
+    DROPBOX_DEMAND_EXAMPLES_DIR,
+    DROPBOX_FOIA_EXAMPLES_DIR,
+    DROPBOX_MEDIATION_EXAMPLES_DIR
+)
 
 DB_PATH = os.path.join("data", "legal_automation_hub.db")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -63,18 +73,26 @@ def get_templates(tenant_id: str, category: str = None, include_deleted: bool = 
     """Directly list templates from Dropbox instead of SQLite."""
     from services.dropbox_client import list_templates   # Lazy import
 
+    folder_map = {
+        "email": DROPBOX_EMAIL_TEMPLATE_DIR,
+        "demand": DROPBOX_DEMAND_TEMPLATE_DIR,
+        "mediation_memo": DROPBOX_MEDIATION_TEMPLATE_DIR,
+        "foia": DROPBOX_FOIA_TEMPLATE_DIR,
+        "batch_docs": f"{DROPBOX_TEMPLATES_ROOT}/Batch_Docs"
+    }
+
     if not category:
-        categories = ["email", "batch_docs", "foia", "demand"]
+        categories = folder_map.keys()
         templates = []
         for cat in categories:
             templates += [
-                {"name": f, "path": f"{DROPBOX_TEMPLATES_ROOT}/{cat}/{f}"}
+                {"name": f, "path": f"{folder_map[cat]}/{f}"}
                 for f in list_templates(cat)
             ]
         return templates
 
     return [
-        {"name": f, "path": f"{DROPBOX_TEMPLATES_ROOT}/{category}/{f}"}
+        {"name": f, "path": f"{folder_map[category]}/{f}"}
         for f in list_templates(category)
     ]
 
@@ -82,8 +100,15 @@ def get_templates(tenant_id: str, category: str = None, include_deleted: bool = 
 def upload_template(category: str, filename: str, file_bytes: bytes):
     """Upload a template to Dropbox."""
     from services.dropbox_client import upload_file_to_dropbox  # Lazy import
+    folder_map = {
+        "email": DROPBOX_EMAIL_TEMPLATE_DIR,
+        "demand": DROPBOX_DEMAND_TEMPLATE_DIR,
+        "mediation_memo": DROPBOX_MEDIATION_TEMPLATE_DIR,
+        "foia": DROPBOX_FOIA_TEMPLATE_DIR,
+        "batch_docs": f"{DROPBOX_TEMPLATES_ROOT}/Batch_Docs"
+    }
     try:
-        path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{filename}"
+        path = f"{folder_map[category]}/{filename}"
         upload_file_to_dropbox(path, file_bytes)
         return {"name": filename, "path": path}
     except Exception as e:
@@ -93,8 +118,15 @@ def upload_template(category: str, filename: str, file_bytes: bytes):
 def delete_template(category: str, filename: str):
     """Delete a template from Dropbox."""
     from services.dropbox_client import delete_file_from_dropbox  # Lazy import
+    folder_map = {
+        "email": DROPBOX_EMAIL_TEMPLATE_DIR,
+        "demand": DROPBOX_DEMAND_TEMPLATE_DIR,
+        "mediation_memo": DROPBOX_MEDIATION_TEMPLATE_DIR,
+        "foia": DROPBOX_FOIA_TEMPLATE_DIR,
+        "batch_docs": f"{DROPBOX_TEMPLATES_ROOT}/Batch_Docs"
+    }
     try:
-        path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{filename}"
+        path = f"{folder_map[category]}/{filename}"
         delete_file_from_dropbox(path)
     except Exception as e:
         handle_error(e, code="DB_TEMPLATE_DELETE_001", raise_it=True)
@@ -103,9 +135,16 @@ def delete_template(category: str, filename: str):
 def rename_template(category: str, old_name: str, new_name: str):
     """Rename or move a template in Dropbox."""
     from services.dropbox_client import move_file_in_dropbox  # Lazy import
+    folder_map = {
+        "email": DROPBOX_EMAIL_TEMPLATE_DIR,
+        "demand": DROPBOX_DEMAND_TEMPLATE_DIR,
+        "mediation_memo": DROPBOX_MEDIATION_TEMPLATE_DIR,
+        "foia": DROPBOX_FOIA_TEMPLATE_DIR,
+        "batch_docs": f"{DROPBOX_TEMPLATES_ROOT}/Batch_Docs"
+    }
     try:
-        old_path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{old_name}"
-        new_path = f"{DROPBOX_TEMPLATES_ROOT}/{category}/{new_name}"
+        old_path = f"{folder_map[category]}/{old_name}"
+        new_path = f"{folder_map[category]}/{new_name}"
         move_file_in_dropbox(old_path, new_path)
         return new_path
     except Exception as e:
@@ -119,20 +158,25 @@ def rename_template(category: str, old_name: str, new_name: str):
 def get_examples(tenant_id: str, category: str = None):
     """Retrieve examples directly from Dropbox."""
     from services.dropbox_client import list_examples  # Lazy import
+    folder_map = {
+        "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
+        "foia": DROPBOX_FOIA_EXAMPLES_DIR,
+        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR
+    }
     try:
         if not category:
-            categories = ["memos", "demands", "foia"]
+            categories = folder_map.keys()
             examples = []
             for cat in categories:
                 files = list_examples(cat)
                 examples += [
-                    {"name": f, "path": f"{DROPBOX_EXAMPLES_ROOT}/{cat}/{f}"}
+                    {"name": f, "path": f"{folder_map[cat]}/{f}"}
                     for f in files
                 ]
             return examples
 
         files = list_examples(category)
-        return [{"name": f, "path": f"{DROPBOX_EXAMPLES_ROOT}/{category}/{f}"} for f in files]
+        return [{"name": f, "path": f"{folder_map[category]}/{f}"} for f in files]
 
     except Exception as e:
         handle_error(e, code="DB_EXAMPLES_LIST_001", raise_it=True)
@@ -141,8 +185,13 @@ def get_examples(tenant_id: str, category: str = None):
 def upload_example(category: str, filename: str, file_bytes: bytes):
     """Upload an example to Dropbox."""
     from services.dropbox_client import upload_file_to_dropbox  # Lazy import
+    folder_map = {
+        "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
+        "foia": DROPBOX_FOIA_EXAMPLES_DIR,
+        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR
+    }
     try:
-        path = f"{DROPBOX_EXAMPLES_ROOT}/{category}/{filename}"
+        path = f"{folder_map[category]}/{filename}"
         upload_file_to_dropbox(path, file_bytes)
         return {"name": filename, "path": path}
     except Exception as e:
@@ -152,8 +201,13 @@ def upload_example(category: str, filename: str, file_bytes: bytes):
 def delete_example(category: str, filename: str):
     """Delete an example from Dropbox."""
     from services.dropbox_client import delete_file_from_dropbox  # Lazy import
+    folder_map = {
+        "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
+        "foia": DROPBOX_FOIA_EXAMPLES_DIR,
+        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR
+    }
     try:
-        path = f"{DROPBOX_EXAMPLES_ROOT}/{category}/{filename}"
+        path = f"{folder_map[category]}/{filename}"
         delete_file_from_dropbox(path)
     except Exception as e:
         handle_error(e, code="DB_EXAMPLES_DELETE_001", raise_it=True)
@@ -162,9 +216,14 @@ def delete_example(category: str, filename: str):
 def rename_example(category: str, old_name: str, new_name: str):
     """Rename an example in Dropbox."""
     from services.dropbox_client import move_file_in_dropbox  # Lazy import
+    folder_map = {
+        "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
+        "foia": DROPBOX_FOIA_EXAMPLES_DIR,
+        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR
+    }
     try:
-        old_path = f"{DROPBOX_EXAMPLES_ROOT}/{category}/{old_name}"
-        new_path = f"{DROPBOX_EXAMPLES_ROOT}/{category}/{new_name}"
+        old_path = f"{folder_map[category]}/{old_name}"
+        new_path = f"{folder_map[category]}/{new_name}"
         move_file_in_dropbox(old_path, new_path)
         return new_path
     except Exception as e:

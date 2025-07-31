@@ -15,6 +15,7 @@ from prompts.prompt_factory import build_prompt
 from core.prompts.demand_example import EXAMPLE_DEMAND, SETTLEMENT_EXAMPLE
 from services.openai_client import safe_generate
 from core.usage_tracker import check_quota_and_decrement
+from services.dropbox_client import download_template_file, list_examples, download_example_file
 
 
 # === Async prompt generators ===
@@ -135,16 +136,17 @@ def replace_placeholders(doc: Document, replacements: dict):
 
 
 async def fill_template(data: dict, template_path: str, output_dir: str) -> str:
+    """
+    Fill the demand template with provided data and return the output path.
+    """
     try:
         if not data or not isinstance(data, dict):
             raise ValueError("Input data for template filling is missing or invalid.")
+
+        # If the template_path is just a filename, download from Dropbox
         if not os.path.exists(template_path):
-            handle_error(
-                FileNotFoundError(f"Template not found: {template_path}"),
-                code="DEMAND_TEMPLATE_001",
-                user_message="Demand template not found.",
-                raise_it=True,
-            )
+            local_template = download_template_file("demand", template_path, "templates_cache")
+            template_path = local_template
 
         # Validate file size and prepare output
         validate_file_size(template_path)
@@ -193,6 +195,9 @@ async def fill_template(data: dict, template_path: str, output_dir: str) -> str:
 
 
 async def generate_all_demands(template_path: str, excel_path: str, output_dir: str):
+    """
+    Generate multiple demands from an Excel input.
+    """
     try:
         if not os.path.exists(excel_path):
             handle_error(
@@ -261,7 +266,9 @@ async def generate_demand_letter(
 
 if __name__ == "__main__":
     try:
-        TEMPLATE_PATH = "templates/demand_template.docx"
+        # Fetch the latest demand template from Dropbox by name
+        TEMPLATE_NAME = "demand_template.docx"
+        TEMPLATE_PATH = download_template_file("demand", TEMPLATE_NAME, "templates_cache")
         EXCEL_PATH = "data_demand_requests.xlsx"
         OUTPUT_DIR = get_session_temp_dir()  # Isolated temp dir
         import asyncio

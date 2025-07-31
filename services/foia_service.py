@@ -10,7 +10,7 @@ from core.auth import get_tenant_id
 from utils.file_utils import get_session_temp_dir
 from logger import logger
 from core.prompts.prompt_factory import build_prompt
-
+from services.dropbox_client import download_template_file  # NEW: Dropbox template download
 
 async def generate_synopsis(casesynopsis: str) -> str:
     """
@@ -34,17 +34,31 @@ async def generate_synopsis(casesynopsis: str) -> str:
         )
 
 
-async def generate_foia_request(data: dict, template_path: str, output_path: str, example_text: str = "") -> tuple:
+async def generate_foia_request(data: dict, template_name: str, output_path: str, example_text: str = "") -> tuple:
     """
     Generates a FOIA request letter (.docx) and returns the file path, body text, and bullet list.
+    Downloads template from Dropbox if it's not already present locally.
     """
     try:
         if not isinstance(data, dict):
             raise ValueError("FOIA input data is invalid.")
-        if not template_path or not os.path.exists(template_path):
-            raise FileNotFoundError(f"Template path is invalid: {template_path}")
+        if not template_name:
+            raise ValueError("Template name is missing.")
         if not output_path:
             raise ValueError("Output path is required for FOIA letter generation.")
+
+        # Ensure template is downloaded if missing locally
+        template_path = os.path.normpath(template_name)
+        if not os.path.exists(template_path):
+            template_path = download_template_file("foia", template_name, "foia_templates_cache")
+
+        if not template_path or not os.path.exists(template_path):
+            handle_error(
+                FileNotFoundError(f"Template not found: {template_path}"),
+                code="FOIA_GEN_TEMPLATE_001",
+                user_message="FOIA template is missing or inaccessible.",
+                raise_it=True,
+            )
 
         tenant_id = get_tenant_id()
         check_quota_and_decrement(tenant_id, "foia_requests")

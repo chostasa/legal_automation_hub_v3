@@ -10,6 +10,7 @@ from utils.thread_utils import run_in_thread, run_async
 from logger import logger
 from core.usage_tracker import check_quota_and_decrement
 from core.auth import get_tenant_id
+from services.dropbox_client import download_template_file  # NEW: centralized Dropbox template fetching
 
 from core.prompts.memo_guidelines import FULL_SAFETY_PROMPT
 from core.prompts.memo_examples import (
@@ -140,8 +141,16 @@ Context:
         return ""
 
 
-async def generate_memo_from_fields(data: dict, template_path: str, output_dir: str, test_mode: bool = False) -> tuple:
+async def generate_memo_from_fields(data: dict, template_name: str, output_dir: str, test_mode: bool = False) -> tuple:
+    """
+    Generate mediation memo using data + template from Dropbox if needed.
+    """
     try:
+        # Ensure template is available locally (download from Dropbox if not)
+        template_path = os.path.normpath(template_name)
+        if not os.path.exists(template_path):
+            template_path = download_template_file("mediation_memo", template_name, "memo_templates_cache")
+
         if not template_path or not os.path.exists(template_path):
             handle_error(
                 FileNotFoundError(f"Template not found at {template_path}"),

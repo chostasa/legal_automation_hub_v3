@@ -9,19 +9,42 @@ from core.audit import log_audit_event
 from core.cache_utils import clear_caches
 from core.error_handling import handle_error
 from logger import logger
-from core.db import get_templates
+from core.db import get_templates, get_examples
 from utils.docx_utils import replace_text_in_docx_all
 from services.dropbox_client import DropboxClient
-from core.constants import DROPBOX_TEMPLATES_ROOT
+from core.constants import (
+    DROPBOX_EMAIL_TEMPLATE_DIR,
+    DROPBOX_DEMAND_TEMPLATE_DIR,
+    DROPBOX_MEDIATION_TEMPLATE_DIR,
+    DROPBOX_FOIA_TEMPLATE_DIR,
+    DROPBOX_TEMPLATES_ROOT,
+    DROPBOX_DEMAND_EXAMPLES_DIR,
+    DROPBOX_FOIA_EXAMPLES_DIR,
+    DROPBOX_MEDIATION_EXAMPLES_DIR
+)
 from dropbox.files import WriteMode
 
-# Template categories available
+# Template categories mapped to new Dropbox folders
 CATEGORIES = {
-    "Mediation Memo": "mediation",
+    "Mediation Memo": "mediation_memo",
     "Demand Letter": "demand",
     "FOIA Letter": "foia",
     "Batch Documents": "batch_docs",
     "Email Templates": "email"
+}
+
+CATEGORY_PATH_MAP = {
+    "email": DROPBOX_EMAIL_TEMPLATE_DIR,
+    "demand": DROPBOX_DEMAND_TEMPLATE_DIR,
+    "mediation_memo": DROPBOX_MEDIATION_TEMPLATE_DIR,
+    "foia": DROPBOX_FOIA_TEMPLATE_DIR,
+    "batch_docs": f"{DROPBOX_TEMPLATES_ROOT}/Batch_Docs"
+}
+
+EXAMPLES_PATH_MAP = {
+    "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
+    "foia": DROPBOX_FOIA_EXAMPLES_DIR,
+    "mediation_memo": DROPBOX_MEDIATION_EXAMPLES_DIR
 }
 
 def normalize_filename(name: str, category: str) -> str:
@@ -73,6 +96,7 @@ def run_ui():
                 "Choose Template Category", list(CATEGORIES.keys()), key="template_category"
             )
             selected_category = CATEGORIES[selected_category_label]
+            category_path = CATEGORY_PATH_MAP[selected_category]
 
             st.subheader(f"📁 {selected_category_label} Templates")
 
@@ -89,7 +113,7 @@ def run_ui():
                     normalized_name = normalize_filename(uploaded_template.name, selected_category)
                     versioned_name = f"{timestamp}_{normalized_name}"
 
-                    dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{versioned_name}"
+                    dropbox_path = f"{category_path}/{versioned_name}"
                     client.dbx.files_upload(uploaded_template.getvalue(), dropbox_path, mode=WriteMode.overwrite)
 
                     st.success(f"✅ Uploaded template: {versioned_name}")
@@ -146,8 +170,8 @@ def run_ui():
                         if st.button("Rename", key=f"rename_btn_{name}"):
                             try:
                                 clean_new_name = normalize_filename(new_name, selected_category)
-                                old_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{name}"
-                                new_path = f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{clean_new_name}"
+                                old_path = f"{category_path}/{name}"
+                                new_path = f"{category_path}/{clean_new_name}"
 
                                 client.dbx.files_move_v2(old_path, new_path, autorename=False)
                                 st.success(f"✅ Renamed to {clean_new_name}")
@@ -161,7 +185,7 @@ def run_ui():
                     with col3:
                         if st.button("🗑️ Delete", key=f"delete_{name}"):
                             try:
-                                client.dbx.files_delete_v2(f"{DROPBOX_TEMPLATES_ROOT}/{selected_category}/{name}")
+                                client.dbx.files_delete_v2(f"{category_path}/{name}")
                                 st.success(f"✅ Deleted {name}")
                                 clear_caches()
 
@@ -177,35 +201,25 @@ def run_ui():
         except Exception as e:
             st.error(handle_error(e, code="TEMPLATE_UI_006"))
 
-    # ==================== Tab 2: Style Examples ==================== #
+    # ==================== Tab 2: Style Examples (Dropbox) ==================== #
     with tab2:
         try:
             selected_example_label = st.selectbox(
-                "Choose Example Category", list(CATEGORIES.keys()), key="example_category"
+                "Choose Example Category", ["Mediation Memo", "Demand Letter", "FOIA Letter"], key="example_category"
             )
             example_category = CATEGORIES[selected_example_label]
-            example_dir = os.path.join("examples", tenant_id, example_category)
-            os.makedirs(example_dir, exist_ok=True)
+            example_path = EXAMPLES_PATH_MAP.get(example_category)
 
             st.subheader(f"🖋️ {selected_example_label} Style Examples")
 
+            # Upload new style example
             uploaded_example = st.file_uploader("Upload Style Example (.txt)", type=["txt"])
-            if uploaded_example:
+            if uploaded_example and example_path:
                 try:
                     normalized_name = normalize_filename(uploaded_example.name, "email")
-                    example_path = os.path.join(example_dir, normalized_name)
+                    dropbox_path = f"{example_path}/{normalized_name}"
 
-                    with open(example_path, "wb") as f:
-                        f.write(uploaded_example.read())
-
-                    meta = {
-                        "filename": normalized_name,
-                        "uploaded_at": datetime.utcnow().isoformat(),
-                        "tenant_id": tenant_id,
-                        "category": example_category,
-                    }
-                    with open(example_path.replace(".txt", ".json"), "w") as f:
-                        json.dump(meta, f, indent=2)
+                    client.dbx.files_upload(uploaded_example.getvalue(), dropbox_path, mode=WriteMode.overwrite)
 
                     st.success(f"✅ Uploaded example: {normalized_name}")
                     clear_caches()
@@ -221,16 +235,13 @@ def run_ui():
 
             st.markdown("---")
             search_filter = st.text_input("🔍 Search by name").lower()
-            examples = [f for f in os.listdir(example_dir) if f.endswith(".txt")]
+
+            # Load style examples list from Dropbox
+            examples = get_examples(tenant_id=tenant_id, category=example_category.replace("_memo", ""))
 
             if examples:
-                for filename in examples:
-                    meta_path = os.path.join(example_dir, filename.replace(".txt", ".json"))
-                    uploaded_at = ""
-                    if os.path.exists(meta_path):
-                        with open(meta_path, "r") as mf:
-                            meta = json.load(mf)
-                            uploaded_at = meta.get("uploaded_at", "")
+                for ex in examples:
+                    filename = ex.get("name", "Unknown")
 
                     if search_filter not in filename.lower():
                         continue
@@ -238,8 +249,6 @@ def run_ui():
                     col1, col2, col3 = st.columns([5, 2, 2])
                     with col1:
                         st.write(f"🖋️ **{filename}**")
-                        if uploaded_at:
-                            st.caption(f"📅 Uploaded: {uploaded_at.split('T')[0]}")
 
                     with col2:
                         new_name = st.text_input(
@@ -248,34 +257,28 @@ def run_ui():
                         if st.button("Rename", key=f"rename_ex_btn_{filename}"):
                             try:
                                 clean_new_name = normalize_filename(new_name, "email")
-                                new_path = os.path.join(example_dir, clean_new_name)
+                                old_path = f"{example_path}/{filename}"
+                                new_path = f"{example_path}/{clean_new_name}"
 
-                                if os.path.exists(new_path):
-                                    st.warning("⚠️ File with that name already exists.")
-                                else:
-                                    os.rename(example_dir + "/" + filename, new_path)
-                                    if os.path.exists(meta_path):
-                                        os.rename(meta_path, new_path.replace(".txt", ".json"))
+                                client.dbx.files_move_v2(old_path, new_path, autorename=False)
 
-                                    st.success(f"✅ Renamed to {clean_new_name}")
-                                    clear_caches()
-                                    log_audit_event("Style Example Renamed", {
-                                        "from": filename,
-                                        "to": clean_new_name,
-                                        "tenant_id": tenant_id,
-                                        "category": example_category,
-                                        "module": "template_manager"
-                                    })
-                                    st.rerun()
+                                st.success(f"✅ Renamed to {clean_new_name}")
+                                clear_caches()
+                                log_audit_event("Style Example Renamed", {
+                                    "from": filename,
+                                    "to": clean_new_name,
+                                    "tenant_id": tenant_id,
+                                    "category": example_category,
+                                    "module": "template_manager"
+                                })
+                                st.rerun()
                             except Exception as e:
                                 st.error(handle_error(e, code="TEMPLATE_UI_008"))
 
                     with col3:
                         if st.button("🗑️ Delete", key=f"delete_ex_{filename}"):
                             try:
-                                os.remove(example_dir + "/" + filename)
-                                if os.path.exists(meta_path):
-                                    os.remove(meta_path)
+                                client.dbx.files_delete_v2(f"{example_path}/{filename}")
 
                                 st.success(f"✅ Deleted {filename}")
                                 clear_caches()
@@ -289,7 +292,7 @@ def run_ui():
                             except Exception as e:
                                 st.error(handle_error(e, code="TEMPLATE_UI_009"))
             else:
-                st.info("No examples found matching your search.")
+                st.info("No style examples found matching your search.")
 
         except Exception as e:
             st.error(handle_error(e, code="TEMPLATE_UI_010"))

@@ -5,8 +5,17 @@ from io import BytesIO
 from config import AppConfig, get_config
 from core.error_handling import handle_error
 from logger import logger
-from core.constants import DROPBOX_TEMPLATES_ROOT, DROPBOX_EXAMPLES_ROOT
-
+from core.constants import (
+    DROPBOX_TEMPLATES_ROOT,
+    DROPBOX_EXAMPLES_ROOT,
+    DROPBOX_EMAIL_TEMPLATE_DIR,
+    DROPBOX_DEMAND_TEMPLATE_DIR,
+    DROPBOX_MEDIATION_TEMPLATE_DIR,
+    DROPBOX_FOIA_TEMPLATE_DIR,
+    DROPBOX_DEMAND_EXAMPLES_DIR,
+    DROPBOX_FOIA_EXAMPLES_DIR,
+    DROPBOX_MEDIATION_EXAMPLES_DIR
+)
 
 def normalize_path(path: str) -> str:
     """
@@ -125,13 +134,14 @@ class DropboxClient:
         Ensure the full folder tree for templates/examples exists in Dropbox.
         """
         base_folders = [
-            f"{DROPBOX_TEMPLATES_ROOT}/email",
-            f"{DROPBOX_TEMPLATES_ROOT}/batch_docs",
-            f"{DROPBOX_TEMPLATES_ROOT}/foia",
-            f"{DROPBOX_TEMPLATES_ROOT}/demand",
-            f"{DROPBOX_EXAMPLES_ROOT}/demand",
-            f"{DROPBOX_EXAMPLES_ROOT}/foia",
-            f"{DROPBOX_EXAMPLES_ROOT}/mediation",
+            DROPBOX_EMAIL_TEMPLATE_DIR,
+            DROPBOX_DEMAND_TEMPLATE_DIR,
+            DROPBOX_MEDIATION_TEMPLATE_DIR,
+            DROPBOX_FOIA_TEMPLATE_DIR,
+            f"{DROPBOX_TEMPLATES_ROOT}/Batch_Docs",
+            DROPBOX_DEMAND_EXAMPLES_DIR,
+            DROPBOX_FOIA_EXAMPLES_DIR,
+            DROPBOX_MEDIATION_EXAMPLES_DIR,
         ]
         for folder in base_folders:
             folder = normalize_path(folder)
@@ -152,10 +162,24 @@ def download_dashboard_df(
 
 
 def list_templates(category: str):
-    """Return list of template files for a category (email, batch_docs, etc.)"""
+    """
+    Return list of template files for a category (email, demand, mediation_memo, foia, batch_docs).
+    """
+    from core.constants import (
+        DROPBOX_EMAIL_TEMPLATE_DIR,
+        DROPBOX_DEMAND_TEMPLATE_DIR,
+        DROPBOX_MEDIATION_TEMPLATE_DIR,
+        DROPBOX_FOIA_TEMPLATE_DIR
+    )
+    folder_map = {
+        "email": DROPBOX_EMAIL_TEMPLATE_DIR,
+        "demand": DROPBOX_DEMAND_TEMPLATE_DIR,
+        "mediation_memo": DROPBOX_MEDIATION_TEMPLATE_DIR,
+        "foia": DROPBOX_FOIA_TEMPLATE_DIR,
+        "batch_docs": f"{DROPBOX_TEMPLATES_ROOT}/Batch_Docs"
+    }
     client = DropboxClient()
-    path = f"{DROPBOX_TEMPLATES_ROOT}/{category}"
-    return client.list_files(path)
+    return client.list_files(folder_map[category])
 
 
 def download_template_file(category: str, filename: str, local_dir="templates"):
@@ -163,24 +187,84 @@ def download_template_file(category: str, filename: str, local_dir="templates"):
     Download a template file by category.
     Sanitizes the filename to avoid duplicate paths/extensions.
     """
+    folder_map = {
+        "email": DROPBOX_EMAIL_TEMPLATE_DIR,
+        "demand": DROPBOX_DEMAND_TEMPLATE_DIR,
+        "mediation_memo": DROPBOX_MEDIATION_TEMPLATE_DIR,
+        "foia": DROPBOX_FOIA_TEMPLATE_DIR,
+        "batch_docs": f"{DROPBOX_TEMPLATES_ROOT}/Batch_Docs"
+    }
     client = DropboxClient()
-
     filename = normalize_path(os.path.basename(filename))
-    path = normalize_path(f"{DROPBOX_TEMPLATES_ROOT}/{category}/{filename}")
+    path = normalize_path(f"{folder_map[category]}/{filename}")
     return client.download_file(path, local_dir)
 
 
 def list_examples(module: str):
+    """
+    List style example files for a module (demand, foia, mediation).
+    """
+    folder_map = {
+        "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
+        "foia": DROPBOX_FOIA_EXAMPLES_DIR,
+        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR
+    }
     client = DropboxClient()
-    path = f"{DROPBOX_EXAMPLES_ROOT}/{module}"
-    return client.list_files(path)
+    return client.list_files(folder_map[module])
 
 
 def download_example_file(module: str, filename: str, local_dir="examples"):
     """
     Download example files safely, avoiding duplicate paths.
     """
+    folder_map = {
+        "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
+        "foia": DROPBOX_FOIA_EXAMPLES_DIR,
+        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR
+    }
     client = DropboxClient()
     filename = normalize_path(os.path.basename(filename))
-    path = normalize_path(f"{DROPBOX_EXAMPLES_ROOT}/{module}/{filename}")
+    path = normalize_path(f"{folder_map[module]}/{filename}")
     return client.download_file(path, local_dir)
+
+def upload_file_to_dropbox(path: str, file_bytes: bytes):
+    """
+    Upload a file to Dropbox, creating folders if needed.
+    """
+    client = DropboxClient()
+    try:
+        path = normalize_path(path)
+        folder = os.path.dirname(path)
+        client.list_files(folder)  # ensure folder exists
+        client.dbx.files_upload(file_bytes, path, mode=dropbox.files.WriteMode.overwrite)
+        logger.info(f"[DROPBOX_UPLOAD] 📤 Uploaded file to {path}")
+    except Exception as e:
+        handle_error(e, code="DROPBOX_UPLOAD_001", raise_it=True)
+
+
+def delete_file_from_dropbox(path: str):
+    """
+    Delete a file from Dropbox.
+    """
+    client = DropboxClient()
+    try:
+        path = normalize_path(path)
+        client.dbx.files_delete_v2(path)
+        logger.info(f"[DROPBOX_DELETE] 🗑️ Deleted {path}")
+    except Exception as e:
+        handle_error(e, code="DROPBOX_DELETE_001", raise_it=True)
+
+
+def move_file_in_dropbox(old_path: str, new_path: str):
+    """
+    Move or rename a file in Dropbox.
+    """
+    client = DropboxClient()
+    try:
+        old_path = normalize_path(old_path)
+        new_path = normalize_path(new_path)
+        client.dbx.files_move_v2(old_path, new_path, autorename=False)
+        logger.info(f"[DROPBOX_MOVE] 🔄 Renamed/relocated {old_path} → {new_path}")
+    except Exception as e:
+        handle_error(e, code="DROPBOX_MOVE_001", raise_it=True)
+
