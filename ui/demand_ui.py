@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import hashlib
+import time
 from datetime import datetime
 
 from core.session_utils import get_session_temp_dir
@@ -36,6 +37,17 @@ def load_binary_file(path: str) -> bytes:
         return f.read()
 
 
+def load_with_retry(path: str, retries: int = 3, delay: float = 0.5) -> bytes:
+    """
+    Retry-safe loader for generated demand letters to avoid race conditions.
+    """
+    for attempt in range(retries):
+        if os.path.exists(path):
+            return load_binary_file(path)
+        time.sleep(delay)
+    raise FileNotFoundError(f"Demand letter not found after retries: {path}")
+
+
 def run_ui():
     st.header("📂 Demand Letter Generator")
 
@@ -43,7 +55,9 @@ def run_ui():
     st.markdown("### 🎨 Optional: Style / Tone Example")
 
     # Upload new example
-    uploaded_example = st.file_uploader("Upload New Style Example (.txt)", type=["txt"], key="upload_example")
+    uploaded_example = st.file_uploader(
+        "Upload New Style Example (.txt)", type=["txt"], key="upload_example"
+    )
     if uploaded_example:
         try:
             example_filename = sanitize_filename(uploaded_example.name)
@@ -85,14 +99,20 @@ def run_ui():
     st.markdown("### 📄 Select Demand Template")
 
     # Upload new template (to Dropbox)
-    uploaded_template = st.file_uploader("Upload New Demand Template (.docx)", type=["docx"], key="upload_template")
+    uploaded_template = st.file_uploader(
+        "Upload New Demand Template (.docx)", type=["docx"], key="upload_template"
+    )
     if uploaded_template:
         try:
             timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
             template_filename = f"{timestamp}_{sanitize_filename(uploaded_template.name)}"
             dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/demand/{template_filename}"
 
-            client.dbx.files_upload(uploaded_template.getvalue(), dropbox_path, mode=client.dbx.files.WriteMode.overwrite)
+            client.dbx.files_upload(
+                uploaded_template.getvalue(),
+                dropbox_path,
+                mode=client.dbx.files.WriteMode.overwrite
+            )
             st.success(f"✅ Uploaded template: {template_filename}")
 
             clear_caches()
@@ -180,7 +200,8 @@ def run_ui():
 
                     # Download selected template from Dropbox to use
                     template_path = client.download_file(
-                        f"{DROPBOX_TEMPLATES_ROOT}/demand/{selected_template}", "templates_preview"
+                        f"{DROPBOX_TEMPLATES_ROOT}/demand/{selected_template}",
+                        "templates_preview"
                     )
 
                     if not template_path.lower().endswith(".docx"):
@@ -207,9 +228,17 @@ def run_ui():
 
             decrement_quota("demand_letters", amount=1)
             st.success("✅ Demand letter generated!")
+
+            # Retry-safe load for download
+            try:
+                file_data = load_with_retry(file_path)
+            except FileNotFoundError as e:
+                st.error(f"❌ Demand letter could not be located: {e}")
+                return
+
             st.download_button(
                 "⬇️ Download Demand Letter (.docx)",
-                data=load_binary_file(file_path),
+                data=file_data,
                 file_name=os.path.basename(file_path),
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
@@ -224,7 +253,9 @@ def run_ui():
                     metadata={"client_name": full_name, "template_used": selected_template}
                 )
             except Exception as log_err:
-                logger.warning(redact_log(mask_phi(f"⚠️ Failed to log demand usage: {log_err}")))
+                logger.warning(
+                    redact_log(mask_phi(f"⚠️ Failed to log demand usage: {log_err}"))
+                )
 
             try:
                 log_audit_event("Demand Letter Generated", {
@@ -244,7 +275,9 @@ def run_ui():
                     "module": "demand"
                 })
             except Exception as audit_err:
-                logger.warning(redact_log(mask_phi(f"⚠️ Failed to write audit log: {audit_err}")))
+                logger.warning(
+                    redact_log(mask_phi(f"⚠️ Failed to write audit log: {audit_err}"))
+                )
 
         except Exception as e:
             msg = handle_error(e, code="DEMAND_UI_003")

@@ -4,11 +4,10 @@ from datetime import datetime
 from docx import Document
 from openpyxl import load_workbook
 
-from core.security import mask_phi, redact_log, sanitize_text
+from core.security import mask_phi, redact_log, sanitize_text, sanitize_filename
 from core.error_handling import handle_error
 from utils.docx_utils import replace_text_in_docx_all
 from utils.file_utils import validate_file_size, get_session_temp_dir
-from utils.thread_utils import run_in_thread
 from logger import logger
 
 from prompts.prompt_factory import build_prompt
@@ -178,11 +177,18 @@ async def fill_template(data: dict, template_path: str, output_dir: str) -> str:
 
         # Use isolated session temp directory
         os.makedirs(output_dir, exist_ok=True)
-        output_filename = f"Demand_{full_name.replace(' ', '_') if full_name else 'Client'}_{datetime.today().strftime('%Y-%m-%d')}.docx"
+
+        # Sanitize and build filename
+        raw_filename = f"Demand_{full_name}_{datetime.today().strftime('%Y-%m-%d')}.docx"
+        output_filename = sanitize_filename(raw_filename)
         output_path = os.path.join(output_dir, output_filename)
 
-        # Save Word doc using thread offload
-        run_in_thread(doc.save, output_path)
+        # Save synchronously to avoid race condition
+        doc.save(output_path)
+
+        # Log file creation
+        logger.info(f"[DEMAND_GEN] Saved demand letter: {output_path}")
+
         return output_path
 
     except Exception as e:
@@ -207,7 +213,7 @@ async def generate_all_demands(template_path: str, excel_path: str, output_dir: 
                 raise_it=True,
             )
 
-        wb = run_in_thread(load_workbook, excel_path)
+        wb = load_workbook(excel_path)
         sheet = wb.active
         headers = [str(cell.value).strip() for cell in sheet[1] if cell.value]
 
@@ -243,6 +249,9 @@ async def generate_demand_letter(
     output_path: str,
     example_text: str = None,
 ):
+    """
+    Generate a single demand letter and return the output path.
+    """
     try:
         data = {
             "Client Name": client_name,
@@ -254,7 +263,11 @@ async def generate_demand_letter(
             "RecipientName": defendant,
             "Example Text": example_text or "",
         }
-        return output_path, await fill_template(data, template_path, os.path.dirname(output_path))
+
+        # Build real output dir and regenerate filename via fill_template
+        final_output_path = await fill_template(data, template_path, os.path.dirname(output_path))
+        return final_output_path
+
     except Exception as e:
         handle_error(
             e,
