@@ -39,6 +39,7 @@ from core.prompts.memo_examples import (
 
 from core.prompts.style_transfer import build_style_transfer_prompt
 
+# ==================== Jinja2 Environment ==================== #
 jinja_env = Environment(
     loader=BaseLoader(),
     autoescape=select_autoescape(enabled_extensions=("txt", "j2"))
@@ -62,6 +63,7 @@ Use the following as a tone/style example:
 
 PROMPT_REGISTRY_FILE = "prompt_registry.json"
 
+# ==================== Registry Helpers ==================== #
 def _load_prompt_registry() -> dict:
     if os.path.exists(PROMPT_REGISTRY_FILE):
         with open(PROMPT_REGISTRY_FILE, "r") as f:
@@ -93,6 +95,7 @@ def register_prompt(prompt_type: str, prompt: str):
     except Exception as e:
         logger.warning(f"Failed to audit prompt registration: {e}")
 
+# ==================== Build Prompt ==================== #
 def build_prompt(
     prompt_type: str,
     section: str,
@@ -184,4 +187,3 @@ def build_prompt(
 
         register_prompt(prompt_type, prompt)
         return prompt
-
