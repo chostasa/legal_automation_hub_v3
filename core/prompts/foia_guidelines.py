@@ -46,7 +46,13 @@ Only return the list.
 """
 
 FOIA_SYNOPSIS_PROMPT = """
-Summarize the following legal case background in 2 professional sentences explaining what happened and the resulting harm or damages. Do not include any parties' names or personal identifiers:
+Summarize the following case background in exactly 2 sentences:
+1. First sentence: describe what happened.
+2. Second sentence: describe the resulting harm or damages.
 
+DO NOT use bullet points, lists, or include any names or personal identifiers.
+
+Case synopsis:
 {case_synopsis}
 """
+
