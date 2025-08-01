@@ -18,7 +18,7 @@ from core.db import get_templates
 clean_temp_dir()
 
 # Column names for client details in dashboard data
-NAME_COLUMN = "Case Details First Party Name (Full - Last, First)"
+NAME_COLUMN = "First Party Name (First, Last)"
 EMAIL_COLUMN = "Case Details First Party Details Default Email Account Address"
 
 
