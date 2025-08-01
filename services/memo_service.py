@@ -420,7 +420,11 @@ Example:
         })
 
         # Output final docx
-        output_path = os.path.join(output_dir, f"Mediation_Memo_{plaintiffs or 'Unknown'}.docx")
+        safe_name = plaintiffs if plaintiffs else "Unknown"
+        safe_name = safe_name.replace(",", "_").replace(" ", "_")
+
+        output_path = os.path.join(output_dir, f"Mediation_Memo_{safe_name}.docx")
+
         if not test_mode:
             replace_text_in_docx_all(template_path, memo_data, output_path)
         else:
