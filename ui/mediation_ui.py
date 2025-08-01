@@ -59,7 +59,7 @@ def run_ui():
             try:
                 timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
                 template_filename = f"{timestamp}_{sanitize_filename(uploaded_template.name)}"
-                dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/mediation/{template_filename}"
+                dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/mediation_memo/{template_filename}"
 
                 client.dbx.files_upload(
                     uploaded_template.getvalue(),
