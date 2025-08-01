@@ -14,27 +14,32 @@ from core.audit import log_audit_event
 from core.usage_tracker import check_quota, decrement_quota
 from logger import logger
 
+# Clean temp directory at the start
 clean_temp_dir()
 
 TENANT_ID = get_tenant_id()
 TEMPLATE_DIR = os.path.join("templates", "tester_docs", TENANT_ID)
 os.makedirs(TEMPLATE_DIR, exist_ok=True)
 
+
 def parse_input_replacements(input_str: str) -> dict:
+    """Parse the key-value replacements from JSON or YAML."""
     try:
         return json.loads(input_str)
     except json.JSONDecodeError:
         try:
             return yaml.safe_load(input_str)
         except yaml.YAMLError as e:
-            handle_error(e, code="TEMPLATE_TESTER_001", user_message="Invalid JSON or YAML format.", raise_it=True)
+            handle_error(
+                e,
+                code="TEMPLATE_TESTER_001",
+                user_message="Invalid JSON or YAML format.",
+                raise_it=True
+            )
 
-def stream_file(path: str):
-    with open(path, "rb") as f:
-        while chunk := f.read(8192):
-            yield chunk
 
 def run_ui():
+    """Render the Template Tester UI."""
     st.header("🧪 Template Tester")
 
     with st.form("tester_form"):
@@ -56,33 +61,43 @@ def run_ui():
             return
 
         try:
+            # Save uploaded template
             saved_template_path = os.path.join(
                 TEMPLATE_DIR, sanitize_filename(uploaded_template.name)
             )
             with open(saved_template_path, "wb") as f:
                 f.write(uploaded_template.read())
 
+            # Parse replacements
             replacements = parse_input_replacements(key_value_input.strip())
             if not isinstance(replacements, dict):
                 st.error("❌ Parsed input must be a dictionary.")
                 return
 
+            # Quota checks
             check_quota("template_tester_runs", amount=1)
             temp_dir = get_session_temp_dir()
             output_path = os.path.join(temp_dir, "preview_output.docx")
 
+            # Replace placeholders in the template
             with st.spinner("🔄 Generating preview..."):
                 replace_text_in_docx_all(saved_template_path, replacements, output_path)
             decrement_quota("template_tester_runs", amount=1)
 
             st.success("✅ Preview generated!")
+
+            # Read file as bytes (fixes generator error)
+            with open(output_path, "rb") as f:
+                output_bytes = f.read()
+
             st.download_button(
                 label="⬇️ Download Rendered Preview",
-                data=stream_file(output_path),
+                data=output_bytes,
                 file_name="preview_output.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 
+            # Audit event
             log_audit_event("Template Preview Generated", {
                 "tenant_id": TENANT_ID,
                 "template": uploaded_template.name
