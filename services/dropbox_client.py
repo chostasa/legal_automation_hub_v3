@@ -170,7 +170,7 @@ def download_dashboard_df(
 
 def list_templates(category: str):
     """
-    Return list of template files for a category (email, demand, mediation_memo, foia, batch_docs).
+    Return list of template files for a category (email, demand, mediation, foia, batch_docs).
     """
     from core.constants import (
         DROPBOX_EMAIL_TEMPLATE_DIR,
@@ -181,7 +181,7 @@ def list_templates(category: str):
     folder_map = {
         "email": DROPBOX_EMAIL_TEMPLATE_DIR,
         "demand": DROPBOX_DEMAND_TEMPLATE_DIR,
-        "mediation_memo": DROPBOX_MEDIATION_TEMPLATE_DIR,
+        "mediation": DROPBOX_MEDIATION_TEMPLATE_DIR,
         "foia": DROPBOX_FOIA_TEMPLATE_DIR,
         "batch_docs": f"{DROPBOX_TEMPLATES_ROOT}/Batch_Docs"
     }
@@ -197,7 +197,7 @@ def download_template_file(category: str, filename: str, local_dir="templates"):
     folder_map = {
         "email": DROPBOX_EMAIL_TEMPLATE_DIR,
         "demand": DROPBOX_DEMAND_TEMPLATE_DIR,
-        "mediation_memo": DROPBOX_MEDIATION_TEMPLATE_DIR,
+        "mediation": DROPBOX_MEDIATION_TEMPLATE_DIR,
         "foia": DROPBOX_FOIA_TEMPLATE_DIR,
         "batch_docs": f"{DROPBOX_TEMPLATES_ROOT}/Batch_Docs"
     }
