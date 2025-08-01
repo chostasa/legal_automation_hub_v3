@@ -45,6 +45,9 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
     if selected_example != "None":
         try:
             local_path = download_example_file("style_transfer", selected_example)
+            if not local_path or not isinstance(local_path, str):
+                raise FileNotFoundError(f"Example file not found for: {selected_example}")
+
             with open(local_path, "r", encoding="utf-8") as f:
                 example_text = f.read()
 
@@ -93,7 +96,7 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
             try:
                 df = pd.read_excel(uploaded_file)
                 if input_col not in df.columns:
-                    st.error(f"Column '{input_col}' not found in uploaded file.")
+                    st.error(f"Column '{input_col}' not found in uploaded file. Available columns: {list(df.columns)}")
                 else:
                     inputs_df = df[[input_col]].rename(columns={input_col: "Input"})
             except Exception as e:
