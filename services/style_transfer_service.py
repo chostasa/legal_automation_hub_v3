@@ -30,6 +30,13 @@ async def generate_style_mimic_output(example_paragraphs: list[str], new_input: 
             example=example_text
         )
 
+        # 🚨 Debug log to inspect the prompt
+        if not prompt or not isinstance(prompt, str):
+            logger.error(f"[STYLE_TRANSFER] build_prompt() returned invalid prompt: {prompt}")
+            raise ValueError("Prompt returned from build_prompt() is empty or invalid.")
+
+        logger.debug(f"[STYLE_TRANSFER] Prompt being sent to OpenAI (first 500 chars):\n{prompt[:500]}")
+
         fingerprint = f"style::{hash(example_text)}::{hash(new_input.strip())}"
         cached = get_cache(fingerprint)
         if cached:

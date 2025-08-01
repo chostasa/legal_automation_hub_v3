@@ -35,10 +35,19 @@ class OpenAIClient:
         user_id = get_user_id()
         user_role = get_user_role()
 
+        # 🚨 Defensive check for None or empty prompt
+        if not prompt or not isinstance(prompt, str):
+            logger.error(f"[OPENAI_GEN] Received invalid prompt: {prompt}")
+            raise AppError(
+                code="OPENAI_GEN_004",
+                message="Prompt for text generation is empty or invalid.",
+                details=f"Tenant={tenant_id}"
+            )
+
         trimmed = trim_to_token_limit(prompt)
         used_model = model or self.model or DEFAULT_MODEL
 
-        if used_model not in ["gpt-3.5-turbo", "gpt-4"]:
+        if used_model not in ["gpt-3.5-turbo", "gpt-4", "gpt-4o", "gpt-4-turbo"]:
             logger.warning(
                 redact_log(
                     mask_phi(f"⚠️ Invalid model requested: {used_model}. Falling back to {DEFAULT_MODEL}")
@@ -51,7 +60,11 @@ class OpenAIClient:
             return f"[TEST MODE] Prompt length={len(trimmed)} Model={used_model}"
 
         if not check_quota("openai_tokens"):
-            raise AppError(code="OPENAI_GEN_000", message="Quota exceeded for tenant.", details=f"Tenant={tenant_id}")
+            raise AppError(
+                code="OPENAI_GEN_000",
+                message="Quota exceeded for tenant.",
+                details=f"Tenant={tenant_id}"
+            )
 
         start_time = time.time()
         response = await self.client.chat.completions.create(
@@ -90,6 +103,7 @@ class OpenAIClient:
             )
 
         return content
+
 
     @openai_retry
     async def safe_generate(
