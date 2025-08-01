@@ -59,7 +59,7 @@ def run_ui():
             try:
                 timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
                 template_filename = f"{timestamp}_{sanitize_filename(uploaded_template.name)}"
-                dropbox_path = f"{template_folder}/{template_filename}"
+                dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/mediation/{template_filename}"
 
                 client.dbx.files_upload(
                     uploaded_template.getvalue(),
@@ -81,19 +81,23 @@ def run_ui():
             except Exception as e:
                 st.error(handle_error(e, code="MEMO_UI_005"))
 
-        if not template_path:
-            try:
-                template_files = client.list_files(template_folder)
-                if template_files:
-                    selected_template_name = st.selectbox("Choose Template to Use", template_files)
-                    if selected_template_name:
-                        template_path = client.download_file(
-                            f"{template_folder}/{selected_template_name}", "templates_preview"
-                        )
-                else:
-                    st.warning("⚠️ No templates found. Please upload one above.")
-            except Exception as e:
-                st.error(handle_error(e, code="MEMO_UI_002"))
+        try:
+            template_files = client.list_files(template_folder)
+            if template_files:
+                # Auto-select uploaded template if present, else default to the first one
+                default_index = 0
+                if uploaded_template:
+                    default_index = len(template_files) - 1  # last one uploaded
+
+                selected_template_name = st.selectbox("Choose Template to Use", template_files, index=default_index)
+                template_path = client.download_file(
+                    f"{template_folder}/{selected_template_name}", "templates_preview"
+                )
+            else:
+                st.warning("⚠️ No templates found. Please upload one above.")
+        except Exception as e:
+            st.error(handle_error(e, code="MEMO_UI_002"))
+
 
         # === STYLE EXAMPLES (Dropbox) ===
         st.subheader("🧠 Optional Style Example")

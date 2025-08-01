@@ -26,7 +26,7 @@ from dropbox.files import WriteMode
 
 # Template categories mapped to new Dropbox folders
 CATEGORIES = {
-    "Mediation Memo": "mediation_memo",
+    "Mediation Memo": "mediation",
     "Demand Letter": "demand",
     "FOIA Letter": "foia",
     "Batch Documents": "batch_docs",
@@ -36,7 +36,7 @@ CATEGORIES = {
 CATEGORY_PATH_MAP = {
     "email": DROPBOX_EMAIL_TEMPLATE_DIR,
     "demand": DROPBOX_DEMAND_TEMPLATE_DIR,
-    "mediation_memo": DROPBOX_MEDIATION_TEMPLATE_DIR,
+    "mediation": DROPBOX_MEDIATION_TEMPLATE_DIR,
     "foia": DROPBOX_FOIA_TEMPLATE_DIR,
     "batch_docs": f"{DROPBOX_TEMPLATES_ROOT}/Batch_Docs"
 }
@@ -44,7 +44,7 @@ CATEGORY_PATH_MAP = {
 EXAMPLES_PATH_MAP = {
     "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
     "foia": DROPBOX_FOIA_EXAMPLES_DIR,
-    "mediation_memo": DROPBOX_MEDIATION_EXAMPLES_DIR
+    "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR
 }
 
 
