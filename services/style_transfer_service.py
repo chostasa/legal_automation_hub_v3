@@ -30,7 +30,6 @@ async def generate_style_mimic_output(example_paragraphs: list[str], new_input: 
             example=example_text
         )
 
-        # 🚨 Debug log to inspect the prompt
         if not prompt or not isinstance(prompt, str):
             logger.error(f"[STYLE_TRANSFER] build_prompt() returned invalid prompt: {prompt}")
             raise ValueError("Prompt returned from build_prompt() is empty or invalid.")
