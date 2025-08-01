@@ -139,31 +139,30 @@ def final_polish_memo(memo_data: dict, test_mode: bool = False) -> dict:
         return memo_data
 
 
-async def generate_quotes_from_raw_depo(raw_text: str, categories: list, test_mode: bool = False) -> dict:
+def generate_quotes_from_raw_depo(raw_text: str, categories: list, test_mode: bool = False) -> dict:
     try:
         if test_mode:
             return {cat.lower().replace(" ", "_") + "_quotes": "Test Quote" for cat in categories}
         lines = normalize_deposition_lines(raw_text)
         qa_text = merge_multiline_qas(lines)
         chunks = [qa_text[i:i + 9000] for i in range(0, len(qa_text), 9000)]
-        # Fix: Ensure chunks and categories are not empty before calling parser
         if not chunks or not categories:
             logger.warning("[MEMO_QUOTES_001] Skipping quote extraction: chunks or categories empty")
             return {}
-        return await generate_quotes_in_chunks(chunks, categories=categories)
+        return generate_quotes_in_chunks(chunks, categories=categories)
     except Exception as e:
         handle_error(e, code="MEMO_QUOTES_001", user_message="Failed to extract quotes from deposition.")
         return {}
 
 
-async def curate_quotes_for_section(section_name: str, quotes: str, context: str, test_mode: bool = False) -> str:
+
+def curate_quotes_for_section(section_name: str, quotes: str, context: str, test_mode: bool = False) -> str:
     if not quotes.strip():
         return ""
     try:
         if test_mode:
             return quotes.strip()
-        prompt = f"""
-{FULL_SAFETY_PROMPT}
+        prompt = f"""{FULL_SAFETY_PROMPT}
 
 From these quotes:
 
@@ -176,7 +175,7 @@ Make sure each selected quote directly supports the section's legal or factual a
 Context:
 {context}
 """
-        curated = await safe_generate(prompt=prompt, model="gpt-4")
+        curated = safe_generate(prompt=prompt, model="gpt-4")
         return curated.strip()
     except Exception as e:
         handle_error(e, code="MEMO_QUOTES_002", user_message=f"Failed to curate quotes for {section_name}.")
@@ -204,18 +203,20 @@ def generate_memo_from_fields(data: dict, template_name: str, output_dir: str, t
         plaintiffs = data.get("plaintiffs", "")
         defendants = data.get("defendants", "")
 
-        liability_quotes = asyncio.run(curate_quotes_for_section(
+        liability_quotes = curate_quotes_for_section(
             "Facts & Liability",
             data.get("liability_quotes", ""),
             data.get('complaint_narrative', ''),
             test_mode=test_mode
-        ))
-        damages_quotes = asyncio.run(curate_quotes_for_section(
+        )
+
+        damages_quotes = curate_quotes_for_section(
             "Harms & Losses",
             data.get("damages_quotes", ""),
             data.get('medical_summary', ''),
             test_mode=test_mode
-        ))
+        )
+
 
         intro_prompt = f"""
 {FULL_SAFETY_PROMPT}
@@ -396,14 +397,13 @@ Settlement Summary:
 Example:
 {CONCLUSION_EXAMPLE}
 """
-        conclusion_text = 
-            safe_generate(
-                prompt=trim_to_token_limit(conclusion_prompt, 2500),
-                model="gpt-4",
-                system_msg=CONCLUSION_MSG
-            )
-        
+        conclusion_text = safe_generate(
+            prompt=trim_to_token_limit(conclusion_prompt, 2500),
+            model="gpt-4",
+            system_msg=CONCLUSION_MSG
+        )
         memo_data["Conclusion"] = polish_section(conclusion_text, test_mode=test_mode)
+
 
 
         # APPLY FINAL POLISH (Full memo)
