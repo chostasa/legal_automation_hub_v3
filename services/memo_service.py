@@ -50,31 +50,32 @@ You will receive a full draft of a mediation memorandum.
 Your task is to produce a final version that is persuasive, complete, and professionally polished.
 
 **Core Instructions:**
-1. **Keep the overall structure and all section headings exactly as written** 
-   (e.g., "Introduction", "Parties", "Facts & Liability", "Causation & Injuries", "Harms & Losses", "Future Medical Bills", "Conclusion"). 
-   Do not rename, delete, or merge sections.
-2. **Remove only true repetition or redundant phrasing**. Do NOT cut important facts, 
-   damages details, deposition quotes, or evidence references. Retain the original language, tone, and legal fluency.
-3. **Preserve narrative richness and evidentiary support:** keep detailed descriptions of injuries, treatment, lost earning capacity, quality-of-life losses, and liability facts. 
-   These details are critical to persuasion.
+1. Keep the overall structure and all section headings exactly as written 
+   (e.g., "Introduction", "Parties", "Facts & Liability", "Causation & Injuries", 
+   "Harms & Losses", "Future Medical Bills", "Conclusion"). Do not rename, delete, or merge sections.
+2. Remove only true repetition or redundant phrasing. Do NOT cut important facts, damages details, 
+   deposition quotes, or evidence references. Retain the original language, tone, and legal fluency.
+3. Preserve narrative richness and evidentiary support: keep detailed descriptions of injuries, treatment, 
+   lost earning capacity, quality-of-life losses, and liability facts. 
 4. Strengthen transitions between sections so the memorandum flows logically and persuasively.
 5. Use active voice, strong legal framing (duty → breach → causation → harm), 
    and a polished trial-attorney tone throughout.
 6. Ensure all damages, costs, and dollar amounts remain intact and clearly tied 
    to the underlying facts and liability arguments.
 7. Avoid overly clinical or mechanical language—make the memo compelling while remaining professional.
-8. Do not shorten for the sake of word count – trim only true redundancy. Keep the narrative full and persuasive, even if it is longer.
-9. Preserve every deposition quote and evidence reference (e.g., exhibits, witness testimony, medical records) – these are essential for credibility. Do not reword quotes.
-10. Explicitly connect injuries and harms to liability and damages – Ensure every harm is causally tied to the defendant’s breach of duty.
-11. Reinforce the case value and settlement posture in the Conclusion – End with a strong, firm statement showing litigation-readiness and trial risk.
+8. Do not shorten for the sake of word count – trim only true redundancy. Keep the narrative full and persuasive.
+9. Preserve every deposition quote and evidence reference (e.g., exhibits, witness testimony, medical records). 
+   Do not reword quotes.
+10. Explicitly connect injuries and harms to liability and damages – ensure every harm is causally tied to the defendant’s breach.
+11. Reinforce the case value and settlement posture in the Conclusion – End with a strong statement showing litigation-readiness and trial risk.
 12. Clarify complex medical terms or damages in plain English when helpful (e.g., “cervical fusion, which limits neck mobility and causes daily pain”).
-13. Emphasize long-term impact – Make sure ongoing medical needs, future losses, and reduced quality of life are clearly explained and persuasive.
-14. Never add or guess facts – Do not insert new injuries, events, or numbers that do not exist in the draft.
-15. **Evoke empathy and show human impact:** Convey the gravity of the plaintiff’s suffering and life disruption without exaggerating or adding facts. Demonstrate the human cost of the defendant’s negligence.
-16. **Increase persuasive pressure:** Frame the narrative so that the defense or mediator reading this memo feels substantial pressure to resolve the case. Make clear that failure to settle will lead to significant exposure at trial.
+13. Emphasize long-term impact – make sure ongoing medical needs, future losses, and reduced quality of life are clear.
+14. Never add or guess facts – do not insert new injuries, events, or numbers that do not exist in the draft.
+15. Evoke empathy and show human impact: Convey the gravity of the plaintiff’s suffering and life disruption without exaggeration. Demonstrate the human cost of the defendant’s negligence.
+16. Increase persuasive pressure: Frame the narrative so that the defense or mediator reading this memo feels substantial pressure to resolve the case. Make clear that failure to settle will lead to significant exposure at trial.
 17. Highlight the credibility of plaintiffs and corroborating evidence: Emphasize consistency, reliability, and how witnesses, deposition testimony, and documents corroborate their accounts.
-18. Balance emotion with professionalism: While evoking empathy, ensure the tone is authoritative and respectful. The memo should feel like it could be presented directly to a mediator, judge, or jury.
-19. Underscore trial risk and jury appeal: Clearly signal that a jury would be deeply sympathetic to the plaintiffs and likely award damages exceeding the current settlement position. Frame settlement as the defendant’s best option.
+18. Balance emotion with professionalism: While evoking empathy, ensure the tone is authoritative and respectful.
+19. Underscore trial risk and jury appeal: Clearly signal that a jury would be sympathetic and likely award damages exceeding the current settlement position. Frame settlement as the defendant’s best option.
 20. Maintain dignity: When describing hardships or suffering, avoid language that could be perceived as exploitative. Show plaintiffs’ resilience while underscoring the magnitude of what they have endured.
 
 **Goal:** The final mediation memorandum must read like it was personally reviewed and signed off by a senior trial attorney.
