@@ -39,12 +39,7 @@ FUTURE_MSG = "Draft the Future Medical Expenses section."
 CONCLUSION_MSG = "Draft a strong Conclusion with litigation readiness."
 
 
-# === Full memo polishing function (like Demand final polish) ===
 def polish_mediation_memo_text(text: str) -> str:
-    """
-    Polishes the final mediation memo: removes repetition, strengthens transitions,
-    and enhances persuasiveness while retaining structure and all facts.
-    """
     try:
         if not text:
             return text
@@ -95,7 +90,6 @@ Here is the draft mediation memorandum to polish:
         return text
 
 
-# === Section-level polish (used during generation) ===
 def polish_section(text: str, context: str = "", test_mode: bool = False) -> str:
     if not text.strip():
         return ""
@@ -123,20 +117,14 @@ Section:
         return text
 
 
-# === Old final_polish_memo replaced with new full-text polish ===
 def final_polish_memo(memo_data: dict, test_mode: bool = False) -> dict:
-    """
-    Uses the full-memo polish function (polish_mediation_memo_text) for the entire memo.
-    """
     try:
         if test_mode:
             return memo_data
 
-        # Join all sections into a single text string for full polish
         joined_text = "\n\n".join([f"## {k}\n{v}" for k, v in memo_data.items()])
         polished = polish_mediation_memo_text(joined_text)
 
-        # Re-split back into sections using markers
         new_data = {}
         for section in memo_data.keys():
             marker = f"## {section}"
@@ -158,6 +146,10 @@ async def generate_quotes_from_raw_depo(raw_text: str, categories: list, test_mo
         lines = normalize_deposition_lines(raw_text)
         qa_text = merge_multiline_qas(lines)
         chunks = [qa_text[i:i + 9000] for i in range(0, len(qa_text), 9000)]
+        # Fix: Ensure chunks and categories are not empty before calling parser
+        if not chunks or not categories:
+            logger.warning("[MEMO_QUOTES_001] Skipping quote extraction: chunks or categories empty")
+            return {}
         return await generate_quotes_in_chunks(chunks, categories=categories)
     except Exception as e:
         handle_error(e, code="MEMO_QUOTES_001", user_message="Failed to extract quotes from deposition.")
@@ -192,11 +184,7 @@ Context:
 
 
 def generate_memo_from_fields(data: dict, template_name: str, output_dir: str, test_mode: bool = False) -> tuple:
-    """
-    Generate mediation memo using data + template from Dropbox if needed.
-    """
     try:
-        # Ensure template is available locally (download from Dropbox if not)
         template_path = os.path.normpath(template_name)
         if not os.path.exists(template_path):
             template_path = download_template_file("mediation_memo", template_name, "memo_templates_cache")
@@ -216,7 +204,6 @@ def generate_memo_from_fields(data: dict, template_name: str, output_dir: str, t
         plaintiffs = data.get("plaintiffs", "")
         defendants = data.get("defendants", "")
 
-        # Curate liability and damages quotes
         liability_quotes = asyncio.run(curate_quotes_for_section(
             "Facts & Liability",
             data.get("liability_quotes", ""),
@@ -230,7 +217,6 @@ def generate_memo_from_fields(data: dict, template_name: str, output_dir: str, t
             test_mode=test_mode
         ))
 
-        # INTRO SECTION
         intro_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -250,7 +236,6 @@ Example:
                                                system_msg=INTRO_MSG))
         memo_data["Introduction"] = polish_section(intro_text, test_mode=test_mode)
 
-        # PLAINTIFF & DEFENDANT PARAGRAPHS
         parties_block = []
         for i in range(1, 4):
             name = data.get(f"plaintiff{i}", "").strip()
@@ -300,7 +285,6 @@ Example:
             else:
                 memo_data[f"Defendant_{i}"] = ""
 
-        # PARTIES SECTION
         parties_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -316,7 +300,6 @@ Ensure:
                                                  system_msg=PARTIES_MSG))
         memo_data["Parties"] = polish_section(parties_text, test_mode=test_mode)
 
-        # FACTS & LIABILITY
         facts_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -338,7 +321,6 @@ Example:
                                                system_msg=FACTS_MSG))
         memo_data["Facts_Liability"] = polish_section(facts_text, test_mode=test_mode)
 
-        # CAUSATION / INJURIES
         causation_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -358,7 +340,6 @@ Example:
                                                    system_msg=CAUSATION_MSG))
         memo_data["Causation_Injuries_Treatment"] = polish_section(causation_text, test_mode=test_mode)
 
-        # HARMS & LOSSES
         harms_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -380,7 +361,6 @@ Example:
                                                system_msg=HARMS_MSG))
         memo_data["Additional_Harms_Losses"] = polish_section(harms_text, test_mode=test_mode)
 
-        # FUTURE MEDICAL BILLS
         future_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -400,7 +380,6 @@ Example:
                                                 system_msg=FUTURE_MSG))
         memo_data["Future_Medical_Bills"] = polish_section(future_text, test_mode=test_mode)
 
-        # CONCLUSION
         conclusion_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -415,10 +394,15 @@ Settlement Summary:
 Example:
 {CONCLUSION_EXAMPLE}
 """
-        conclusion_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(conclusion_prompt, 2500),
-                                                    model="gpt-4",
-                                                    system_msg=CONCLUSION_MSG))
+        conclusion_text = asyncio.run(
+            safe_generate(
+                prompt=trim_to_token_limit(conclusion_prompt, 2500),
+                model="gpt-4",
+                system_msg=CONCLUSION_MSG
+            )
+        )
         memo_data["Conclusion"] = polish_section(conclusion_text, test_mode=test_mode)
+
 
         # APPLY FINAL POLISH (Full memo)
         memo_data = {k: html.unescape(v) for k, v in memo_data.items()}

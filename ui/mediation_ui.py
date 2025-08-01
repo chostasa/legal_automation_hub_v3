@@ -1,7 +1,6 @@
 import streamlit as st
 import os
 import hashlib
-import asyncio
 from datetime import datetime
 
 from utils.file_utils import clean_temp_dir, get_session_temp_dir, sanitize_filename
@@ -51,7 +50,7 @@ def run_ui():
             try:
                 timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
                 template_filename = f"{timestamp}_{sanitize_filename(uploaded_template.name)}"
-                dropbox_path = f"{DROPBOX_TEMPLATES_ROOT}/mediation_memo/{template_filename}"
+                dropbox_path = f"{template_folder}/{template_filename}"
 
                 client.dbx.files_upload(
                     uploaded_template.getvalue(),
@@ -78,7 +77,7 @@ def run_ui():
             if template_files:
                 default_index = 0
                 if uploaded_template:
-                    default_index = len(template_files) - 1  # Select the uploaded template last
+                    default_index = len(template_files) - 1
                 selected_template_name = st.selectbox("Choose Template to Use", template_files, index=default_index)
                 template_path = client.download_file(
                     f"{template_folder}/{selected_template_name}", "templates_preview"
@@ -189,9 +188,12 @@ def run_ui():
             with st.spinner("🔄 Processing..."):
                 try:
                     check_quota("memo_generation", amount=1)
-                    raw_quotes = {}
-                    if raw_depo:
+
+                    # ✅ Only parse quotes if depo text & categories present
+                    if raw_depo.strip() and quote_categories:
                         raw_quotes = asyncio.run(generate_quotes_from_raw_depo(raw_depo, quote_categories))
+                    else:
+                        raw_quotes = {}
 
                     data = {
                         "court": sanitize_text(court),
@@ -218,6 +220,8 @@ def run_ui():
                     file_path, memo_data = generate_memo_from_fields(data, template_path, temp_dir)
 
                     st.session_state.memo_cache[form_key] = (file_path, memo_data, raw_quotes)
+
+                    st.session_state.party_edits = {}
                     decrement_quota("memo_generation", amount=1)
 
                 except Exception as e:
