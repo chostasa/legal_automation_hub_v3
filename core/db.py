@@ -13,7 +13,8 @@ from core.constants import (
     DROPBOX_FOIA_TEMPLATE_DIR,
     DROPBOX_DEMAND_EXAMPLES_DIR,
     DROPBOX_FOIA_EXAMPLES_DIR,
-    DROPBOX_MEDIATION_EXAMPLES_DIR
+    DROPBOX_MEDIATION_EXAMPLES_DIR,
+    DROPBOX_STYLE_EXAMPLES_DIR 
 )
 
 DB_PATH = os.path.join("data", "legal_automation_hub.db")
@@ -162,7 +163,8 @@ def get_examples(tenant_id: str, category: str = None):
     folder_map = {
         "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
         "foia": DROPBOX_FOIA_EXAMPLES_DIR,
-        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR
+        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR,
+        "style_transfer": DROPBOX_STYLE_EXAMPLES_DIR
     }
     try:
         if not category:
@@ -189,7 +191,8 @@ def upload_example(category: str, filename: str, file_bytes: bytes):
     folder_map = {
         "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
         "foia": DROPBOX_FOIA_EXAMPLES_DIR,
-        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR
+        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR,
+        "style_transfer": DROPBOX_STYLE_EXAMPLES_DIR 
     }
     try:
         path = f"{folder_map[category]}/{filename}"
@@ -205,7 +208,8 @@ def delete_example(category: str, filename: str):
     folder_map = {
         "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
         "foia": DROPBOX_FOIA_EXAMPLES_DIR,
-        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR
+        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR,
+        "style_transfer": DROPBOX_STYLE_EXAMPLES_DIR
     }
     try:
         path = f"{folder_map[category]}/{filename}"
@@ -220,7 +224,8 @@ def rename_example(category: str, old_name: str, new_name: str):
     folder_map = {
         "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
         "foia": DROPBOX_FOIA_EXAMPLES_DIR,
-        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR
+        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR,
+        "style_transfer": DROPBOX_STYLE_EXAMPLES_DIR 
     }
     try:
         old_path = f"{folder_map[category]}/{old_name}"

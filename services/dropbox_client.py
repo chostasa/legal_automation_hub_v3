@@ -149,6 +149,7 @@ class DropboxClient:
             DROPBOX_DEMAND_EXAMPLES_DIR,
             DROPBOX_FOIA_EXAMPLES_DIR,
             DROPBOX_MEDIATION_EXAMPLES_DIR,
+            DROPBOX_STYLE_EXAMPLES_DIR 
         ]
         for folder in base_folders:
             folder = normalize_path(folder)
@@ -220,7 +221,8 @@ def list_examples(module: str):
     folder_map = {
         "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
         "foia": DROPBOX_FOIA_EXAMPLES_DIR,
-        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR
+        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR,
+        "style_transfer": DROPBOX_STYLE_EXAMPLES_DIR
     }
     client = DropboxClient()
     return client.list_files(folder_map[module])
@@ -233,7 +235,8 @@ def download_example_file(module: str, filename: str, local_dir="examples"):
     folder_map = {
         "demand": DROPBOX_DEMAND_EXAMPLES_DIR,
         "foia": DROPBOX_FOIA_EXAMPLES_DIR,
-        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR
+        "mediation": DROPBOX_MEDIATION_EXAMPLES_DIR,
+        "style_transfer": DROPBOX_STYLE_EXAMPLES_DIR 
     }
     client = DropboxClient()
     filename = normalize_path(os.path.basename(filename))

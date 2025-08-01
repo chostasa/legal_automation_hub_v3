@@ -1,16 +1,18 @@
 import streamlit as st
 import pandas as pd
-import os
 import asyncio
 from io import BytesIO
 
 from services.style_transfer_service import run_batch_style_transfer
-from core.security import mask_phi, redact_log, sanitize_filename
+from core.security import sanitize_filename
 from core.auth import get_tenant_id, get_user_role
 from core.audit import log_audit_event
 from core.error_handling import handle_error
 from core.usage_tracker import check_quota, decrement_quota
 from logger import logger
+
+from core.db import get_examples, upload_example
+from services.dropbox_client import download_example_file
 
 
 def run_style_transfer_ui():
@@ -25,28 +27,30 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
 
     tenant_id = get_tenant_id()
     user_role = get_user_role()
-    EXAMPLE_DIR = os.path.join("examples", tenant_id, "style_transfer")
-    os.makedirs(EXAMPLE_DIR, exist_ok=True)
 
     st.subheader("🎨 Choose or Add Example Paragraph(s)")
 
-    # Load saved examples
+    # Load examples from Dropbox
     try:
-        available_examples = [f for f in os.listdir(EXAMPLE_DIR) if f.endswith(".txt")]
+        available_examples = get_examples(tenant_id, "style_transfer")
+        example_names = [ex["name"] for ex in available_examples]
     except Exception as e:
         msg = handle_error(e, code="STYLE_UI_001")
         st.error(msg)
         return
 
-    selected_example = st.selectbox("📂 Select Existing Example (optional)", ["None"] + available_examples)
+    selected_example = st.selectbox("📂 Select Existing Example (optional)", ["None"] + example_names)
 
     example_text = ""
     if selected_example != "None":
         try:
-            with open(os.path.join(EXAMPLE_DIR, selected_example), "r", encoding="utf-8") as f:
+            local_path = download_example_file("style_transfer", selected_example)
+            with open(local_path, "r", encoding="utf-8") as f:
                 example_text = f.read()
+
             with st.expander("🧠 Preview Selected Example"):
                 st.code(example_text[:3000], language="markdown")
+
         except Exception as e:
             msg = handle_error(e, code="STYLE_UI_002")
             st.error(msg)
@@ -58,16 +62,15 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
     )
     example_list = [p.strip() for p in example_input.split("---") if p.strip()]
 
-    # Save example if admin
+    # Save example (Admin only)
     if example_input.strip() and st.button("💾 Save as Example"):
         try:
             if user_role.lower() != "admin":
                 st.error("❌ Only Admins can save style examples.")
             else:
-                filename = sanitize_filename(f"example_{len(available_examples)+1}.txt")
-                path = os.path.join(EXAMPLE_DIR, filename)
-                with open(path, "w", encoding="utf-8") as f:
-                    f.write(example_input)
+                filename = sanitize_filename(f"example_{len(example_names)+1}.txt")
+                upload_example("style_transfer", filename, example_input.encode("utf-8"))
+
                 st.success(f"✅ Saved example as {filename}")
                 log_audit_event("Style Example Uploaded", {
                     "filename": filename,
