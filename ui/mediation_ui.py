@@ -47,7 +47,7 @@ def run_ui():
 
         # === TEMPLATES (Dropbox) ===
         st.markdown("### 📄 Select Mediation Memo Template")
-        template_folder = f"{DROPBOX_TEMPLATES_ROOT}/mediation"
+        template_folder = f"{DROPBOX_TEMPLATES_ROOT}/mediation_memo"
 
         uploaded_template = st.file_uploader(
             "Upload New Mediation Memo Template (.docx)", type=["docx"], key="upload_template"
