@@ -41,6 +41,63 @@ FUTURE_MSG = "Draft the Future Medical Expenses section."
 CONCLUSION_MSG = "Draft a strong Conclusion with litigation readiness."
 
 
+# === Full memo polishing function (like Demand final polish) ===
+async def polish_mediation_memo_text(text: str) -> str:
+    """
+    Polishes the final mediation memo: removes repetition, strengthens transitions,
+    and enhances persuasiveness while retaining structure and all facts.
+    """
+    try:
+        if not text:
+            return text
+
+        prompt = f"""
+You will receive a full draft of a mediation memorandum.
+Your task is to produce a final version that is persuasive, complete, and professionally polished.
+
+**Core Instructions:**
+1. **Keep the overall structure and all section headings exactly as written** 
+   (e.g., "Introduction", "Parties", "Facts & Liability", "Causation & Injuries", "Harms & Losses", "Future Medical Bills", "Conclusion"). 
+   Do not rename, delete, or merge sections.
+2. **Remove only true repetition or redundant phrasing**. Do NOT cut important facts, 
+   damages details, deposition quotes, or evidence references. Retain the original language, tone, and legal fluency.
+3. **Preserve narrative richness and evidentiary support:** keep detailed descriptions of injuries, treatment, lost earning capacity, quality-of-life losses, and liability facts. 
+   These details are critical to persuasion.
+4. Strengthen transitions between sections so the memorandum flows logically and persuasively.
+5. Use active voice, strong legal framing (duty → breach → causation → harm), 
+   and a polished trial-attorney tone throughout.
+6. Ensure all damages, costs, and dollar amounts remain intact and clearly tied 
+   to the underlying facts and liability arguments.
+7. Avoid overly clinical or mechanical language—make the memo compelling while remaining professional.
+8. Do not shorten for the sake of word count – trim only true redundancy. Keep the narrative full and persuasive, even if it is longer.
+9. Preserve every deposition quote and evidence reference (e.g., exhibits, witness testimony, medical records) – these are essential for credibility. Do not reword quotes.
+10. Explicitly connect injuries and harms to liability and damages – Ensure every harm is causally tied to the defendant’s breach of duty.
+11. Reinforce the case value and settlement posture in the Conclusion – End with a strong, firm statement showing litigation-readiness and trial risk.
+12. Clarify complex medical terms or damages in plain English when helpful (e.g., “cervical fusion, which limits neck mobility and causes daily pain”).
+13. Emphasize long-term impact – Make sure ongoing medical needs, future losses, and reduced quality of life are clearly explained and persuasive.
+14. Never add or guess facts – Do not insert new injuries, events, or numbers that do not exist in the draft.
+15. **Evoke empathy and show human impact:** Convey the gravity of the plaintiff’s suffering and life disruption without exaggerating or adding facts. Demonstrate the human cost of the defendant’s negligence.
+16. **Increase persuasive pressure:** Frame the narrative so that the defense or mediator reading this memo feels substantial pressure to resolve the case. Make clear that failure to settle will lead to significant exposure at trial.
+17. Highlight the credibility of plaintiffs and corroborating evidence: Emphasize consistency, reliability, and how witnesses, deposition testimony, and documents corroborate their accounts.
+18. Balance emotion with professionalism: While evoking empathy, ensure the tone is authoritative and respectful. The memo should feel like it could be presented directly to a mediator, judge, or jury.
+19. Underscore trial risk and jury appeal: Clearly signal that a jury would be deeply sympathetic to the plaintiffs and likely award damages exceeding the current settlement position. Frame settlement as the defendant’s best option.
+20. Maintain dignity: When describing hardships or suffering, avoid language that could be perceived as exploitative. Show plaintiffs’ resilience while underscoring the magnitude of what they have endured.
+
+**Goal:** The final mediation memorandum must read like it was personally reviewed and signed off by a senior trial attorney.
+It should be persuasive, evidentiary-based, and leave the defense under pressure to settle.
+
+Here is the draft mediation memorandum to polish:
+{text}
+"""
+        polished = await safe_generate(prompt)
+        return polished.strip() if polished else text
+
+    except Exception as e:
+        logger.warning(f"[MEMO_POLISH] Failed to polish mediation memo text: {e}")
+        return text
+
+
+# === Section-level polish (used during generation) ===
 async def polish_section(text: str, context: str = "", test_mode: bool = False) -> str:
     if not text.strip():
         return ""
@@ -68,34 +125,29 @@ Section:
         return text
 
 
+# === Old final_polish_memo replaced with new full-text polish ===
 async def final_polish_memo(memo_data: dict, test_mode: bool = False) -> dict:
+    """
+    Uses the full-memo polish function (polish_mediation_memo_text) for the entire memo.
+    """
     try:
         if test_mode:
             return memo_data
-        joined = "\n\n".join([f"## {k}\n{v}" for k, v in memo_data.items()])
-        prompt = f"""
-{FULL_SAFETY_PROMPT}
 
-Perform a final, full-memo polish:
-1. Remove any duplicated facts or injuries between sections (Intro, Parties, Facts, Harms, Conclusion).
-2. Break up dense paragraphs (2–4 sentences each).
-3. Ensure smooth transitions between sections using strong connective language.
-4. Tie damages and future medical costs directly to the client's quality of life and earning capacity.
-5. Ensure the Parties section fully introduces all Plaintiffs and Defendants.
-6. Standardize citations (Ex. A, Name Dep. [Line]) and correct any special character issues.
+        # Join all sections into a single text string for full polish
+        joined_text = "\n\n".join([f"## {k}\n{v}" for k, v in memo_data.items()])
+        polished = await polish_mediation_memo_text(joined_text)
 
-Memo:
-{joined}
-"""
-        cleaned = await safe_generate(prompt=prompt, model="gpt-4")
+        # Re-split back into sections using markers
         new_data = {}
         for section in memo_data.keys():
             marker = f"## {section}"
-            if marker in cleaned:
-                new_data[section] = cleaned.split(marker, 1)[-1].split("##", 1)[0].strip()
+            if marker in polished:
+                new_data[section] = polished.split(marker, 1)[-1].split("##", 1)[0].strip()
             else:
                 new_data[section] = memo_data[section]
         return new_data
+
     except Exception as e:
         handle_error(e, code="MEMO_POLISH_002", user_message="Final polish failed. Returning unpolished memo.")
         return memo_data
@@ -166,6 +218,7 @@ async def generate_memo_from_fields(data: dict, template_name: str, output_dir: 
         plaintiffs = data.get("plaintiffs", "")
         defendants = data.get("defendants", "")
 
+        # Curate liability and damages quotes
         liability_quotes = await curate_quotes_for_section(
             "Facts & Liability", data.get("liability_quotes", ""), data.get('complaint_narrative', ''), test_mode=test_mode
         )
@@ -173,7 +226,7 @@ async def generate_memo_from_fields(data: dict, template_name: str, output_dir: 
             "Harms & Losses", data.get("damages_quotes", ""), data.get('medical_summary', ''), test_mode=test_mode
         )
 
-        # Intro Section
+        # INTRO SECTION
         intro_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -193,6 +246,7 @@ Example:
             test_mode=test_mode
         )
 
+        # PLAINTIFF & DEFENDANT PARAGRAPHS
         parties_block = []
         for i in range(1, 4):
             name = data.get(f"plaintiff{i}", "").strip()
@@ -242,7 +296,7 @@ Example:
             else:
                 memo_data[f"Defendant_{i}"] = ""
 
-        # Parties Section
+        # PARTIES SECTION
         parties_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -258,7 +312,7 @@ Ensure:
             test_mode=test_mode
         )
 
-        # Facts & Liability
+        # FACTS & LIABILITY
         facts_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -280,7 +334,7 @@ Example:
             test_mode=test_mode
         )
 
-        # Causation/Injuries
+        # CAUSATION / INJURIES
         causation_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -300,7 +354,7 @@ Example:
             test_mode=test_mode
         )
 
-        # Harms & Losses
+        # HARMS & LOSSES
         harms_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -322,7 +376,7 @@ Example:
             test_mode=test_mode
         )
 
-        # Future Medical Bills
+        # FUTURE MEDICAL BILLS
         future_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -342,7 +396,7 @@ Example:
             test_mode=test_mode
         )
 
-        # Conclusion
+        # CONCLUSION
         conclusion_prompt = f"""
 {FULL_SAFETY_PROMPT}
 
@@ -362,9 +416,11 @@ Example:
             test_mode=test_mode
         )
 
+        # APPLY FINAL POLISH (Full memo)
         memo_data = {k: html.unescape(v) for k, v in memo_data.items()}
         memo_data = await final_polish_memo(memo_data, test_mode=test_mode)
 
+        # Update placeholders
         memo_data.update({
             "Court": html.unescape(data.get("court", "")),
             "Case_Number": html.unescape(data.get("case_number", "")),
@@ -373,6 +429,7 @@ Example:
             "Demand": html.unescape(data.get("settlement_summary", ""))
         })
 
+        # Output final docx
         output_path = os.path.join(output_dir, f"Mediation_Memo_{plaintiffs or 'Unknown'}.docx")
         if not test_mode:
             await run_async(run_in_thread, replace_text_in_docx_all, template_path, memo_data, output_path)
@@ -399,6 +456,9 @@ Example:
 
 
 def generate_plaintext_memo(data: dict) -> str:
+    """
+    Generate plaintext version of memo for preview.
+    """
     try:
         sections = [
             "Introduction", "Parties", "Facts_Liability",

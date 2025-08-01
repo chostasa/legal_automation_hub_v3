@@ -17,8 +17,11 @@ from utils.thread_utils import run_async
 from services.memo_service import (
     generate_quotes_from_raw_depo,
     generate_memo_from_fields,
-    generate_plaintext_memo
+    generate_plaintext_memo,
+    polish_mediation_memo_text,
+    final_polish_memo  # NEW: reuse full polish logic from memo_service
 )
+from utils.docx_utils import replace_text_in_docx_all  # NEW: to rebuild polished docx
 from services.dropbox_client import DropboxClient
 from core.constants import DROPBOX_TEMPLATES_ROOT
 from dropbox.files import WriteMode
@@ -27,13 +30,6 @@ from dropbox.files import WriteMode
 clean_temp_dir()
 
 ERROR_CODE = "MEMO_GEN_001"
-
-
-def stream_file(path: str):
-    """Stream file in chunks for downloads."""
-    with open(path, "rb") as f:
-        while chunk := f.read(8192):
-            yield chunk
 
 
 async def run_async_memo_generation(data, template_path, temp_dir):
@@ -47,14 +43,12 @@ def run_ui():
     try:
         tenant_id = get_tenant_id()
         user_id = get_user_id()
-        role = get_user_role()
         client = DropboxClient()
 
         # === TEMPLATES (Dropbox) ===
         st.markdown("### 📄 Select Mediation Memo Template")
         template_folder = f"{DROPBOX_TEMPLATES_ROOT}/mediation"
 
-        # Upload a new template to Dropbox
         uploaded_template = st.file_uploader(
             "Upload New Mediation Memo Template (.docx)", type=["docx"], key="upload_template"
         )
@@ -85,12 +79,9 @@ def run_ui():
                 template_path = client.download_file(dropbox_path, "templates_preview")
 
             except Exception as e:
-                msg = handle_error(e, code="MEMO_UI_005")
-                st.error(msg)
+                st.error(handle_error(e, code="MEMO_UI_005"))
 
-        # List templates from Dropbox
         if not template_path:
-            selected_template = None
             try:
                 template_files = client.list_files(template_folder)
                 if template_files:
@@ -102,8 +93,7 @@ def run_ui():
                 else:
                     st.warning("⚠️ No templates found. Please upload one above.")
             except Exception as e:
-                msg = handle_error(e, code="MEMO_UI_002")
-                st.error(msg)
+                st.error(handle_error(e, code="MEMO_UI_002"))
 
         # === STYLE EXAMPLES (Dropbox) ===
         st.subheader("🧠 Optional Style Example")
@@ -168,23 +158,16 @@ def run_ui():
         errors = []
         if not template_path or not template_path.endswith(".docx"):
             errors.append("You must select or upload a valid .docx template.")
-        if not court.strip():
-            errors.append("Court name is required.")
-        if not case_number.strip():
-            errors.append("Case number is required.")
-        if not complaint_narrative.strip():
-            errors.append("Complaint narrative is required.")
-        if not settlement_summary.strip():
-            errors.append("Settlement summary is required.")
-        if not medical_summary.strip():
-            errors.append("Medical summary is required.")
+        if not court.strip(): errors.append("Court name is required.")
+        if not case_number.strip(): errors.append("Case number is required.")
+        if not complaint_narrative.strip(): errors.append("Complaint narrative is required.")
+        if not settlement_summary.strip(): errors.append("Settlement summary is required.")
+        if not medical_summary.strip(): errors.append("Medical summary is required.")
 
         valid_plaintiffs = [p for p in plaintiffs if p.strip()]
         valid_defendants = [d for d in defendants if d.strip()]
-        if not valid_plaintiffs:
-            errors.append("At least one valid plaintiff name is required.")
-        if not valid_defendants:
-            errors.append("At least one valid defendant name is required.")
+        if not valid_plaintiffs: errors.append("At least one valid plaintiff name is required.")
+        if not valid_defendants: errors.append("At least one valid defendant name is required.")
 
         if errors:
             for msg in errors:
@@ -238,8 +221,7 @@ def run_ui():
                     decrement_quota("memo_generation", amount=1)
 
                 except Exception as e:
-                    msg = handle_error(e, code=ERROR_CODE)
-                    st.error(msg)
+                    st.error(handle_error(e, code=ERROR_CODE))
                     return
 
         # === PREVIEW/OUTPUT ===
@@ -271,9 +253,9 @@ def run_ui():
 
         st.success("✅ Memo generated successfully!")
 
+        # === UNPOLISHED DOCX DOWNLOAD ===
         with open(file_path, "rb") as f:
             memo_bytes = f.read()
-
         st.download_button(
             label="⬇️ Download Mediation Memo (.docx)",
             data=memo_bytes,
@@ -281,14 +263,38 @@ def run_ui():
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
 
+        # === POLISHED DOCX DOWNLOAD ===
+        with st.spinner("✨ Polishing full memo..."):
+            polished_data = asyncio.run(final_polish_memo(memo_data))
+            polished_file_path = file_path.replace(".docx", "_polished.docx")
+            replace_text_in_docx_all(template_path, polished_data, polished_file_path)
+
+        with open(polished_file_path, "rb") as pf:
+            polished_bytes = pf.read()
+        st.download_button(
+            label="✨ Download Polished Memo (.docx)",
+            data=polished_bytes,
+            file_name=os.path.basename(polished_file_path),
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+        # === TEXT PREVIEWS ===
         txt_preview = generate_plaintext_memo(memo_data)
         st.download_button(
-            label="📄 Download Plain Text Preview",
+            label="📄 Download Plain Text Preview (Unpolished)",
             data=txt_preview,
             file_name=os.path.basename(file_path).replace(".docx", ".txt"),
             mime="text/plain"
         )
+        polished_txt_preview = generate_plaintext_memo(polished_data)
+        st.download_button(
+            label="📄 Download Polished Plain Text Preview",
+            data=polished_txt_preview,
+            file_name=os.path.basename(file_path).replace(".docx", "_polished.txt"),
+            mime="text/plain"
+        )
 
+        # === QUOTES ===
         for key, value in raw_quotes.items():
             if value.strip():
                 label = key.replace("_quotes", "").replace("_", " ").title()
@@ -297,6 +303,7 @@ def run_ui():
                     for q in value.strip().split("\n\n"):
                         st.markdown(f"- {q.strip()}")
 
+        # === Logging & Audit ===
         try:
             log_usage(
                 event_type="memo_generated",
@@ -311,9 +318,7 @@ def run_ui():
                 },
             )
         except Exception as log_err:
-            logger.warning(
-                redact_log(mask_phi(f"[{ERROR_CODE}] ⚠️ Failed to log memo usage: {log_err}"))
-            )
+            logger.warning(redact_log(mask_phi(f"[{ERROR_CODE}] ⚠️ Failed to log memo usage: {log_err}")))
 
         try:
             log_audit_event("Mediation Memo Generated", {
@@ -326,19 +331,14 @@ def run_ui():
             })
 
             template_name = selected_template_name if not uploaded_template else uploaded_template.name
-
             log_audit_event("Mediation Template Used", {
                 "template": template_name,
                 "example_used": selected_example_name if example_text else "None",
                 "tenant_id": tenant_id,
                 "module": "mediation"
             })
-
         except Exception as audit_err:
-            logger.warning(
-                redact_log(mask_phi(f"[{ERROR_CODE}] ⚠️ Failed to write audit log: {audit_err}"))
-            )
+            logger.warning(redact_log(mask_phi(f"[{ERROR_CODE}] ⚠️ Failed to write audit log: {audit_err}")))
 
     except Exception as outer_e:
-        msg = handle_error(outer_e, code="MEMO_UI_001")
-        st.error(msg)
+        st.error(handle_error(outer_e, code="MEMO_UI_001"))
