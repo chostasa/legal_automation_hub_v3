@@ -101,6 +101,13 @@ def run_ui():
         st.error(f"❌ Failed to download template: {msg}")
         return
 
+    # Global attachments and CC (applies to all emails)
+    st.markdown("### 📎 Global Attachments and CC (applied to all emails)")
+    attachments = st.file_uploader(
+        "Attach PDF or Word files", type=["pdf", "docx"], accept_multiple_files=True
+    )
+    global_cc = st.text_input("CC (comma-separated emails)", value="").split(",")
+
     # Sidebar filters
     with st.sidebar:
         st.markdown("### 🔎 Filter Clients")
@@ -109,11 +116,6 @@ def run_ui():
 
         selected_codes = st.multiselect("Class Code", class_codes, default=class_codes)
         selected_statuses = st.multiselect("Status", statuses, default=statuses) if statuses else []
-
-        st.markdown("### 📎 Attachments (Optional)")
-        attachments = st.file_uploader(
-            "Attach PDF or Word files", type=["pdf", "docx"], accept_multiple_files=True
-        )
 
         st.markdown("### 📊 Usage Summary")
         try:
@@ -172,12 +174,18 @@ def run_ui():
                     build_email(row_data, template_path, attachments)
                 )
 
+                # Merge global CC into per-email CC
+                combined_cc = list(filter(None, cc + global_cc))
+
                 subject_key = f"subject_{i}"
                 body_key = f"body_{i}"
+                cc_key = f"cc_{i}"
                 status_key = f"status_{i}"
 
                 st.markdown(f"**{sanitized['name']}** — _{recipient_email}_")
                 st.text_input("✏️ Subject", subject, key=subject_key)
+
+                st.text_input("📧 CC (comma-separated)", ", ".join(combined_cc), key=cc_key)
 
                 st.markdown("📄 Email Body Preview:")
                 st.components.v1.html(body, height=350, scrolling=True)
@@ -189,9 +197,10 @@ def run_ui():
                 if st.button(f"📧 Send to {sanitized['name']}", key=f"send_{i}"):
                     try:
                         check_quota(tenant_id, get_user_id(), "emails_sent", 1)
+                        cc_list = [email.strip() for email in st.session_state[cc_key].split(",") if email.strip()]
                         with st.spinner(f"📧 Sending email to {sanitized['name']}..."):
                             status = asyncio.run(
-                                send_email_and_update(row_data, subject, body, cc, template_path, attachments)
+                                send_email_and_update(row_data, subject, body, cc_list, template_path, attachments)
                             )
                             st.session_state.email_status[status_key] = status
 
@@ -219,7 +228,7 @@ def run_ui():
                         "client": row_data,
                         "subject_key": subject_key,
                         "body_key": body_key,
-                        "cc": cc,
+                        "cc_key": cc_key,
                         "status_key": status_key,
                     }
                 )
@@ -243,7 +252,11 @@ def run_ui():
                     client = preview["client"]
                     subject = st.session_state.get(preview["subject_key"], "")
                     body = st.session_state.get(preview["body_key"], "")
-                    cc = preview["cc"]
+                    cc_list = [
+                        email.strip()
+                        for email in st.session_state.get(preview["cc_key"], "").split(",")
+                        if email.strip()
+                    ]
 
                     async def send_one(preview_item, client_data, subj, bod, cc_list):
                         try:
@@ -272,7 +285,7 @@ def run_ui():
                             err_msg = handle_error(e, code="EMAIL_UI_004")
                             st.session_state.email_status[preview_item["status_key"]] = err_msg
 
-                    tasks.append(send_one(preview, client, subject, body, cc))
+                    tasks.append(send_one(preview, client, subject, body, cc_list))
 
                 if tasks:
                     await asyncio.gather(*tasks)
