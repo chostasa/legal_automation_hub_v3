@@ -10,7 +10,7 @@ from logger import logger
 import hashlib
 import datetime
 import re
-from utils.session_utils import get_session_id
+from core.session_utils import get_session_id
 
 
 # Import tenant and user for isolation
