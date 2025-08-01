@@ -231,9 +231,11 @@ Complaint Narrative:
 Example:
 {INTRO_EXAMPLE}
 """
-        intro_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(intro_prompt, 3000),
-                                               model="gpt-4",
-                                               system_msg=INTRO_MSG))
+        intro_text = safe_generate(
+            prompt=trim_to_token_limit(intro_prompt, 3000),
+            model="gpt-4",
+            system_msg=INTRO_MSG
+        )
         memo_data["Introduction"] = polish_section(intro_text, test_mode=test_mode)
 
         parties_block = []
