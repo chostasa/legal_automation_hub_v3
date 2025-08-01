@@ -142,9 +142,15 @@ def run_ui():
             | filtered_df[EMAIL_COLUMN].str.lower().str.contains(search)
         ]
 
-    # Multi-select clients
+    # Multi-select clients (auto-select all if data came from Litigation Dashboard)
+    default_clients = []
+    if "dashboard_df" in st.session_state:
+        default_clients = filtered_df[NAME_COLUMN].tolist()
+
     selected_clients = st.multiselect(
-        "Select Clients to Email", filtered_df[NAME_COLUMN].tolist()
+        "Select Clients to Email",
+        filtered_df[NAME_COLUMN].tolist(),
+        default=default_clients
     )
 
     # Initialize state
