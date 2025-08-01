@@ -6,7 +6,6 @@ from core.error_handling import handle_error
 from utils.docx_utils import replace_text_in_docx_all
 from services.openai_client import safe_generate
 from utils.token_utils import trim_to_token_limit
-from utils.thread_utils import run_in_thread, run_async
 from logger import logger
 from core.usage_tracker import check_quota_and_decrement
 from core.auth import get_tenant_id
@@ -17,7 +16,6 @@ from core.prompts.memo_examples import (
     INTRO_EXAMPLE,
     PLAINTIFF_STATEMENT_EXAMPLE,
     DEFENDANT_STATEMENT_EXAMPLE,
-    DEMAND_EXAMPLE,
     FACTS_LIABILITY_EXAMPLE,
     CAUSATION_EXAMPLE,
     HARMS_EXAMPLE,
@@ -42,7 +40,7 @@ CONCLUSION_MSG = "Draft a strong Conclusion with litigation readiness."
 
 
 # === Full memo polishing function (like Demand final polish) ===
-async def polish_mediation_memo_text(text: str) -> str:
+def polish_mediation_memo_text(text: str) -> str:
     """
     Polishes the final mediation memo: removes repetition, strengthens transitions,
     and enhances persuasiveness while retaining structure and all facts.
@@ -86,10 +84,10 @@ Your task is to produce a final version that is persuasive, complete, and profes
 **Goal:** The final mediation memorandum must read like it was personally reviewed and signed off by a senior trial attorney.
 It should be persuasive, evidentiary-based, and leave the defense under pressure to settle.
 
-Here is the draft mediation memorandum to polish:
+Here is the draft mediation memorandum to polish: 
 {text}
 """
-        polished = await safe_generate(prompt)
+        polished = asyncio.run(safe_generate(prompt))
         return polished.strip() if polished else text
 
     except Exception as e:
@@ -98,7 +96,7 @@ Here is the draft mediation memorandum to polish:
 
 
 # === Section-level polish (used during generation) ===
-async def polish_section(text: str, context: str = "", test_mode: bool = False) -> str:
+def polish_section(text: str, context: str = "", test_mode: bool = False) -> str:
     if not text.strip():
         return ""
     try:
@@ -119,14 +117,14 @@ Context: {context}
 Section:
 {text}
 """
-        return await safe_generate(prompt=prompt, model="gpt-4")
+        return asyncio.run(safe_generate(prompt=prompt, model="gpt-4"))
     except Exception as e:
         handle_error(e, code="MEMO_POLISH_001", user_message="Failed to polish memo section.")
         return text
 
 
 # === Old final_polish_memo replaced with new full-text polish ===
-async def final_polish_memo(memo_data: dict, test_mode: bool = False) -> dict:
+def final_polish_memo(memo_data: dict, test_mode: bool = False) -> dict:
     """
     Uses the full-memo polish function (polish_mediation_memo_text) for the entire memo.
     """
@@ -136,7 +134,7 @@ async def final_polish_memo(memo_data: dict, test_mode: bool = False) -> dict:
 
         # Join all sections into a single text string for full polish
         joined_text = "\n\n".join([f"## {k}\n{v}" for k, v in memo_data.items()])
-        polished = await polish_mediation_memo_text(joined_text)
+        polished = polish_mediation_memo_text(joined_text)
 
         # Re-split back into sections using markers
         new_data = {}
@@ -193,7 +191,7 @@ Context:
         return ""
 
 
-async def generate_memo_from_fields(data: dict, template_name: str, output_dir: str, test_mode: bool = False) -> tuple:
+def generate_memo_from_fields(data: dict, template_name: str, output_dir: str, test_mode: bool = False) -> tuple:
     """
     Generate mediation memo using data + template from Dropbox if needed.
     """
@@ -219,12 +217,18 @@ async def generate_memo_from_fields(data: dict, template_name: str, output_dir: 
         defendants = data.get("defendants", "")
 
         # Curate liability and damages quotes
-        liability_quotes = await curate_quotes_for_section(
-            "Facts & Liability", data.get("liability_quotes", ""), data.get('complaint_narrative', ''), test_mode=test_mode
-        )
-        damages_quotes = await curate_quotes_for_section(
-            "Harms & Losses", data.get("damages_quotes", ""), data.get('medical_summary', ''), test_mode=test_mode
-        )
+        liability_quotes = asyncio.run(curate_quotes_for_section(
+            "Facts & Liability",
+            data.get("liability_quotes", ""),
+            data.get('complaint_narrative', ''),
+            test_mode=test_mode
+        ))
+        damages_quotes = asyncio.run(curate_quotes_for_section(
+            "Harms & Losses",
+            data.get("damages_quotes", ""),
+            data.get('medical_summary', ''),
+            test_mode=test_mode
+        ))
 
         # INTRO SECTION
         intro_prompt = f"""
@@ -241,10 +245,10 @@ Complaint Narrative:
 Example:
 {INTRO_EXAMPLE}
 """
-        memo_data["Introduction"] = await polish_section(
-            await safe_generate(prompt=trim_to_token_limit(intro_prompt, 3000), model="gpt-4", system_msg=INTRO_MSG),
-            test_mode=test_mode
-        )
+        intro_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(intro_prompt, 3000),
+                                               model="gpt-4",
+                                               system_msg=INTRO_MSG))
+        memo_data["Introduction"] = polish_section(intro_text, test_mode=test_mode)
 
         # PLAINTIFF & DEFENDANT PARAGRAPHS
         parties_block = []
@@ -264,10 +268,10 @@ Party Info:
 Example:
 {PLAINTIFF_STATEMENT_EXAMPLE}
 """
-                memo_data[f"Plaintiff_{i}"] = await polish_section(
-                    await safe_generate(prompt=trim_to_token_limit(plaintiff_prompt, 2500), model="gpt-4", system_msg=PLAINTIFF_MSG),
-                    test_mode=test_mode
-                )
+                text = asyncio.run(safe_generate(prompt=trim_to_token_limit(plaintiff_prompt, 2500),
+                                                 model="gpt-4",
+                                                 system_msg=PLAINTIFF_MSG))
+                memo_data[f"Plaintiff_{i}"] = polish_section(text, test_mode=test_mode)
                 parties_block.append(memo_data[f"Plaintiff_{i}"])
             else:
                 memo_data[f"Plaintiff_{i}"] = ""
@@ -288,10 +292,10 @@ Defendant Info:
 Example:
 {DEFENDANT_STATEMENT_EXAMPLE}
 """
-                memo_data[f"Defendant_{i}"] = await polish_section(
-                    await safe_generate(prompt=trim_to_token_limit(defendant_prompt, 2500), model="gpt-4", system_msg=DEFENDANT_MSG),
-                    test_mode=test_mode
-                )
+                text = asyncio.run(safe_generate(prompt=trim_to_token_limit(defendant_prompt, 2500),
+                                                 model="gpt-4",
+                                                 system_msg=DEFENDANT_MSG))
+                memo_data[f"Defendant_{i}"] = polish_section(text, test_mode=test_mode)
                 parties_block.append(memo_data[f"Defendant_{i}"])
             else:
                 memo_data[f"Defendant_{i}"] = ""
@@ -307,10 +311,10 @@ Ensure:
 - Logical flow and smooth transitions
 - No redundancy or repetition of accident details
 """
-        memo_data["Parties"] = await polish_section(
-            await safe_generate(prompt=trim_to_token_limit(parties_prompt, 3000), model="gpt-4", system_msg=PARTIES_MSG),
-            test_mode=test_mode
-        )
+        parties_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(parties_prompt, 3000),
+                                                 model="gpt-4",
+                                                 system_msg=PARTIES_MSG))
+        memo_data["Parties"] = polish_section(parties_text, test_mode=test_mode)
 
         # FACTS & LIABILITY
         facts_prompt = f"""
@@ -329,10 +333,10 @@ Liability Quotes:
 Example:
 {FACTS_LIABILITY_EXAMPLE}
 """
-        memo_data["Facts_Liability"] = await polish_section(
-            await safe_generate(prompt=trim_to_token_limit(facts_prompt, 3500), model="gpt-4", system_msg=FACTS_MSG),
-            test_mode=test_mode
-        )
+        facts_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(facts_prompt, 3500),
+                                               model="gpt-4",
+                                               system_msg=FACTS_MSG))
+        memo_data["Facts_Liability"] = polish_section(facts_text, test_mode=test_mode)
 
         # CAUSATION / INJURIES
         causation_prompt = f"""
@@ -349,10 +353,10 @@ Medical Summary:
 Example:
 {CAUSATION_EXAMPLE}
 """
-        memo_data["Causation_Injuries_Treatment"] = await polish_section(
-            await safe_generate(prompt=trim_to_token_limit(causation_prompt, 3000), model="gpt-4", system_msg=CAUSATION_MSG),
-            test_mode=test_mode
-        )
+        causation_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(causation_prompt, 3000),
+                                                   model="gpt-4",
+                                                   system_msg=CAUSATION_MSG))
+        memo_data["Causation_Injuries_Treatment"] = polish_section(causation_text, test_mode=test_mode)
 
         # HARMS & LOSSES
         harms_prompt = f"""
@@ -371,10 +375,10 @@ Damages Quotes:
 Example:
 {HARMS_EXAMPLE}
 """
-        memo_data["Additional_Harms_Losses"] = await polish_section(
-            await safe_generate(prompt=trim_to_token_limit(harms_prompt, 3000), model="gpt-4", system_msg=HARMS_MSG),
-            test_mode=test_mode
-        )
+        harms_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(harms_prompt, 3000),
+                                               model="gpt-4",
+                                               system_msg=HARMS_MSG))
+        memo_data["Additional_Harms_Losses"] = polish_section(harms_text, test_mode=test_mode)
 
         # FUTURE MEDICAL BILLS
         future_prompt = f"""
@@ -391,10 +395,10 @@ Future Care Summary:
 Example:
 {FUTURE_BILLS_EXAMPLE}
 """
-        memo_data["Future_Medical_Bills"] = await polish_section(
-            await safe_generate(prompt=trim_to_token_limit(future_prompt, 2500), model="gpt-4", system_msg=FUTURE_MSG),
-            test_mode=test_mode
-        )
+        future_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(future_prompt, 2500),
+                                                model="gpt-4",
+                                                system_msg=FUTURE_MSG))
+        memo_data["Future_Medical_Bills"] = polish_section(future_text, test_mode=test_mode)
 
         # CONCLUSION
         conclusion_prompt = f"""
@@ -411,14 +415,14 @@ Settlement Summary:
 Example:
 {CONCLUSION_EXAMPLE}
 """
-        memo_data["Conclusion"] = await polish_section(
-            await safe_generate(prompt=trim_to_token_limit(conclusion_prompt, 2500), model="gpt-4", system_msg=CONCLUSION_MSG),
-            test_mode=test_mode
-        )
+        conclusion_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(conclusion_prompt, 2500),
+                                                    model="gpt-4",
+                                                    system_msg=CONCLUSION_MSG))
+        memo_data["Conclusion"] = polish_section(conclusion_text, test_mode=test_mode)
 
         # APPLY FINAL POLISH (Full memo)
         memo_data = {k: html.unescape(v) for k, v in memo_data.items()}
-        memo_data = await final_polish_memo(memo_data, test_mode=test_mode)
+        memo_data = final_polish_memo(memo_data, test_mode=test_mode)
 
         # Update placeholders
         memo_data.update({
@@ -432,7 +436,7 @@ Example:
         # Output final docx
         output_path = os.path.join(output_dir, f"Mediation_Memo_{plaintiffs or 'Unknown'}.docx")
         if not test_mode:
-            await run_async(run_in_thread, replace_text_in_docx_all, template_path, memo_data, output_path)
+            replace_text_in_docx_all(template_path, memo_data, output_path)
         else:
             output_path = os.path.join(output_dir, "Test_Mediation_Memo.docx")
 

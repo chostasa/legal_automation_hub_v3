@@ -1,7 +1,6 @@
 import streamlit as st
 import os
 import hashlib
-import json
 import asyncio
 from datetime import datetime
 
@@ -9,32 +8,25 @@ from utils.file_utils import clean_temp_dir, get_session_temp_dir, sanitize_file
 from core.security import sanitize_text, redact_log, mask_phi
 from core.cache_utils import clear_caches
 from core.audit import log_audit_event
-from core.auth import get_tenant_id, get_user_role, get_user_id
+from core.auth import get_tenant_id, get_user_id
 from core.error_handling import handle_error
 from core.usage_tracker import check_quota, decrement_quota, log_usage
 from logger import logger
-from utils.thread_utils import run_async
 from services.memo_service import (
     generate_quotes_from_raw_depo,
     generate_memo_from_fields,
     generate_plaintext_memo,
-    polish_mediation_memo_text,
-    final_polish_memo  # NEW: reuse full polish logic from memo_service
+    final_polish_memo
 )
-from utils.docx_utils import replace_text_in_docx_all  # NEW: to rebuild polished docx
+from utils.docx_utils import replace_text_in_docx_all
 from services.dropbox_client import DropboxClient
 from core.constants import DROPBOX_TEMPLATES_ROOT
 from dropbox.files import WriteMode
 
-# Clean temp dir only once
+# Clean temp directory on load
 clean_temp_dir()
 
 ERROR_CODE = "MEMO_GEN_001"
-
-
-async def run_async_memo_generation(data, template_path, temp_dir):
-    """Async wrapper for memo generation."""
-    return await run_async(generate_memo_from_fields, data, template_path, temp_dir)
 
 
 def run_ui():
@@ -84,11 +76,9 @@ def run_ui():
         try:
             template_files = client.list_files(template_folder)
             if template_files:
-                # Auto-select uploaded template if present, else default to the first one
                 default_index = 0
                 if uploaded_template:
-                    default_index = len(template_files) - 1  # last one uploaded
-
+                    default_index = len(template_files) - 1  # Select the uploaded template last
                 selected_template_name = st.selectbox("Choose Template to Use", template_files, index=default_index)
                 template_path = client.download_file(
                     f"{template_folder}/{selected_template_name}", "templates_preview"
@@ -97,7 +87,6 @@ def run_ui():
                 st.warning("⚠️ No templates found. Please upload one above.")
         except Exception as e:
             st.error(handle_error(e, code="MEMO_UI_002"))
-
 
         # === STYLE EXAMPLES (Dropbox) ===
         st.subheader("🧠 Optional Style Example")
@@ -162,16 +151,23 @@ def run_ui():
         errors = []
         if not template_path or not template_path.endswith(".docx"):
             errors.append("You must select or upload a valid .docx template.")
-        if not court.strip(): errors.append("Court name is required.")
-        if not case_number.strip(): errors.append("Case number is required.")
-        if not complaint_narrative.strip(): errors.append("Complaint narrative is required.")
-        if not settlement_summary.strip(): errors.append("Settlement summary is required.")
-        if not medical_summary.strip(): errors.append("Medical summary is required.")
+        if not court.strip():
+            errors.append("Court name is required.")
+        if not case_number.strip():
+            errors.append("Case number is required.")
+        if not complaint_narrative.strip():
+            errors.append("Complaint narrative is required.")
+        if not settlement_summary.strip():
+            errors.append("Settlement summary is required.")
+        if not medical_summary.strip():
+            errors.append("Medical summary is required.")
 
         valid_plaintiffs = [p for p in plaintiffs if p.strip()]
         valid_defendants = [d for d in defendants if d.strip()]
-        if not valid_plaintiffs: errors.append("At least one valid plaintiff name is required.")
-        if not valid_defendants: errors.append("At least one valid defendant name is required.")
+        if not valid_plaintiffs:
+            errors.append("At least one valid plaintiff name is required.")
+        if not valid_defendants:
+            errors.append("At least one valid defendant name is required.")
 
         if errors:
             for msg in errors:
@@ -197,7 +193,6 @@ def run_ui():
                     if raw_depo:
                         raw_quotes = asyncio.run(generate_quotes_from_raw_depo(raw_depo, quote_categories))
 
-
                     data = {
                         "court": sanitize_text(court),
                         "case_number": sanitize_text(case_number),
@@ -220,9 +215,7 @@ def run_ui():
                         data[f"defendant{i}"] = sanitize_text(name)
 
                     temp_dir = get_session_temp_dir()
-                    file_path, memo_data = asyncio.run(
-                        run_async_memo_generation(data, template_path, temp_dir)
-                    )
+                    file_path, memo_data = generate_memo_from_fields(data, template_path, temp_dir)
 
                     st.session_state.memo_cache[form_key] = (file_path, memo_data, raw_quotes)
                     decrement_quota("memo_generation", amount=1)
@@ -272,7 +265,7 @@ def run_ui():
 
         # === POLISHED DOCX DOWNLOAD ===
         with st.spinner("✨ Polishing full memo..."):
-            polished_data = asyncio.run(final_polish_memo(memo_data))
+            polished_data = final_polish_memo(memo_data)
             polished_file_path = file_path.replace(".docx", "_polished.docx")
             replace_text_in_docx_all(template_path, polished_data, polished_file_path)
 
