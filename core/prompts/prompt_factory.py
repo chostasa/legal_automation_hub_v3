@@ -194,3 +194,17 @@ EXAMPLE BULLET STYLE (for tone only, facts are not relevant):
 """
         register_prompt(prompt_type, prompt)
         return prompt
+
+    elif prompt_type == "style_transfer":
+        examples = example.split("---") if example else []
+        prompt = build_style_transfer_prompt(examples, summary)
+
+        if not prompt or not prompt.strip():
+            logger.error("[STYLE_TRANSFER] build_prompt() returned invalid prompt: None or empty")
+            return ""  # explicitly return empty so the service can handle
+
+        register_prompt(prompt_type, prompt)
+        return prompt
+
+    else:
+        raise ValueError(f"Unknown prompt_type: {prompt_type}")
