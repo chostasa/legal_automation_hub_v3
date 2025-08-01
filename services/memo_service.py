@@ -10,6 +10,7 @@ from logger import logger
 from core.usage_tracker import check_quota_and_decrement
 from core.auth import get_tenant_id
 from services.dropbox_client import download_template_file  # NEW: centralized Dropbox template fetching
+from io import BytesIO
 
 from core.prompts.memo_guidelines import FULL_SAFETY_PROMPT
 from core.prompts.memo_examples import (
@@ -182,7 +183,7 @@ Context:
         return ""
 
 
-def generate_memo_from_fields(data: dict, template_name: str, output_dir: str, test_mode: bool = False) -> tuple:
+def generate_memo_from_fields(data: dict, template_name: str, test_mode: bool = False) -> tuple:
     try:
         template_path = os.path.normpath(template_name)
         if not os.path.exists(template_path):
@@ -419,26 +420,16 @@ Example:
             "Demand": html.unescape(data.get("settlement_summary", ""))
         })
 
-        # Output final docx
-        safe_name = plaintiffs if plaintiffs else "Unknown"
-        safe_name = safe_name.replace(",", "_").replace(" ", "_")
-
-        output_path = os.path.join(output_dir, f"Mediation_Memo_{safe_name}.docx")
-
+        memo_buffer = BytesIO()
         if not test_mode:
-            replace_text_in_docx_all(template_path, memo_data, output_path)
+            replace_text_in_docx_all(template_path, memo_data, memo_buffer)
+            memo_buffer.seek(0)
         else:
-            output_path = os.path.join(output_dir, "Test_Mediation_Memo.docx")
+            # For test mode, just return dummy content
+            memo_buffer.write(b"Test memo content")
+            memo_buffer.seek(0)
 
-        if not os.path.exists(output_path) and not test_mode:
-            handle_error(
-                RuntimeError("Memo DOCX not created."),
-                code="MEMO_OUTPUT_001",
-                user_message="Mediation Memo DOCX could not be created.",
-                raise_it=True
-            )
-
-        return output_path, memo_data
+        return memo_buffer.getvalue(), memo_data
 
     except Exception as e:
         handle_error(

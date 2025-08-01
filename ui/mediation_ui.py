@@ -4,6 +4,7 @@ import hashlib
 from datetime import datetime
 
 from utils.file_utils import clean_temp_dir, get_session_temp_dir, sanitize_filename
+from io import BytesIO
 from core.security import sanitize_text, redact_log, mask_phi
 from core.cache_utils import clear_caches
 from core.audit import log_audit_event
@@ -217,9 +218,9 @@ def run_ui():
                         data[f"defendant{i}"] = sanitize_text(name)
 
                     temp_dir = get_session_temp_dir()
-                    file_path, memo_data = generate_memo_from_fields(data, template_path, temp_dir)
+                    memo_bytes, memo_data = generate_memo_from_fields(data, template_path)
 
-                    st.session_state.memo_cache[form_key] = (file_path, memo_data, raw_quotes)
+                    st.session_state.memo_cache[form_key] = (memo_bytes, memo_data, raw_quotes)
 
                     st.session_state.party_edits = {}
                     decrement_quota("memo_generation", amount=1)
@@ -258,27 +259,25 @@ def run_ui():
         st.success("✅ Memo generated successfully!")
 
         # === UNPOLISHED DOCX DOWNLOAD ===
-        with open(file_path, "rb") as f:
-            memo_bytes = f.read()
+
         st.download_button(
             label="⬇️ Download Mediation Memo (.docx)",
             data=memo_bytes,
-            file_name=os.path.basename(file_path),
+            file_name="Mediation_Memo.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
 
         # === POLISHED DOCX DOWNLOAD ===
         with st.spinner("✨ Polishing full memo..."):
             polished_data = final_polish_memo(memo_data)
-            polished_file_path = file_path.replace(".docx", "_polished.docx")
-            replace_text_in_docx_all(template_path, polished_data, polished_file_path)
+            polished_bytes = BytesIO()
+            replace_text_in_docx_all(template_path, polished_data, polished_bytes)  # Write to BytesIO
+            polished_bytes.seek(0)
 
-        with open(polished_file_path, "rb") as pf:
-            polished_bytes = pf.read()
         st.download_button(
             label="✨ Download Polished Memo (.docx)",
             data=polished_bytes,
-            file_name=os.path.basename(polished_file_path),
+            file_name="Mediation_Memo_polished.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
 
@@ -287,14 +286,14 @@ def run_ui():
         st.download_button(
             label="📄 Download Plain Text Preview (Unpolished)",
             data=txt_preview,
-            file_name=os.path.basename(file_path).replace(".docx", ".txt"),
+            file_name="Mediation_Memo.txt",
             mime="text/plain"
         )
         polished_txt_preview = generate_plaintext_memo(polished_data)
         st.download_button(
             label="📄 Download Polished Plain Text Preview",
             data=polished_txt_preview,
-            file_name=os.path.basename(file_path).replace(".docx", "_polished.txt"),
+            file_name="Mediation_Memo_polished.txt",
             mime="text/plain"
         )
 
