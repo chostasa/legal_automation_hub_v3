@@ -2,7 +2,6 @@ import streamlit as st
 import uuid
 import os
 from core.error_handling import handle_error
-from utils.file_utils import sanitize_filename
 from core.audit import log_audit_event
 
 
@@ -18,8 +17,10 @@ def get_session_id() -> str:
 
 def get_session_temp_dir(base_dir: str = "data/tmp") -> str:
     try:
-        # Lazy import
+        # Lazy imports to avoid circular import
         from core.auth import get_tenant_id, get_user_id
+        from utils.file_utils import sanitize_filename  
+
         tenant_id = get_tenant_id()
         user_id = get_user_id()
         session_id = get_session_id()
