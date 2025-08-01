@@ -82,7 +82,7 @@ It should be persuasive, evidentiary-based, and leave the defense under pressure
 Here is the draft mediation memorandum to polish: 
 {text}
 """
-        polished = asyncio.run(safe_generate(prompt))
+        polished = safe_generate(prompt)
         return polished.strip() if polished else text
 
     except Exception as e:
@@ -111,7 +111,7 @@ Context: {context}
 Section:
 {text}
 """
-        return asyncio.run(safe_generate(prompt=prompt, model="gpt-4"))
+        return safe_generate(prompt=prompt, model="gpt-4")
     except Exception as e:
         handle_error(e, code="MEMO_POLISH_001", user_message="Failed to polish memo section.")
         return text
@@ -255,9 +255,9 @@ Party Info:
 Example:
 {PLAINTIFF_STATEMENT_EXAMPLE}
 """
-                text = asyncio.run(safe_generate(prompt=trim_to_token_limit(plaintiff_prompt, 2500),
+                text = safe_generate(prompt=trim_to_token_limit(plaintiff_prompt, 2500),
                                                  model="gpt-4",
-                                                 system_msg=PLAINTIFF_MSG))
+                                                 system_msg=PLAINTIFF_MSG)
                 memo_data[f"Plaintiff_{i}"] = polish_section(text, test_mode=test_mode)
                 parties_block.append(memo_data[f"Plaintiff_{i}"])
             else:
@@ -279,9 +279,9 @@ Defendant Info:
 Example:
 {DEFENDANT_STATEMENT_EXAMPLE}
 """
-                text = asyncio.run(safe_generate(prompt=trim_to_token_limit(defendant_prompt, 2500),
+                text = safe_generate(prompt=trim_to_token_limit(defendant_prompt, 2500),
                                                  model="gpt-4",
-                                                 system_msg=DEFENDANT_MSG))
+                                                 system_msg=DEFENDANT_MSG)
                 memo_data[f"Defendant_{i}"] = polish_section(text, test_mode=test_mode)
                 parties_block.append(memo_data[f"Defendant_{i}"])
             else:
@@ -297,9 +297,9 @@ Ensure:
 - Logical flow and smooth transitions
 - No redundancy or repetition of accident details
 """
-        parties_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(parties_prompt, 3000),
+        parties_text = safe_generate(prompt=trim_to_token_limit(parties_prompt, 3000),
                                                  model="gpt-4",
-                                                 system_msg=PARTIES_MSG))
+                                                 system_msg=PARTIES_MSG)
         memo_data["Parties"] = polish_section(parties_text, test_mode=test_mode)
 
         facts_prompt = f"""
@@ -318,9 +318,9 @@ Liability Quotes:
 Example:
 {FACTS_LIABILITY_EXAMPLE}
 """
-        facts_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(facts_prompt, 3500),
+        facts_text = safe_generate(prompt=trim_to_token_limit(facts_prompt, 3500),
                                                model="gpt-4",
-                                               system_msg=FACTS_MSG))
+                                               system_msg=FACTS_MSG)
         memo_data["Facts_Liability"] = polish_section(facts_text, test_mode=test_mode)
 
         causation_prompt = f"""
@@ -337,9 +337,9 @@ Medical Summary:
 Example:
 {CAUSATION_EXAMPLE}
 """
-        causation_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(causation_prompt, 3000),
+        causation_text = safe_generate(prompt=trim_to_token_limit(causation_prompt, 3000),
                                                    model="gpt-4",
-                                                   system_msg=CAUSATION_MSG))
+                                                   system_msg=CAUSATION_MSG)
         memo_data["Causation_Injuries_Treatment"] = polish_section(causation_text, test_mode=test_mode)
 
         harms_prompt = f"""
@@ -358,9 +358,9 @@ Damages Quotes:
 Example:
 {HARMS_EXAMPLE}
 """
-        harms_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(harms_prompt, 3000),
+        harms_text = safe_generate(prompt=trim_to_token_limit(harms_prompt, 3000),
                                                model="gpt-4",
-                                               system_msg=HARMS_MSG))
+                                               system_msg=HARMS_MSG)
         memo_data["Additional_Harms_Losses"] = polish_section(harms_text, test_mode=test_mode)
 
         future_prompt = f"""
@@ -377,9 +377,9 @@ Future Care Summary:
 Example:
 {FUTURE_BILLS_EXAMPLE}
 """
-        future_text = asyncio.run(safe_generate(prompt=trim_to_token_limit(future_prompt, 2500),
+        future_text = safe_generate(prompt=trim_to_token_limit(future_prompt, 2500),
                                                 model="gpt-4",
-                                                system_msg=FUTURE_MSG))
+                                                system_msg=FUTURE_MSG)
         memo_data["Future_Medical_Bills"] = polish_section(future_text, test_mode=test_mode)
 
         conclusion_prompt = f"""
@@ -396,13 +396,13 @@ Settlement Summary:
 Example:
 {CONCLUSION_EXAMPLE}
 """
-        conclusion_text = asyncio.run(
+        conclusion_text = 
             safe_generate(
                 prompt=trim_to_token_limit(conclusion_prompt, 2500),
                 model="gpt-4",
                 system_msg=CONCLUSION_MSG
             )
-        )
+        
         memo_data["Conclusion"] = polish_section(conclusion_text, test_mode=test_mode)
 
 
