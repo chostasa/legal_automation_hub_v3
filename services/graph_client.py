@@ -33,6 +33,7 @@ class GraphClient:
                 "grant_type": "client_credentials"
             }
             headers = {"Content-Type": "application/x-www-form-urlencoded"}
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, data=data, headers=headers, timeout=10) as response:
                     if response.status != 200:
@@ -42,6 +43,7 @@ class GraphClient:
                             user_message="Unable to authenticate with Microsoft Graph. Please contact support.",
                             raise_it=True
                         )
+
                     json_resp = await response.json()
                     token = json_resp.get("access_token")
                     if not token:
@@ -51,6 +53,7 @@ class GraphClient:
                             user_message="Unable to authenticate with Microsoft Graph. Please contact support.",
                             raise_it=True
                         )
+
                     self.token = token
                     duration = time.time() - start_time
                     logger.info(redact_log(mask_phi(f"⏱️ Graph token retrieval took {duration:.2f}s")))
@@ -66,10 +69,10 @@ class GraphClient:
 
     async def send_email(
         self,
-        sender_address: str,
-        to: str,
-        subject: str,
-        body: str,
+        sender_address: str = None,
+        to: str = None,
+        subject: str = None,
+        body: str = None,
         cc: list = None,
         attachments: list = None,
         body_type: str = "HTML"
@@ -80,7 +83,10 @@ class GraphClient:
         """
         start_time = time.time()
         try:
-            if not sender_address or not to or not subject or not body:
+            # Allow fallback to default sender address from config if not provided
+            sender = sender_address or self.config.GRAPH_SENDER_ADDRESS
+
+            if not sender or not to or not subject or not body:
                 handle_error(
                     ValueError("One or more required email fields are empty."),
                     code="GRAPH_SEND_003",
@@ -90,12 +96,14 @@ class GraphClient:
 
             tenant_id = get_tenant_id()
             user_id = get_user_id()
+
+            # Quota enforcement
             check_quota(tenant_id, "emails_sent", 1)
 
             if not self.token:
                 await self._get_token()
 
-            url = f"{GRAPH_API_BASE}/users/{sender_address}/sendMail"
+            url = f"{GRAPH_API_BASE}/users/{sender}/sendMail"
             headers = {
                 "Authorization": f"Bearer {self.token}",
                 "Content-Type": "application/json"
@@ -136,7 +144,10 @@ class GraphClient:
 
             duration = time.time() - start_time
             log_usage("emails_sent", tenant_id, user_id, 1, {"recipient": to, "duration": duration})
-            log_audit_event("Graph Email Sent", {"recipient": to, "subject": subject, "duration": f"{duration:.2f}s"})
+            log_audit_event(
+                "Graph Email Sent",
+                {"recipient": to, "subject": subject, "duration": f"{duration:.2f}s"}
+            )
             logger.info(mask_phi(redact_log(f"✅ Email sent via Graph to {to} in {duration:.2f}s")))
             return True
 

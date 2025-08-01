@@ -21,25 +21,32 @@ neos = NeosClient()
 
 async def build_email(client_data: dict, template_name: str, attachments: list = None) -> tuple:
     """
-    Returns (subject, body, cc, sanitized_dict, attachments) for a given client row.
+    Returns (subject, body, cc, sanitized_dict, attachments, recipient_email) for a given client row.
     Downloads and normalizes the template_path from Dropbox if missing locally.
     attachments: list of file-like objects or paths.
     """
     try:
         # Build sanitized dictionary for placeholder substitution
         sanitized = {
-            "ClientName": sanitize_text(client_data.get("Client Name", "")),
-            "ReferringAttorney": sanitize_text(client_data.get("Referring Attorney", "N/A")),
-            "ReferringAttorneyEmail": sanitize_email(client_data.get("Referring Attorney Email", "")),
-            "CaseID": sanitize_text(client_data.get("Case ID", "")),
-            "Email": sanitize_email(client_data.get("Email", "")),
+            "name": sanitize_text(
+                client_data.get("Case Details First Party Name (Full - Last, First)", "")
+            ),
+            "RA": sanitize_text(
+                client_data.get("Referred By Name (Full - Last, First)", "")
+            ),
+            "ID": sanitize_text(
+                client_data.get("Case Number", "")
+            )
         }
 
-        # Validate email
-        if not sanitized["Email"] or sanitized["Email"] == "invalid@example.com":
+        # Validate recipient email
+        recipient_email = sanitize_email(
+            client_data.get("Case Details First Party Details Default Email Account Address", "")
+        )
+        if not recipient_email or recipient_email == "invalid@example.com":
             raise AppError(
                 code="EMAIL_BUILD_001",
-                message=f"Invalid email for client: {sanitized.get('ClientName', '[Unknown]')}",
+                message=f"Invalid email for client: {sanitized.get('name', '[Unknown]')}",
                 details=f"Row data: {client_data}",
             )
 
@@ -48,7 +55,7 @@ async def build_email(client_data: dict, template_name: str, attachments: list =
         if not os.path.exists(template_path):
             template_path = download_template_file("email", template_name, "email_templates_cache")
 
-        # Merge the template into subject/body
+        # Merge template with sanitized placeholders
         subject, body, cc = merge_template(template_path, sanitized)
         if not subject or not body:
             raise AppError(
@@ -59,15 +66,15 @@ async def build_email(client_data: dict, template_name: str, attachments: list =
 
         cc = cc or []
 
-        # Log event
+        # Log audit event for build
         log_audit_event("Email Built", {
             "tenant_id": get_tenant_id(),
             "user_id": get_user_id(),
-            "client_name": sanitized.get("ClientName"),
+            "client_name": sanitized.get("name"),
             "template_path": template_path,
         })
 
-        return subject, body, cc, sanitized, attachments or []
+        return subject, body, cc, sanitized, attachments or [], recipient_email
 
     except AppError:
         raise
@@ -80,16 +87,20 @@ async def build_email(client_data: dict, template_name: str, attachments: list =
         )
 
 
-async def send_email_and_update(client: dict, subject: str, body: str, cc: list, template_name: str, attachments: list = None) -> str:
+async def send_email_and_update(client: dict, subject: str, body: str, cc: list,
+                                template_name: str, attachments: list = None) -> str:
     """
     Sends the email (with attachments), updates NEOS, logs usage and returns a result string.
     Downloads template from Dropbox if missing locally.
     """
     try:
-        if not client.get("Email") or client["Email"] == "invalid@example.com":
+        recipient_email = sanitize_email(
+            client.get("Case Details First Party Details Default Email Account Address", "")
+        )
+        if not recipient_email or recipient_email == "invalid@example.com":
             raise AppError(
                 code="EMAIL_SEND_001",
-                message=f"Cannot send email: invalid email address for client {client.get('ClientName', '[Unknown]')}",
+                message=f"Cannot send email: invalid email address for client {client.get('name', '[Unknown]')}",
             )
 
         # Quota check
@@ -122,7 +133,7 @@ async def send_email_and_update(client: dict, subject: str, body: str, cc: list,
         with logger.contextualize(tenant_id=get_tenant_id(), user_id=get_user_id()):
             await graph.send_email(
                 sender_address=None,
-                to=client["Email"],
+                to=recipient_email,
                 subject=subject,
                 body=body,
                 cc=cc,
@@ -130,7 +141,7 @@ async def send_email_and_update(client: dict, subject: str, body: str, cc: list,
                 body_type=body_type
             )
 
-        # Update NEOS (best-effort)
+        # Update NEOS case status (best-effort)
         try:
             await neos.update_case_status(client.get("CaseID", ""), STATUS_QUESTIONNAIRE_SENT)
         except Exception as e:
@@ -149,7 +160,7 @@ async def send_email_and_update(client: dict, subject: str, body: str, cc: list,
         log_audit_event("Email Sent", {
             "tenant_id": get_tenant_id(),
             "user_id": get_user_id(),
-            "client_name": client.get("ClientName"),
+            "client_name": client.get("name", client.get("ClientName")),
             "template_path": template_path,
             "case_id": client.get("CaseID", ""),
         })
@@ -160,7 +171,7 @@ async def send_email_and_update(client: dict, subject: str, body: str, cc: list,
         logger.error(redact_log(mask_phi(str(ae))))
         return f"❌ Failed: {ae.code}"
     except Exception as e:
-        fallback_name = client.get("ClientName", "[Unknown Client]")
+        fallback_name = client.get("name", client.get("ClientName", "[Unknown Client]"))
         handle_error(
             e,
             code="EMAIL_SEND_002",
@@ -176,8 +187,10 @@ async def log_email(client: dict, subject: str, body: str, template_path: str, c
     try:
         subject_clean = sanitize_text(subject)
         body_clean = sanitize_text(body)
-        email_clean = sanitize_email(client.get("Email", "invalid@example.com"))
-        name_clean = sanitize_text(client.get("ClientName", "Unknown"))
+        email_clean = sanitize_email(
+            client.get("Case Details First Party Details Default Email Account Address", "invalid@example.com")
+        )
+        name_clean = sanitize_text(client.get("name", client.get("ClientName", "Unknown")))
 
         tenant_id = get_tenant_id()
         log_dir = os.path.join("email_automation", "logs")
@@ -233,5 +246,5 @@ async def log_email(client: dict, subject: str, body: str, template_path: str, c
         handle_error(
             e,
             code="EMAIL_LOG_001",
-            user_message=f"Failed to log email for {client.get('ClientName', 'Unknown')}",
+            user_message=f"Failed to log email for {client.get('name', client.get('ClientName', 'Unknown'))}",
         )
