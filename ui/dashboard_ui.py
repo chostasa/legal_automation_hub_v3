@@ -49,16 +49,17 @@ def run_ui():
         CAMPAIGN_COL = "Case Type"
         STATUS_COL = "Class Code Title"
         REFERRAL_COL = "Referred By Name (Full - Last, First)"
+        NAME_COL = "Case Details First Party Name (First, Last)"
 
-        # Ensure required columns always exist (even if not in the default view)
         required_cols = [
+            "Case Details First Party Name (First, Last)",
             "Case Details First Party Name (Full - Last, First)",
             "Case Details First Party Details Default Phone Number",
             "Case Details First Party Details Default Email Account Address"
         ]
         for col in required_cols:
             if col not in df.columns:
-                df[col] = ""  # Add blank column if missing
+                df[col] = ""
 
         # Sidebar filters
         st.sidebar.header("🔍 Base Filters")
@@ -131,7 +132,8 @@ def run_ui():
             "Class Code Title",
             "Date Opened",
             "Referred By Name (Full - Last, First)",
-            "Case Details First Party Name (Full - Last, First)",
+            "Case Details First Party Name (First, Last)",           
+            "Case Details First Party Name (Full - Last, First)",     
             "Case Details First Party Details Default Phone Number",
             "Case Details First Party Details Default Email Account Address"
         ]

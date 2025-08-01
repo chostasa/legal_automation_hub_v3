@@ -28,7 +28,7 @@ async def build_email(client_data: dict, template_name: str, attachments: list =
     try:
         # Build sanitized dictionary for placeholder substitution
         sanitized = {
-            "name": sanitize_text(str(client_data.get("First Party Name (First, Last)", ""))),
+            "name": sanitize_text(str(client_data.get("Case Details First Party Name (First, Last)", ""))),
             "RA": sanitize_text(str(client_data.get("Referred By Name (Full - Last, First)", ""))),
             "ID": sanitize_text(str(client_data.get("Case Number", "")))
         }
