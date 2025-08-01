@@ -164,7 +164,7 @@ def run_ui():
                     continue
 
                 # Build email with placeholders filled
-                subject, body, cc, client, _ = asyncio.run(
+                subject, body, cc, sanitized, _, recipient_email = asyncio.run(
                     build_email(row_data, template_path, attachments)
                 )
 
@@ -172,7 +172,7 @@ def run_ui():
                 body_key = f"body_{i}"
                 status_key = f"status_{i}"
 
-                st.markdown(f"**{client['ClientName']}** — _{client['Email']}_")
+                st.markdown(f"**{sanitized['name']}** — _{recipient_email}_")
                 st.text_input("✏️ Subject", subject, key=subject_key)
 
                 # Show body in HTML preview
@@ -183,12 +183,12 @@ def run_ui():
                     f"**Status**: {st.session_state.email_status.get(status_key, '⏳ Ready')}"
                 )
 
-                if st.button(f"📧 Send to {client['ClientName']}", key=f"send_{i}"):
+                if st.button(f"📧 Send to {sanitized['name']}", key=f"send_{i}"):
                     try:
                         check_quota(tenant_id, get_user_id(), "emails_sent", 1)
-                        with st.spinner(f"📧 Sending email to {client['ClientName']}..."):
+                        with st.spinner(f"📧 Sending email to {sanitized['name']}..."):
                             status = asyncio.run(
-                                send_email_and_update(client, subject, body, cc, template_path, attachments)
+                                send_email_and_update(row_data, subject, body, cc, template_path, attachments)
                             )
                             st.session_state.email_status[status_key] = status
 
@@ -202,7 +202,7 @@ def run_ui():
                             log_audit_event(
                                 "Email Sent",
                                 {
-                                    "client_name": client["ClientName"],
+                                    "client_name": sanitized["name"],
                                     "template_path": template_path,
                                     "tenant_id": tenant_id,
                                 },
@@ -213,7 +213,7 @@ def run_ui():
 
                 st.session_state.email_previews.append(
                     {
-                        "client": client,
+                        "client": row_data,
                         "subject_key": subject_key,
                         "body_key": body_key,
                         "cc": cc,
@@ -261,7 +261,7 @@ def run_ui():
                             log_audit_event(
                                 "Batch Email Sent",
                                 {
-                                    "client_name": client_data["ClientName"],
+                                    "client_name": client_data.get("Client Name", "Unknown"),
                                     "template_path": template_path,
                                     "tenant_id": tenant_id,
                                 },

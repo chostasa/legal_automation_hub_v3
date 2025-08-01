@@ -28,15 +28,9 @@ async def build_email(client_data: dict, template_name: str, attachments: list =
     try:
         # Build sanitized dictionary for placeholder substitution
         sanitized = {
-            "name": sanitize_text(
-                client_data.get("Case Details First Party Name (Full - Last, First)", "")
-            ),
-            "RA": sanitize_text(
-                client_data.get("Referred By Name (Full - Last, First)", "")
-            ),
-            "ID": sanitize_text(
-                client_data.get("Case Number", "")
-            )
+            "name": sanitize_text(str(client_data.get("Case Details First Party Name (Full - Last, First)", ""))),
+            "RA": sanitize_text(str(client_data.get("Referred By Name (Full - Last, First)", ""))),
+            "ID": sanitize_text(str(client_data.get("Case Number", "")))
         }
 
         # Validate recipient email
@@ -185,12 +179,12 @@ async def log_email(client: dict, subject: str, body: str, template_path: str, c
     Logs email activity into CSV and JSON files using normalized template_path.
     """
     try:
-        subject_clean = sanitize_text(subject)
-        body_clean = sanitize_text(body)
+        subject_clean = sanitize_text(str(subject))
+        body_clean = sanitize_text(str(body))
         email_clean = sanitize_email(
             client.get("Case Details First Party Details Default Email Account Address", "invalid@example.com")
         )
-        name_clean = sanitize_text(client.get("name", client.get("ClientName", "Unknown")))
+        name_clean = sanitize_text(str(client.get("name", client.get("ClientName", "Unknown"))))
 
         tenant_id = get_tenant_id()
         log_dir = os.path.join("email_automation", "logs")
