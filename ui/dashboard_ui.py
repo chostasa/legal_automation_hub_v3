@@ -50,6 +50,16 @@ def run_ui():
         STATUS_COL = "Class Code Title"
         REFERRAL_COL = "Referred By Name (Full - Last, First)"
 
+        # Ensure required columns always exist (even if not in the default view)
+        required_cols = [
+            "Case Details First Party Name (Full - Last, First)",
+            "Case Details First Party Details Default Phone Number",
+            "Case Details First Party Details Default Email Account Address"
+        ]
+        for col in required_cols:
+            if col not in df.columns:
+                df[col] = ""  # Add blank column if missing
+
         # Sidebar filters
         st.sidebar.header("🔍 Base Filters")
         campaign_filter = st.sidebar.multiselect("📁 Campaign", sorted(df[CAMPAIGN_COL].dropna().unique()))
@@ -124,7 +134,6 @@ def run_ui():
             "Case Details First Party Name (Full - Last, First)",
             "Case Details First Party Details Default Phone Number",
             "Case Details First Party Details Default Email Account Address"
-            "Case Details First Party Name (Full - Last, First)",
         ]
 
         all_display_cols = [col for col in base_display_cols if col in filtered_df.columns] + optional_display_cols
