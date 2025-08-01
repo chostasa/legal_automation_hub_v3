@@ -1,7 +1,6 @@
 import streamlit as st
 import os
 import hashlib
-import asyncio
 from datetime import datetime
 
 from utils.file_utils import clean_temp_dir, get_session_temp_dir, sanitize_filename
@@ -192,7 +191,7 @@ def run_ui():
 
                     # ✅ Only parse quotes if depo text & categories present
                     if raw_depo.strip() and quote_categories:
-                        raw_quotes = asyncio.run(generate_quotes_from_raw_depo(raw_depo, quote_categories))
+                        raw_quotes = generate_quotes_from_raw_depo(raw_depo, quote_categories)
                     else:
                         raw_quotes = {}
 
