@@ -10,6 +10,8 @@ from logger import logger
 import hashlib
 import datetime
 import re
+from utils.session_utils import get_session_id
+
 
 # Import tenant and user for isolation
 from core.auth import get_tenant_id, get_user_id
@@ -190,11 +192,16 @@ def clean_temp_dir(base_dir: str = "data/tmp") -> None:
         raise RuntimeError(f"Failed to clean temp directory: {e}")
 
 
-def get_session_temp_dir(base_dir="temp") -> str:
+from core.auth import get_tenant_id, get_user_id
+
+def get_session_temp_dir(base_dir="data/tmp") -> str:
     """
-    Returns a session-specific temp directory path, creating it if needed.
+    Returns a session-specific temp directory path, organized by tenant and user.
     """
     session_id = get_session_id()
-    temp_dir = os.path.join(base_dir, session_id)
+    tenant_id = get_tenant_id()
+    user_id = get_user_id()
+
+    temp_dir = os.path.join(base_dir, tenant_id, user_id, session_id)
     os.makedirs(temp_dir, exist_ok=True)
     return temp_dir

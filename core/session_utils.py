@@ -16,7 +16,7 @@ def get_session_id() -> str:
         raise
 
 
-def get_session_temp_dir(base_dir: str = "data") -> str:
+def get_session_temp_dir(base_dir: str = "data/tmp") -> str:
     try:
         # Lazy import
         from core.auth import get_tenant_id, get_user_id
@@ -25,9 +25,10 @@ def get_session_temp_dir(base_dir: str = "data") -> str:
         session_id = get_session_id()
 
         safe_tenant = sanitize_filename(tenant_id)
+        safe_user = sanitize_filename(user_id)
         safe_session = sanitize_filename(session_id)
 
-        path = os.path.join(base_dir, safe_tenant, safe_session)
+        path = os.path.join(base_dir, safe_tenant, safe_user, safe_session)
         os.makedirs(path, exist_ok=True)
 
         log_audit_event("Session Temp Dir Created", {
