@@ -77,6 +77,7 @@ def get_templates(tenant_id: str, category: str = None, include_deleted: bool = 
         "email": DROPBOX_EMAIL_TEMPLATE_DIR,
         "demand": DROPBOX_DEMAND_TEMPLATE_DIR,
         "mediation_memo": DROPBOX_MEDIATION_TEMPLATE_DIR,
+        "mediation": DROPBOX_MEDIATION_TEMPLATE_DIR,      
         "foia": DROPBOX_FOIA_TEMPLATE_DIR,
         "batch_docs": f"{DROPBOX_TEMPLATES_ROOT}/Batch_Docs"
     }
