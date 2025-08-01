@@ -193,7 +193,10 @@ def run_ui():
             with st.spinner("🔄 Processing..."):
                 try:
                     check_quota("memo_generation", amount=1)
-                    raw_quotes = generate_quotes_from_raw_depo(raw_depo, quote_categories) if raw_depo else {}
+                    raw_quotes = {}
+                    if raw_depo:
+                        raw_quotes = asyncio.run(generate_quotes_from_raw_depo(raw_depo, quote_categories))
+
 
                     data = {
                         "court": sanitize_text(court),
