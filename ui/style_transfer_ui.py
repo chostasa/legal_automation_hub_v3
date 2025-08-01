@@ -89,6 +89,7 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
     input_method = st.radio("📥 Select Input Method", ["Upload Excel", "Paste Text Inputs"])
     inputs_df = None
 
+    # === Excel upload path ===
     if input_method == "Upload Excel":
         uploaded_file = st.file_uploader("📤 Upload Excel File", type=["xlsx"])
         input_col = st.text_input("🔎 Column to Rewrite", value="Input")
@@ -103,42 +104,77 @@ Each input will be rewritten to match the **tone, structure, and legal voice** o
                 msg = handle_error(e, code="STYLE_UI_004")
                 st.error(msg)
 
+        # Show button only for Excel path
+        if inputs_df is not None and not inputs_df.empty and example_list:
+            if st.button("🔄 Generate Styled Outputs"):
+                with st.spinner("Generating styled outputs..."):
+                    try:
+                        check_quota("openai_tokens", amount=len(inputs_df))
+                        result_df = asyncio.run(run_batch_style_transfer(example_list, inputs_df, input_col="Input"))
+                        decrement_quota("openai_tokens", amount=len(result_df))
+                        st.success(f"✅ Successfully rewrote {len(result_df)} inputs.")
+                        st.dataframe(result_df)
+
+                        buffer = BytesIO()
+                        result_df.to_excel(buffer, index=False, engine='openpyxl')
+                        buffer.seek(0)
+
+                        st.download_button(
+                            "📥 Download Results as Excel",
+                            data=buffer,
+                            file_name="styled_outputs.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+
+                        log_audit_event("Style Transfer Generated", {
+                            "tenant_id": tenant_id,
+                            "input_count": len(result_df),
+                            "example_used": selected_example if selected_example != "None" else "pasted",
+                            "module": "style_transfer"
+                        })
+                    except Exception as e:
+                        msg = handle_error(e, code="STYLE_UI_005")
+                        st.error(msg)
+
+    # === Paste text path ===
     elif input_method == "Paste Text Inputs":
         pasted_text = st.text_area("📋 Paste Inputs Here (separate with '---')", height=300)
         if pasted_text.strip():
             input_list = [x.strip() for x in pasted_text.split('---') if x.strip()]
             inputs_df = pd.DataFrame({"Input": input_list})
 
-    # Generate outputs
-    if inputs_df is not None and not inputs_df.empty and example_list and st.button("🔄 Generate Styled Outputs", key="generate_button_main"):
-        with st.spinner("Generating styled outputs..."):
-            try:
-                check_quota("openai_tokens", amount=len(inputs_df))
-                result_df = asyncio.run(run_batch_style_transfer(example_list, inputs_df, input_col="Input"))
-                decrement_quota("openai_tokens", amount=len(result_df))
-                st.success(f"✅ Successfully rewrote {len(result_df)} inputs.")
-                st.dataframe(result_df)
+        # Show button only for Paste path
+        if inputs_df is not None and not inputs_df.empty and example_list:
+            if st.button("🔄 Generate Styled Outputs"):
+                with st.spinner("Generating styled outputs..."):
+                    try:
+                        check_quota("openai_tokens", amount=len(inputs_df))
+                        result_df = asyncio.run(run_batch_style_transfer(example_list, inputs_df, input_col="Input"))
+                        decrement_quota("openai_tokens", amount=len(result_df))
+                        st.success(f"✅ Successfully rewrote {len(result_df)} inputs.")
+                        st.dataframe(result_df)
 
-                buffer = BytesIO()
-                result_df.to_excel(buffer, index=False, engine='openpyxl')
-                buffer.seek(0)
+                        buffer = BytesIO()
+                        result_df.to_excel(buffer, index=False, engine='openpyxl')
+                        buffer.seek(0)
 
-                st.download_button(
-                    "📥 Download Results as Excel",
-                    data=buffer,
-                    file_name="styled_outputs.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+                        st.download_button(
+                            "📥 Download Results as Excel",
+                            data=buffer,
+                            file_name="styled_outputs.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
 
-                log_audit_event("Style Transfer Generated", {
-                    "tenant_id": tenant_id,
-                    "input_count": len(result_df),
-                    "example_used": selected_example if selected_example != "None" else "pasted",
-                    "module": "style_transfer"
-                })
-            except Exception as e:
-                msg = handle_error(e, code="STYLE_UI_005")
-                st.error(msg)
+                        log_audit_event("Style Transfer Generated", {
+                            "tenant_id": tenant_id,
+                            "input_count": len(result_df),
+                            "example_used": selected_example if selected_example != "None" else "pasted",
+                            "module": "style_transfer"
+                        })
+                    except Exception as e:
+                        msg = handle_error(e, code="STYLE_UI_005")
+                        st.error(msg)
 
-    elif st.button("🔄 Generate Styled Outputs", key="generate_button_fallback"):
+    # Fallback warning if button is pressed without valid input
+    if st.button("🔄 Generate Styled Outputs", key="generate_button_fallback"):
         st.warning("Please provide both example paragraphs and at least one input.")
