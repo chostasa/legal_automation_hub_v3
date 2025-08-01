@@ -32,23 +32,23 @@ def run_ui():
         # Metrics section
         with st.expander("📊 Audit Log Metrics"):
             try:
-                usage_summary = get_usage_summary(tenant_id, get_user_id()) or {}
+                # Fix: get_usage_summary does not accept arguments
+                usage_summary = get_usage_summary() or {}
                 st.write("🔹 Total Audit Events:", usage_summary.get("audit_events", 0))
                 st.write("🔹 Failed Audit Events:", usage_summary.get("audit_failures", 0))
             except Exception as metric_err:
                 logger.warning(f"[AUDIT_UI] Failed to load audit metrics: {metric_err}")
                 st.write("⚠️ Unable to load audit metrics.")
 
-        # Load and enforce tenant-filtered audit logs
+        # Load audit logs - remove tenant_id arg if fetch_audit_events doesn't support it
         with st.spinner("Loading audit logs..."):
             logs = fetch_audit_events(
                 user_id=user_id_filter.strip() if isinstance(user_id_filter, str) else user_id_filter,
                 action=action_filter.strip() or None,
-                limit=limit,
-                tenant_id=tenant_id  # enforce tenant-level isolation
+                limit=limit
             )
 
-        # Additional tenant-level filtering in case fetch_audit_events does not hard filter
+        # Enforce tenant-level isolation here (in case the fetch function doesn't filter by tenant)
         if logs:
             logs = [log for log in logs if log.get("tenant_id") == tenant_id]
 
