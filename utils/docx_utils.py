@@ -3,6 +3,7 @@ import zipfile
 import html
 import datetime
 import hashlib
+from io import BytesIO
 from lxml import etree
 from utils.template_engine import render_docx_placeholders
 from docx import Document
@@ -24,10 +25,12 @@ TARGET_XML_FILES = [
     "word/vbaProject.bin"
 ]
 
+
 def _hash_template_version(file_path: str) -> str:
     """Compute a SHA256 hash of the file for versioning."""
     with open(file_path, "rb") as f:
         return hashlib.sha256(f.read()).hexdigest()
+
 
 def _scan_for_macros(docx_path: str):
     """
@@ -57,11 +60,11 @@ def _scan_for_macros(docx_path: str):
     except Exception as e:
         handle_error(e, code="DOCX_MACRO_001", raise_it=True)
 
-def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str) -> str:
+
+def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path_or_buffer) -> str:
     """
-    Replace placeholders in all major XML parts of a DOCX template, save a new version,
-    and log a version hash for audit purposes.
-    Handles placeholders appearing multiple times and split across runs.
+    Replace placeholders in all major XML parts of a DOCX template.
+    Supports saving to a file path or writing directly to a BytesIO buffer.
     """
     try:
         if not isinstance(replacements, dict):
@@ -74,8 +77,6 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
         validate_file_size(docx_path)
         _scan_for_macros(docx_path)
 
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
         # Decode HTML entities in replacements
         replacements = {
             k: html.unescape(str(v)) if not isinstance(v, list)
@@ -83,64 +84,94 @@ def replace_text_in_docx_all(docx_path: str, replacements: dict, save_path: str)
             for k, v in replacements.items()
         }
 
-        # Replace placeholders in XML files
+        is_buffer = isinstance(save_path_or_buffer, BytesIO)
+        save_path = save_path_or_buffer if is_buffer else os.path.normpath(save_path_or_buffer)
+
+        if not is_buffer:
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
         def _replace_zip():
             with zipfile.ZipFile(docx_path, 'r') as zin:
-                with zipfile.ZipFile(save_path, 'w') as zout:
-                    for item in zin.infolist():
-                        buffer = zin.read(item.filename)
+                if is_buffer:
+                    temp_buffer = BytesIO()
+                    with zipfile.ZipFile(temp_buffer, 'w') as zout:
+                        for item in zin.infolist():
+                            buffer = zin.read(item.filename)
 
-                        if item.filename in TARGET_XML_FILES:
-                            try:
-                                xml = etree.fromstring(buffer)
+                            if item.filename in TARGET_XML_FILES:
+                                try:
+                                    xml = etree.fromstring(buffer)
+                                    for node in xml.xpath('//w:t', namespaces=NAMESPACES):
+                                        if node.text:
+                                            for key, val in replacements.items():
+                                                placeholder = f"{{{{{key}}}}}"
+                                                if placeholder in node.text:
+                                                    node.text = node.text.replace(placeholder, str(val))
+                                    buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
+                                except Exception as e:
+                                    handle_error(e, code="DOCX_PARSE_001", raise_it=True)
 
-                                # Merge runs and replace text at node level
-                                for node in xml.xpath('//w:t', namespaces=NAMESPACES):
-                                    if node.text:
-                                        for key, val in replacements.items():
-                                            placeholder = f"{{{{{key}}}}}"
-                                            if placeholder in node.text:
-                                                node.text = node.text.replace(placeholder, str(val))
+                            zout.writestr(item, buffer)
 
-                                buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
-                            except Exception as e:
-                                handle_error(e, code="DOCX_PARSE_001", raise_it=True)
+                    temp_buffer.seek(0)
+                    save_path_or_buffer.write(temp_buffer.read())
+                    save_path_or_buffer.seek(0)
 
-                        zout.writestr(item, buffer)
+                else:
+                    with zipfile.ZipFile(save_path, 'w') as zout:
+                        for item in zin.infolist():
+                            buffer = zin.read(item.filename)
+
+                            if item.filename in TARGET_XML_FILES:
+                                try:
+                                    xml = etree.fromstring(buffer)
+                                    for node in xml.xpath('//w:t', namespaces=NAMESPACES):
+                                        if node.text:
+                                            for key, val in replacements.items():
+                                                placeholder = f"{{{{{key}}}}}"
+                                                if placeholder in node.text:
+                                                    node.text = node.text.replace(placeholder, str(val))
+                                    buffer = etree.tostring(xml, xml_declaration=True, encoding='utf-8')
+                                except Exception as e:
+                                    handle_error(e, code="DOCX_PARSE_001", raise_it=True)
+
+                            zout.writestr(item, buffer)
 
         run_in_thread(_replace_zip)
 
-        # Post-process bullets and any missed placeholders
-        doc = Document(save_path)
-        for para in doc.paragraphs:
-            for key, val in replacements.items():
-                placeholder = f"{{{{{key}}}}}"
-                if placeholder in para.text:
-                    if isinstance(val, list):
-                        # Replace paragraph with bullet list
-                        para.text = ""
-                        for bullet in val:
-                            if bullet.strip():
-                                new_para = para.insert_paragraph_before(bullet.strip())
-                                new_para.style = "List Bullet"
-                    else:
-                        para.text = para.text.replace(placeholder, str(val))
+        if not is_buffer:
+            # Post-process bullets and any missed placeholders
+            doc = Document(save_path)
+            for para in doc.paragraphs:
+                for key, val in replacements.items():
+                    placeholder = f"{{{{{key}}}}}"
+                    if placeholder in para.text:
+                        if isinstance(val, list):
+                            para.text = ""
+                            for bullet in val:
+                                if bullet.strip():
+                                    new_para = para.insert_paragraph_before(bullet.strip())
+                                    new_para.style = "List Bullet"
+                        else:
+                            para.text = para.text.replace(placeholder, str(val))
 
-        doc.save(save_path)
+            doc.save(save_path)
 
-        # Save and audit
-        version_hash = _hash_template_version(save_path)
-        log_audit_event("DOCX Replace Completed", {
-            "file": save_path,
-            "timestamp": datetime.datetime.utcnow().isoformat(),
-            "version_hash": version_hash,
-            "tenant_id": get_tenant_id()
-        })
-        logger.info(redact_log(mask_phi(
-            f"✅ DOCX replace completed for {save_path}, version: {version_hash}"
-        )))
-        return save_path
+            # Save and audit
+            version_hash = _hash_template_version(save_path)
+            log_audit_event("DOCX Replace Completed", {
+                "file": save_path,
+                "timestamp": datetime.datetime.utcnow().isoformat(),
+                "version_hash": version_hash,
+                "tenant_id": get_tenant_id()
+            })
+            logger.info(redact_log(mask_phi(
+                f"✅ DOCX replace completed for {save_path}, version: {version_hash}"
+            )))
+            return save_path
+        else:
+            # When saving to BytesIO, simply return a success marker
+            return "buffer_written"
 
     except Exception as e:
         handle_error(e, code="DOCX_REPLACE_001", raise_it=True)
-
