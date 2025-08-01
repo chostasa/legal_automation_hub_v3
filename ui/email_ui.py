@@ -17,9 +17,11 @@ from core.db import get_templates
 
 clean_temp_dir()
 
-# Column names for client details in dashboard data
-NAME_COLUMN_FIRST_LAST = "Case Details First Party Name (First, Last)"
-NAME_COLUMN_FULL_LAST_FIRST = "Case Details First Party Name (Full - Last, First)"
+# Column name options for client details
+NAME_COLUMN_OPTIONS = [
+    "Case Details First Party Name (First, Last)",
+    "Case Details First Party Name (Full - Last, First)"
+]
 EMAIL_COLUMN = "Case Details First Party Details Default Email Account Address"
 
 
@@ -29,7 +31,7 @@ def run_ui():
 
     st.header(f"📧 Welcome Email Sender – {branding.get('firm_name', tenant_id)}")
 
-    # Allow Excel Upload or Dashboard data
+    # Load Excel or dashboard data
     uploaded_excel = st.file_uploader("📂 Upload Excel with Client Data (Optional)", type=["xlsx"])
     if uploaded_excel:
         try:
@@ -45,7 +47,7 @@ def run_ui():
                 df = st.session_state.dashboard_df.copy()
                 st.info("📊 Loaded filtered clients from Dashboard.")
 
-                # Allow column removal only when data comes from Dashboard
+                # Optional column removal
                 st.markdown("### 🗂️ Choose Columns to Keep (Optional)")
                 all_columns = list(df.columns)
                 selected_columns = st.multiselect(
@@ -64,14 +66,17 @@ def run_ui():
             st.error(msg)
             return
 
-    # Check required columns exist
-    if NAME_COLUMN not in df.columns or EMAIL_COLUMN not in df.columns:
+    # Pick the correct NAME_COLUMN
+    NAME_COLUMN = next((col for col in NAME_COLUMN_OPTIONS if col in df.columns), None)
+
+    # Ensure required columns exist
+    if not NAME_COLUMN or EMAIL_COLUMN not in df.columns:
         st.error(
-            f"❌ Expected columns '{NAME_COLUMN}' and '{EMAIL_COLUMN}' not found in data."
+            f"❌ Expected one of {NAME_COLUMN_OPTIONS} and '{EMAIL_COLUMN}' not found in data."
         )
         return
 
-    # Load templates from DB
+    # Load email templates
     email_templates = get_templates(tenant_id=tenant_id, category="email")
     if not email_templates:
         st.warning("⚠️ No email templates found. Please upload one in Template Manager.")
@@ -85,7 +90,7 @@ def run_ui():
         st.error("❌ Selected template not found.")
         return
 
-    # Download the template from Dropbox locally
+    # Download the template locally
     try:
         template_path = download_template_file("email", selected_template_name)
         if not os.path.exists(template_path):
@@ -118,7 +123,7 @@ def run_ui():
         except Exception:
             st.write("⚠️ Unable to load usage summary.")
 
-    # Filter the dataframe based on filters
+    # Filter DataFrame by filters
     if "Class Code Title" in df.columns:
         filtered_df = df[
             df["Class Code Title"].isin(selected_codes)
@@ -135,18 +140,18 @@ def run_ui():
             | filtered_df[EMAIL_COLUMN].str.lower().str.contains(search)
         ]
 
-    # Multi-select client list
+    # Multi-select clients
     selected_clients = st.multiselect(
         "Select Clients to Email", filtered_df[NAME_COLUMN].tolist()
     )
 
-    # Initialize session state for previews and statuses
+    # Initialize state
     if "email_previews" not in st.session_state:
         st.session_state.email_previews = []
     if "email_status" not in st.session_state:
         st.session_state.email_status = {}
 
-    # ==================== Preview Emails ==================== #
+    # Preview Emails
     if st.button("🔍 Preview Emails"):
         st.session_state.email_previews = []
         st.session_state.email_status = {}
@@ -155,7 +160,6 @@ def run_ui():
             filtered_df[filtered_df[NAME_COLUMN].isin(selected_clients)].iterrows()
         ):
             try:
-                # Prepare row data (placeholder source)
                 row_data = row.to_dict()
                 row_data["Client Name"] = row_data.get(NAME_COLUMN, "")
                 row_data["Email"] = row_data.get(EMAIL_COLUMN, "")
@@ -164,7 +168,6 @@ def run_ui():
                     st.warning(f"⚠️ Skipping {row_data['Client Name']} - missing email.")
                     continue
 
-                # Build email with placeholders filled
                 subject, body, cc, sanitized, _, recipient_email = asyncio.run(
                     build_email(row_data, template_path, attachments)
                 )
@@ -176,7 +179,6 @@ def run_ui():
                 st.markdown(f"**{sanitized['name']}** — _{recipient_email}_")
                 st.text_input("✏️ Subject", subject, key=subject_key)
 
-                # Show body in HTML preview
                 st.markdown("📄 Email Body Preview:")
                 st.components.v1.html(body, height=350, scrolling=True)
 
@@ -228,14 +230,13 @@ def run_ui():
                     f"❌ Error building email for {row.get(NAME_COLUMN, 'Unknown')}: {msg}"
                 )
 
-    # ==================== Send All ==================== #
+    # Send All
     if st.session_state.email_previews and st.button("📤 Send All"):
         with st.spinner("📤 Sending all emails..."):
 
             async def send_all():
                 tasks = []
                 for preview in st.session_state.email_previews:
-                    # Skip already-sent emails
                     if "✅" in st.session_state.email_status.get(preview["status_key"], ""):
                         continue
 
@@ -278,7 +279,7 @@ def run_ui():
 
             asyncio.run(send_all())
 
-    # ==================== Export Logs ==================== #
+    # Export Logs
     log_dir = os.path.join("email_automation", "logs")
     csv_path = os.path.join(log_dir, f"{tenant_id}_sent_email_log.csv")
     json_path = os.path.join(log_dir, f"{tenant_id}_sent_email_log.json")
