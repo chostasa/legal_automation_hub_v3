@@ -184,7 +184,7 @@ def run_ui():
         form_key = hashlib.md5(input_fingerprint.encode()).hexdigest()
 
         if form_key in st.session_state.memo_cache:
-            file_path, memo_data, raw_quotes = st.session_state.memo_cache[form_key]
+            memo_bytes, memo_data, raw_quotes = st.session_state.memo_cache[form_key]
         else:
             with st.spinner("🔄 Processing..."):
                 try:
@@ -259,7 +259,6 @@ def run_ui():
         st.success("✅ Memo generated successfully!")
 
         # === UNPOLISHED DOCX DOWNLOAD ===
-
         st.download_button(
             label="⬇️ Download Mediation Memo (.docx)",
             data=memo_bytes,
